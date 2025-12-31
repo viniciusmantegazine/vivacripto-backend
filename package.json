@@ -1,0 +1,46 @@
+{
+  "name": "vivacripto-backend",
+  "version": "1.0.0",
+  "description": "VivaCripto Backend API - Cryptocurrency News Portal",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "NODE_ENV=development tsx watch src/index.ts",
+    "build": "tsc && node -r esbuild-register dist/index.js",
+    "start": "NODE_ENV=production node dist/index.js",
+    "db:push": "drizzle-kit generate && drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write src",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.44.5",
+    "express": "^4.21.2",
+    "google-auth-library": "^9.14.0",
+    "jsonwebtoken": "^9.1.2",
+    "mysql2": "^3.15.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^20.10.6",
+    "@types/uuid": "^9.0.7",
+    "@typescript-eslint/eslint-plugin": "^6.17.0",
+    "@typescript-eslint/parser": "^6.17.0",
+    "drizzle-kit": "^0.31.4",
+    "esbuild": "^0.25.0",
+    "esbuild-register": "^3.5.0",
+    "eslint": "^8.56.0",
+    "prettier": "^3.1.1",
+    "tsx": "^4.19.1",
+    "typescript": "^5.3.3",
+    "vitest": "^1.1.0"
+  }
+}
