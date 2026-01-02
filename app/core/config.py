@@ -31,6 +31,19 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/vivacripto"
     
+    @validator("DATABASE_URL", pre=True)
+    def assemble_database_url(cls, v):
+        """Ensure DATABASE_URL uses asyncpg driver"""
+        if isinstance(v, str):
+            # Convert postgres:// to postgresql://
+            if v.startswith("postgres://"):
+                v = v.replace("postgres://", "postgresql://", 1)
+            
+            # Add +asyncpg if not present
+            if "postgresql://" in v and "+asyncpg" not in v:
+                v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
+    
     # Security
     SECRET_KEY: str = "your-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
