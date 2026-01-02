@@ -21,25 +21,19 @@ export class AuthController {
 
   /**
    * POST /api/auth/google/callback
-   * Handle Google OAuth callback
+   * Handle Google OAuth callback with ID Token
+   * Frontend sends the ID Token directly from Google Sign-In
    */
   static googleCallback = asyncHandler(async (req: Request, res: Response) => {
-    const { code } = req.body;
+    const { idToken } = req.body;
 
-    if (!code) {
-      throw new AppError(400, "Authorization code is required");
+    if (!idToken) {
+      throw new AppError(400, "ID Token is required");
     }
 
     try {
-      // Exchange code for tokens
-      const tokens = await AuthService.exchangeCodeForTokens(code);
-
-      if (!tokens.id_token) {
-        throw new AppError(400, "Failed to get ID token from Google");
-      }
-
       // Verify and decode the ID token
-      const googleUser = await AuthService.verifyGoogleToken(tokens.id_token);
+      const googleUser = await AuthService.verifyGoogleToken(idToken);
 
       // TODO: In a real app, you would:
       // 1. Check if user exists in database
