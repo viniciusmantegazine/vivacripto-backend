@@ -3,6 +3,9 @@ set -e
 
 echo "🚀 Iniciando VivaCripto Backend..."
 
+# Salvar DATABASE_URL original
+ORIGINAL_DATABASE_URL="$DATABASE_URL"
+
 # Usar DATABASE_PUBLIC_URL para migrações se disponível
 if [ -n "$DATABASE_PUBLIC_URL" ]; then
     echo "📡 Usando DATABASE_PUBLIC_URL para migrações..."
@@ -41,11 +44,9 @@ run_migrations() {
 # Executar migrações
 run_migrations || true
 
-# Restaurar DATABASE_URL original para a aplicação (usar interno se disponível)
-if [ -n "$DATABASE_PRIVATE_URL" ]; then
-    echo "🔒 Usando DATABASE_PRIVATE_URL para aplicação..."
-    export DATABASE_URL="$DATABASE_PRIVATE_URL"
-fi
+# Restaurar DATABASE_URL original para a aplicação (deve ter +asyncpg)
+echo "🔄 Restaurando DATABASE_URL original para aplicação..."
+export DATABASE_URL="$ORIGINAL_DATABASE_URL"
 
 # Iniciar aplicação
 echo "🎯 Iniciando servidor FastAPI..."
