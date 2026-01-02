@@ -8,7 +8,6 @@ from loguru import logger
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
-from app.db.base import get_async_session
 from app.crud.crud_post import crud_post
 from sqlalchemy.ext.asyncio import AsyncSession
 
