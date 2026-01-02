@@ -2,11 +2,10 @@
   "name": "vivacripto-backend",
   "version": "1.0.0",
   "description": "VivaCripto Backend API - Cryptocurrency News Portal",
-  "type": "module",
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx watch src/index.ts",
-    "build": "tsc && node -r esbuild-register dist/index.js",
+    "build": "tsc",
     "start": "NODE_ENV=production node dist/index.js",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",

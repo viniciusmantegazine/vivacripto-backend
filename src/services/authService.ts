@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
 import { env } from "@config/env";
-import { GoogleUser, AuthUser, JWTPayload } from "@types/index";
+import type { GoogleUser, AuthUser, JWTPayload } from "@types";
 
 const googleClient = new OAuth2Client(
   env.GOOGLE_CLIENT_ID,
@@ -48,8 +48,8 @@ export class AuthService {
     };
 
     return jwt.sign(payload, env.JWT_SECRET, {
-      expiresIn: env.JWT_EXPIRY,
-    });
+      expiresIn: env.JWT_EXPIRY as string | number,
+    } as jwt.SignOptions);
   }
 
   /**
