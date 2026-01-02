@@ -23,5 +23,9 @@ RUN mkdir -p logs
 # Expose port
 EXPOSE 8000
 
+# Copy and set start script
+COPY start.sh .
+RUN chmod +x start.sh
+
 # Run application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["./start.sh"]
