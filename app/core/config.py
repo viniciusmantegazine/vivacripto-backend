@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     
     # Service Tokens
     AUTOMATION_TOKEN: str = "automation-service-token-change-in-production"
-    REVALIDATION_SECRET: str = "revalidation-secret-change-in-production"
+    REVALIDATE_SECRET: str = "revalidation-secret-change-in-production"
     
     # OpenAI
     OPENAI_API_KEY: str = ""

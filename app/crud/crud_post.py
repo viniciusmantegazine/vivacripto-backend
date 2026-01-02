@@ -12,6 +12,14 @@ from app.db.models import Post, Tag
 from app.schemas.post import PostCreate, PostUpdate
 
 
+async def get_recent_posts(db: AsyncSession, since: datetime) -> List[Post]:
+    """Get posts created since a specific date"""
+    result = await db.execute(
+        select(Post).where(Post.created_at >= since)
+    )
+    return list(result.scalars().all())
+
+
 async def get_post_by_id(db: AsyncSession, post_id: UUID) -> Optional[Post]:
     """Get a post by ID"""
     result = await db.execute(
