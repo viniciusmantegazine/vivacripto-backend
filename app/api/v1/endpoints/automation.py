@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
-from app.db.base import get_async_session
+from app.db.base import get_db
 from app.services.automation.news_pipeline import NewsPipeline
 from app.core.config import settings
 from app.core.logging import logger
@@ -17,7 +17,7 @@ router = APIRouter()
 @router.post("/trigger")
 async def trigger_automation(
     authorization: Optional[str] = Header(None),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Dispara o pipeline de automação de notícias
@@ -47,7 +47,7 @@ async def trigger_automation(
 
 @router.get("/status")
 async def get_automation_status(
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Retorna o status da automação
