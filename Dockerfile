@@ -23,9 +23,9 @@ RUN mkdir -p logs
 # Expose port
 EXPOSE 8000
 
-# Copy and set start script
-COPY start.sh .
-RUN chmod +x start.sh
+# Copy and set scripts
+COPY start.sh migrate.sh ./
+RUN chmod +x start.sh migrate.sh
 
 # Run application
 CMD ["./start.sh"]
