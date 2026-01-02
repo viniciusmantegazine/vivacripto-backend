@@ -15,7 +15,7 @@ class ContentGenerator:
     
     def __init__(self):
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-        self.model = "gpt-4-turbo-preview"  # ou "gpt-4o-mini" para custo menor
+        self.model = "gpt-4o-mini"  # Modelo econômico e eficiente
     
     async def generate_article(self, source_news: Dict) -> Optional[Dict]:
         """
