@@ -12,6 +12,7 @@ export interface AuthUser {
   name: string;
   picture?: string;
   googleId: string;
+  role?: "user" | "admin";
   createdAt: Date;
   updatedAt: Date;
 }

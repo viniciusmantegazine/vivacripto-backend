@@ -25,7 +25,8 @@
       "@routes/*": ["./routes/*"],
       "@models/*": ["./models/*"],
       "@utils/*": ["./utils/*"],
-      "@types": ["./types/index.ts"]
+      "@types": ["./types/index.ts"],
+      "@database/*": ["./database/*"]
     }
   },
   "include": ["src/**/*"],

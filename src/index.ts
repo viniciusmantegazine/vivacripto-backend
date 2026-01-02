@@ -3,6 +3,7 @@ import cors from "cors";
 import { env } from "@config/env";
 import { errorHandler } from "@middlewares/errorHandler";
 import authRoutes from "@routes/authRoutes";
+import articleRoutes from "@routes/articleRoutes";
 
 const app = express();
 
@@ -58,6 +59,7 @@ app.get("/health", (req, res) => {
  * Routes
  */
 app.use("/api/auth", authRoutes);
+app.use("/api/articles", articleRoutes);
 
 /**
  * 404 handler
