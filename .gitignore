@@ -1,39 +1,58 @@
-# Dependencies
-node_modules/
-package-lock.json
-pnpm-lock.yaml
-yarn.lock
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Environment
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# Environment variables
 .env
 .env.local
-.env.*.local
 
-# Build
-dist/
-build/
-*.tsbuildinfo
-
-# IDE
+# IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-.DS_Store
 
 # Logs
 logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+
+# Database
+*.db
+*.sqlite
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Testing
-coverage/
-.nyc_output/
+.pytest_cache/
+.coverage
+htmlcov/
 
-# Misc
-.cache/
-temp/
-tmp/
+# Alembic
+alembic/versions/*.pyc
