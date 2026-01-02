@@ -6,7 +6,7 @@ from datetime import datetime
 from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Table, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
-from app.db.base import Base
+from app.db.base_class import Base
 
 
 # Association table for many-to-many relationship between posts and tags

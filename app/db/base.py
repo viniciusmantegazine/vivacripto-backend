@@ -2,9 +2,9 @@
 Database configuration and session management
 """
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
+from app.db.base_class import Base
 
 # Create async engine
 engine = create_async_engine(
@@ -22,9 +22,6 @@ AsyncSessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
 )
-
-# Base class for models
-Base = declarative_base()
 
 
 async def get_db() -> AsyncSession:
