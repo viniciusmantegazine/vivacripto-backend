@@ -64,3 +64,21 @@ async def root():
 async def health_check():
     """Health check endpoint"""
     return JSONResponse(content={"status": "healthy"})
+
+
+@app.exception_handler(404)
+async def not_found_handler(request, exc):
+    """Custom 404 handler"""
+    return JSONResponse(
+        status_code=404,
+        content={
+            "message": "Endpoint not found",
+            "available_endpoints": {
+                "root": "/",
+                "health": "/health",
+                "api_docs": f"{settings.API_V1_STR}/docs",
+                "api_health": f"{settings.API_V1_STR}/health",
+                "api_posts": f"{settings.API_V1_STR}/posts",
+            }
+        }
+    )
