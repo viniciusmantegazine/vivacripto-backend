@@ -1,130 +1,149 @@
-# VivaCripto Backend
+# VivaCripto Backend API
 
-Backend API para o portal de notícias de criptomoedas VivaCripto.
+Backend FastAPI para o portal de notícias VivaCripto.
 
 ## 🚀 Stack Técnico
 
-- **Runtime**: Node.js + TypeScript
-- **Framework**: Express.js
-- **Autenticação**: Google OAuth 2.0
-- **Banco de Dados**: MySQL + Drizzle ORM
-- **Validação**: Zod
-- **Hospedagem**: Railway
-
-## 📋 Pré-requisitos
-
-- Node.js 18+
-- npm ou pnpm
-- MySQL 8+
-- Credenciais do Google OAuth
-
-## 🔧 Instalação
-
-```bash
-# Clonar repositório
-git clone https://github.com/viniciusmantegazine/vivacripto-backend.git
-cd vivacripto-backend
-
-# Instalar dependências
-npm install
-
-# Configurar variáveis de ambiente
-cp .env.example .env
-# Editar .env com suas credenciais
-```
-
-## 🔐 Configuração do Google OAuth
-
-1. Acesse [Google Cloud Console](https://console.cloud.google.com)
-2. Crie um novo projeto
-3. Ative a API "Google+ API"
-4. Crie credenciais OAuth 2.0:
-   - Tipo: Web application
-   - URIs autorizados:
-     - `http://localhost:3000` (desenvolvimento)
-     - `https://seu-dominio.com` (produção)
-   - URIs de redirecionamento autorizados:
-     - `http://localhost:3000/api/auth/google/callback` (desenvolvimento)
-     - `https://seu-dominio.com/api/auth/google/callback` (produção)
-
-5. Copie `Client ID` e `Client Secret` para `.env`
+- **Framework**: FastAPI (Python 3.11+)
+- **Banco de Dados**: PostgreSQL 14+ + SQLAlchemy 2.0 (async)
+- **Cache**: Redis
+- **IA**: OpenAI (GPT-4, DALL-E 3)
+- **Storage**: Cloudinary
+- **Validação**: Pydantic
+- **Hospedagem**: Railway/Render
 
 ## 📁 Estrutura do Projeto
 
 ```
-src/
-├── config/          # Configurações (env, database)
-├── controllers/     # Controladores (lógica de requisição)
-├── services/        # Serviços (lógica de negócio)
-├── middlewares/     # Middlewares (autenticação, erro)
-├── routes/          # Rotas da API
-├── models/          # Modelos de dados
-├── types/           # Tipos TypeScript
-├── utils/           # Utilitários
-└── index.ts         # Arquivo principal
+app/
+├── main.py                 # Entry point da aplicação
+├── core/
+│   ├── config.py           # Configurações
+│   ├── security.py         # JWT e autenticação
+│   └── logging.py          # Setup de logs
+├── db/
+│   ├── base.py             # Configuração do DB
+│   └── models.py           # Modelos SQLAlchemy
+├── schemas/
+│   ├── post.py             # Schemas Pydantic
+│   └── newsletter.py
+├── crud/
+│   └── crud_post.py        # Operações CRUD
+├── api/
+│   └── v1/
+│       ├── api.py          # Router principal
+│       └── endpoints/      # Endpoints da API
+└── services/               # Serviços (automação, IA, etc.)
 ```
 
-## 🚀 Desenvolvimento
+## 🔧 Instalação
+
+### Requisitos
+
+- Python 3.11+
+- PostgreSQL 14+
+- Redis (opcional, mas recomendado)
+
+### Setup Local
+
+1. Clone o repositório:
+```bash
+git clone https://github.com/viniciusmantegazine/vivacripto-backend.git
+cd vivacripto-backend
+```
+
+2. Crie um ambiente virtual:
+```bash
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# ou
+venv\Scripts\activate  # Windows
+```
+
+3. Instale as dependências:
+```bash
+pip install -r requirements.txt
+```
+
+4. Configure as variáveis de ambiente:
+```bash
+cp .env.example .env
+# Edite o arquivo .env com suas credenciais
+```
+
+5. Execute as migrações do banco de dados:
+```bash
+alembic upgrade head
+```
+
+6. Inicie o servidor:
+```bash
+uvicorn app.main:app --reload
+```
+
+A API estará disponível em `http://localhost:8000`
+
+## 📚 Documentação da API
+
+- **Swagger UI**: http://localhost:8000/api/v1/docs
+- **ReDoc**: http://localhost:8000/api/v1/redoc
+
+## 📋 Endpoints Principais
+
+### Posts
+
+- `GET /api/v1/posts` - Listar posts (com paginação)
+- `GET /api/v1/posts/{id}` - Obter post por ID
+- `GET /api/v1/posts/slug/{slug}` - Obter post por slug
+- `GET /api/v1/posts/search?q=bitcoin` - Buscar posts
+- `POST /api/v1/posts` - Criar post (requer token)
+- `PUT /api/v1/posts/{id}` - Atualizar post (requer token)
+- `DELETE /api/v1/posts/{id}` - Deletar post (requer token)
+
+### Newsletter
+
+- `POST /api/v1/newsletter/subscribe` - Inscrever email
+
+### Health
+
+- `GET /api/v1/health` - Health check
+
+## 🐳 Deploy
+
+### Docker
 
 ```bash
-# Iniciar servidor em modo desenvolvimento
-npm run dev
-
-# Servidor rodará em http://localhost:3000
+docker build -t vivacripto-api .
+docker run -p 8000:8000 --env-file .env vivacripto-api
 ```
 
-## 📚 API Endpoints
+### Railway/Render
 
-### Autenticação
+1. Conecte o repositório
+2. Configure as variáveis de ambiente
+3. Deploy automático a cada push na branch `main`
 
-- `GET /api/auth/google` - Obter URL de login do Google
-- `POST /api/auth/google/callback` - Callback do Google OAuth
-- `POST /api/auth/verify-token` - Verificar validade do token
-- `POST /api/auth/logout` - Logout
-- `GET /api/auth/me` - Obter usuário atual (requer autenticação)
+## 🛠️ Desenvolvimento
 
-## 🧪 Testes
+### Criar nova migração
 
 ```bash
-# Rodar testes
-npm test
-
-# Modo watch
-npm run test:watch
+alembic revision --autogenerate -m "descrição da migração"
+alembic upgrade head
 ```
 
-## 🗄️ Banco de Dados
+### Executar testes
 
 ```bash
-# Aplicar migrações
-npm run db:push
-
-# Abrir Drizzle Studio
-npm run db:studio
+pytest
 ```
-
-## 📦 Build e Deploy
-
-```bash
-# Build para produção
-npm run build
-
-# Iniciar em produção
-npm start
-```
-
-### Deploy no Railway
-
-1. Conectar repositório GitHub ao Railway
-2. Configurar variáveis de ambiente no Railway
-3. Railway fará deploy automático a cada push
 
 ## 🔒 Segurança
 
-- Todos os tokens JWT são verificados no backend
-- CORS configurado para aceitar apenas o frontend autorizado
-- Variáveis sensíveis em `.env` (nunca commitar)
-- Validação de entrada em todos os endpoints
+- Autenticação via JWT para endpoints administrativos
+- Token de serviço para automação
+- CORS configurado
+- Validação de entrada com Pydantic
 
 ## 📝 Variáveis de Ambiente
 
