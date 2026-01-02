@@ -7,14 +7,36 @@ import authRoutes from "@routes/authRoutes";
 const app = express();
 
 /**
+ * CORS Configuration
+ * Normalize frontend URL to handle trailing slashes
+ */
+const getFrontendUrl = (): string => {
+  const url = env.FRONTEND_URL || "http://localhost:5173";
+  return url.replace(/\/$/, ""); // Remove trailing slash
+};
+
+/**
  * Middleware
  */
 app.use(
   cors({
-    origin: env.FRONTEND_URL,
+    origin: (origin, callback) => {
+      // Allow requests from the frontend URL (with or without trailing slash)
+      const frontendUrl = getFrontendUrl();
+      
+      if (!origin || origin === frontendUrl || origin === `${frontendUrl}/`) {
+        callback(null, true);
+      } else if (env.NODE_ENV === "development") {
+        // Allow any origin in development
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    optionsSuccessStatus: 200,
   })
 );
 
@@ -60,6 +82,7 @@ app.listen(PORT, () => {
   console.log(`🚀 VivaCripto Backend running on http://localhost:${PORT}`);
   console.log(`📝 Environment: ${env.NODE_ENV}`);
   console.log(`🔐 Google OAuth configured: ${!!env.GOOGLE_CLIENT_ID}`);
+  console.log(`🌐 CORS enabled for: ${getFrontendUrl()}`);
 });
 
 export default app;
