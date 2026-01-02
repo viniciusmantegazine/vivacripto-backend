@@ -56,6 +56,7 @@ class NewsPipeline:
         
         try:
             # 1. Verificar limite diário
+            logger.info("Verificando limite diário de posts...")
             if not await self._check_daily_limit(db):
                 report["status"] = "skipped"
                 report["message"] = f"Limite diário de {self.MAX_POSTS_PER_DAY} posts atingido"
@@ -166,9 +167,17 @@ class NewsPipeline:
     
     async def _check_daily_limit(self, db: AsyncSession) -> bool:
         """Verifica se o limite diário de posts foi atingido"""
-        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        today_posts = await crud_post.get_recent_posts(db, since=today_start)
-        return len(today_posts) < self.MAX_POSTS_PER_DAY
+        try:
+            logger.debug("Consultando posts de hoje no banco de dados...")
+            today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            today_posts = await crud_post.get_recent_posts(db, since=today_start)
+            logger.debug(f"Posts hoje: {len(today_posts)}/{self.MAX_POSTS_PER_DAY}")
+            return len(today_posts) < self.MAX_POSTS_PER_DAY
+        except Exception as e:
+            logger.error(f"Erro ao verificar limite diário: {type(e).__name__}: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
     
     async def _get_remaining_daily_slots(self, db: AsyncSession) -> int:
         """Retorna quantos posts ainda podem ser publicados hoje"""
