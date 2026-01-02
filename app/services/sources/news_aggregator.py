@@ -27,6 +27,8 @@ class NewsAggregator:
             Lista agregada de notícias de todas as fontes
         """
         logger.info(f"Iniciando coleta de notícias (últimas {hours_back}h)")
+        logger.debug(f"RSS Collector: {self.rss_collector}")
+        logger.debug(f"API Collector: {self.api_collector}")
         
         all_news = []
         

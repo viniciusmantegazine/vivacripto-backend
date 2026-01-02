@@ -64,8 +64,14 @@ class NewsPipeline:
             
             # 2. Coletar notícias
             logger.info("\n[FASE 1] Coletando notícias das fontes...")
-            news_items = await self.aggregator.collect_news(hours_back=24)
-            report["collected"] = len(news_items)
+            try:
+                news_items = await self.aggregator.collect_news(hours_back=24)
+                report["collected"] = len(news_items)
+            except Exception as e:
+                logger.error(f"Erro ao coletar notícias: {type(e).__name__}: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                raise
             
             if not news_items:
                 report["status"] = "completed"
