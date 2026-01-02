@@ -2,10 +2,9 @@
 Deduplication and Filtering Service
 Remove notícias duplicadas e filtra conteúdo relevante
 """
-from typing import List, Dict, Set
+from typing import List, Dict, Set, Optional
 from datetime import datetime, timedelta
 from loguru import logger
-from sentence_transformers import SentenceTransformer
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -18,9 +17,18 @@ class DeduplicationService:
     """Serviço de deduplicação e filtragem de notícias"""
     
     def __init__(self):
-        # Modelo para embeddings semânticos
-        self.model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+        # Modelo para embeddings semânticos (lazy loading)
+        self._model: Optional[any] = None
         self.similarity_threshold = 0.75  # 75% de similaridade = duplicado
+    
+    def _get_model(self):
+        """Lazy loading do modelo SentenceTransformer"""
+        if self._model is None:
+            from sentence_transformers import SentenceTransformer
+            logger.info("Carregando modelo SentenceTransformer...")
+            self._model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+            logger.info("Modelo carregado com sucesso")
+        return self._model
     
     async def filter_and_deduplicate(
         self, 
@@ -112,7 +120,7 @@ class DeduplicationService:
         titles = [item.get("title", "") for item in news_items]
         
         # Gerar embeddings
-        embeddings = self.model.encode(titles)
+        embeddings = self._get_model().encode(titles)
         
         # Calcular matriz de similaridade
         similarity_matrix = cosine_similarity(embeddings)
@@ -153,9 +161,9 @@ class DeduplicationService:
         existing_titles = [post.title for post in existing_posts]
         
         # Gerar embeddings
-        existing_embeddings = self.model.encode(existing_titles)
+        existing_embeddings = self._get_model().encode(existing_titles)
         new_titles = [item.get("title", "") for item in news_items]
-        new_embeddings = self.model.encode(new_titles)
+        new_embeddings = self._get_model().encode(new_titles)
         
         # Calcular similaridade
         similarity_matrix = cosine_similarity(new_embeddings, existing_embeddings)
