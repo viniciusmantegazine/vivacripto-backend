@@ -22,7 +22,7 @@ from app.core.config import settings
 class NewsPipeline:
     """Pipeline de automação de notícias"""
     
-    MAX_POSTS_PER_DAY = 10
+    MAX_POSTS_PER_DAY = 1  # Gerar apenas 1 notícia por execução
     
     def __init__(self):
         self.aggregator = NewsAggregator()
