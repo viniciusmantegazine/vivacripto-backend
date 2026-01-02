@@ -158,3 +158,42 @@ async def search_posts(db: AsyncSession, query: str, limit: int = 10) -> List[Po
     
     result = await db.execute(search_query)
     return result.scalars().all()
+
+
+class CRUDPost:
+    """CRUD operations class for Post"""
+    
+    async def get_recent_posts(self, db: AsyncSession, since: datetime) -> List[Post]:
+        return await get_recent_posts(db, since)
+    
+    async def get_post_by_id(self, db: AsyncSession, post_id: UUID) -> Optional[Post]:
+        return await get_post_by_id(db, post_id)
+    
+    async def get_post_by_slug(self, db: AsyncSession, slug: str) -> Optional[Post]:
+        return await get_post_by_slug(db, slug)
+    
+    async def get_posts(
+        self,
+        db: AsyncSession,
+        skip: int = 0,
+        limit: int = 10,
+        status: Optional[str] = None,
+        category_id: Optional[UUID] = None,
+    ) -> tuple[List[Post], int]:
+        return await get_posts(db, skip, limit, status, category_id)
+    
+    async def create_post(self, db: AsyncSession, post_in: PostCreate) -> Post:
+        return await create_post(db, post_in)
+    
+    async def update_post(self, db: AsyncSession, post_id: UUID, post_in: PostUpdate) -> Optional[Post]:
+        return await update_post(db, post_id, post_in)
+    
+    async def delete_post(self, db: AsyncSession, post_id: UUID) -> bool:
+        return await delete_post(db, post_id)
+    
+    async def search_posts(self, db: AsyncSession, query: str, limit: int = 10) -> List[Post]:
+        return await search_posts(db, query, limit)
+
+
+# Instância global para ser importada
+crud_post = CRUDPost()
