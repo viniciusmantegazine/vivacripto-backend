@@ -45,3 +45,4 @@ redis==5.0.1
 
 # Utils
 python-slugify==8.0.1
+markdown==3.5.1
