@@ -74,15 +74,14 @@ def upgrade() -> None:
     op.create_table(
         'automation_logs',
         sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('task_type', sa.String(length=100), nullable=False),
-        sa.Column('status', sa.String(length=50), nullable=False),
-        sa.Column('message', sa.Text(), nullable=True),
-        sa.Column('metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column('run_id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('level', sa.String(length=20), nullable=False),
+        sa.Column('message', sa.Text(), nullable=False),
+        sa.Column('log_metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_automation_logs_id'), 'automation_logs', ['id'], unique=False)
-    op.create_index(op.f('ix_automation_logs_task_type'), 'automation_logs', ['task_type'], unique=False)
 
     # Create posts table
     op.create_table(
@@ -130,7 +129,6 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_posts_slug'), table_name='posts')
     op.drop_index(op.f('ix_posts_id'), table_name='posts')
     op.drop_table('posts')
-    op.drop_index(op.f('ix_automation_logs_task_type'), table_name='automation_logs')
     op.drop_index(op.f('ix_automation_logs_id'), table_name='automation_logs')
     op.drop_table('automation_logs')
     op.drop_index(op.f('ix_newsletter_subscribers_id'), table_name='newsletter_subscribers')

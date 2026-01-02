@@ -121,5 +121,5 @@ class AutomationLog(Base):
     run_id = Column(UUID(as_uuid=True), nullable=False)
     level = Column(String(20), nullable=False)
     message = Column(Text, nullable=False)
-    metadata = Column(JSONB)
+    log_metadata = Column(JSONB)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
