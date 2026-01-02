@@ -17,7 +17,16 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Set the SQLAlchemy URL from environment variable
-config.set_main_option('sqlalchemy.url', settings.DATABASE_URL.replace('+asyncpg', ''))
+# Convert asyncpg URL to psycopg2 URL for Alembic
+database_url = settings.DATABASE_URL
+if '+asyncpg' in database_url:
+    database_url = database_url.replace('+asyncpg', '')
+if database_url.startswith('postgresql://'):
+    database_url = database_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
+elif database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql+psycopg2://', 1)
+
+config.set_main_option('sqlalchemy.url', database_url)
 
 # add your model's MetaData object here
 target_metadata = Base.metadata
