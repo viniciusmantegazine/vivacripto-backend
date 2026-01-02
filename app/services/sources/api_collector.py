@@ -59,10 +59,15 @@ class APICollector:
                 "public": "true",
             }
             
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(
+                timeout=self.timeout,
+                follow_redirects=True
+            ) as client:
+                logger.debug(f"Buscando notícias do CryptoPanic...")
                 response = await client.get(url, params=params)
                 response.raise_for_status()
                 data = response.json()
+                logger.debug(f"CryptoPanic retornou {len(data.get('results', []))} notícias")
             
             cutoff_time = datetime.now() - timedelta(hours=hours_back)
             
@@ -97,7 +102,11 @@ class APICollector:
                     logger.warning(f"Erro ao processar item do CryptoPanic: {e}")
                     continue
         
+        except httpx.ConnectError as e:
+            logger.error(f"Erro de conexão ao buscar CryptoPanic API: {e}")
+        except httpx.TimeoutException as e:
+            logger.error(f"Timeout ao buscar CryptoPanic API: {e}")
         except Exception as e:
-            logger.error(f"Erro ao buscar CryptoPanic API: {e}")
+            logger.error(f"Erro inesperado ao buscar CryptoPanic API: {type(e).__name__}: {e}")
         
         return news_items

@@ -113,18 +113,41 @@ class RSSCollector:
     
     async def _fetch_feed(self, url: str) -> Optional[feedparser.FeedParserDict]:
         """Busca e parseia um feed RSS"""
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(url)
-                response.raise_for_status()
-                
-                # Parse feed
-                feed = feedparser.parse(response.text)
-                return feed
+        max_retries = 2
         
-        except Exception as e:
-            logger.error(f"Erro ao buscar feed {url}: {e}")
-            return None
+        for attempt in range(max_retries):
+            try:
+                async with httpx.AsyncClient(
+                    timeout=self.timeout,
+                    follow_redirects=True,
+                    limits=httpx.Limits(max_connections=5)
+                ) as client:
+                    logger.debug(f"Tentativa {attempt + 1}/{max_retries} para {url}")
+                    response = await client.get(url)
+                    response.raise_for_status()
+                    
+                    # Parse feed
+                    feed = feedparser.parse(response.text)
+                    logger.debug(f"Feed {url} parseado com sucesso: {len(feed.entries)} entradas")
+                    return feed
+            
+            except httpx.ConnectError as e:
+                logger.warning(f"Erro de conexão ao buscar {url} (tentativa {attempt + 1}/{max_retries}): {e}")
+                if attempt == max_retries - 1:
+                    logger.error(f"Falha definitiva ao conectar em {url} após {max_retries} tentativas")
+                    return None
+            
+            except httpx.TimeoutException as e:
+                logger.warning(f"Timeout ao buscar {url} (tentativa {attempt + 1}/{max_retries}): {e}")
+                if attempt == max_retries - 1:
+                    logger.error(f"Timeout definitivo em {url} após {max_retries} tentativas")
+                    return None
+            
+            except Exception as e:
+                logger.error(f"Erro inesperado ao buscar feed {url}: {type(e).__name__}: {e}")
+                return None
+        
+        return None
     
     def _parse_date(self, entry: feedparser.FeedParserDict) -> Optional[datetime]:
         """Parseia a data de publicação de uma entrada"""

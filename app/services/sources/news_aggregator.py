@@ -31,12 +31,22 @@ class NewsAggregator:
         all_news = []
         
         # Coletar de RSS feeds
-        rss_news = await self.rss_collector.collect_all(hours_back)
-        all_news.extend(rss_news)
+        try:
+            logger.info("Coletando de RSS feeds...")
+            rss_news = await self.rss_collector.collect_all(hours_back)
+            all_news.extend(rss_news)
+            logger.info(f"RSS feeds: {len(rss_news)} notícias coletadas")
+        except Exception as e:
+            logger.error(f"Erro ao coletar RSS feeds: {type(e).__name__}: {e}")
         
         # Coletar de APIs
-        api_news = await self.api_collector.collect_all(hours_back)
-        all_news.extend(api_news)
+        try:
+            logger.info("Coletando de APIs externas...")
+            api_news = await self.api_collector.collect_all(hours_back)
+            all_news.extend(api_news)
+            logger.info(f"APIs: {len(api_news)} notícias coletadas")
+        except Exception as e:
+            logger.error(f"Erro ao coletar de APIs: {type(e).__name__}: {e}")
         
         logger.info(f"Coleta finalizada: {len(all_news)} notícias no total")
         
