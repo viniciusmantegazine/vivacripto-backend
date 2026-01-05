@@ -72,6 +72,7 @@ class PostCreate(PostBase):
     author_id: Optional[UUID] = None
     tag_ids: Optional[List[UUID]] = []
     status: str = "draft"
+    published_at: Optional[datetime] = None
     
     @validator("status")
     def validate_status(cls, v):

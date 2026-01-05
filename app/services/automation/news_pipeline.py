@@ -14,7 +14,9 @@ from app.services.automation.deduplication import DeduplicationService
 from app.services.ai.content_generator import ContentGenerator
 from app.services.ai.image_generator import ImageGenerator
 from app.services.automation.quality_validator import QualityValidator
+from app.services.ai.category_classifier import category_classifier
 from app.crud.crud_post import crud_post
+from app.db.models import Category
 from app.schemas.post import PostCreate
 from app.core.config import settings
 
@@ -194,6 +196,29 @@ class NewsPipeline:
                 extensions=['extra', 'codehilite']
             )
             
+            # Classificar categoria automaticamente
+            category_slug = category_classifier.classify(
+                title=article["title"],
+                content=article["content_markdown"],
+                excerpt=article.get("excerpt", "")
+            )
+            
+            # Buscar categoria no banco
+            from sqlalchemy import select
+            result = await db.execute(
+                select(Category).where(Category.slug == category_slug)
+            )
+            category = result.scalar_one_or_none()
+            
+            if not category:
+                logger.warning(f"Category '{category_slug}' not found in database, creating...")
+                category = Category(
+                    name=category_classifier.get_category_name(category_slug),
+                    slug=category_slug
+                )
+                db.add(category)
+                await db.flush()
+            
             # Criar post
             post_data = PostCreate(
                 title=article["title"],
@@ -207,6 +232,7 @@ class NewsPipeline:
                 meta_title=article.get("meta_title"),
                 meta_description=article.get("meta_description"),
                 canonical_url=None,
+                category_id=category.id,
             )
             
             await crud_post.create_post(db, post_data)
