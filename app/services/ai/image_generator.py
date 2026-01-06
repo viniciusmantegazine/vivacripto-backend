@@ -88,51 +88,214 @@ class ImageGenerator:
             return None
     
     def _create_image_prompt(self, title: str, content: str) -> str:
-        """Cria prompt otimizado para geração de imagem"""
-        # Extrair tema principal
-        theme_keywords = self._extract_theme_keywords(title, content)
+        """Cria prompt otimizado e contextual para geração de imagem"""
+        # Extrair contexto detalhado do artigo
+        context = self._extract_detailed_context(title, content)
         
         prompt = f"""Create a modern, professional illustration for a cryptocurrency news article.
 
-Theme: {theme_keywords}
+Article Context: {context['description']}
 
-Style requirements:
-- Digital art, modern and clean
-- Cryptocurrency/blockchain themed
+Main Subject: {context['subject']}
+Key Elements: {', '.join(context['elements'])}
+Visual Style: {context['style']}
+
+Style Requirements:
+- Digital art, modern and clean aesthetic
+- {context['color_scheme']} color palette
 - Abstract and illustrative (NOT photorealistic)
-- Professional and trustworthy aesthetic
-- Vibrant but not overwhelming colors
-- Suitable for a news website header
+- Professional and trustworthy look
+- Suitable for a news website header image
+- Focus on {context['focus']}
 
-NO text, NO logos, NO specific people or brands."""
+Technical Requirements:
+- NO text, NO logos, NO specific people faces
+- NO brand names or trademarks
+- Landscape orientation (16:9)
+- High contrast for readability
 
+Mood: {context['mood']}"""
+
+        logger.info(f"Image prompt generated - Subject: {context['subject']}, Focus: {context['focus']}")
         return prompt
     
-    def _extract_theme_keywords(self, title: str, content: str) -> str:
-        """Extrai palavras-chave temáticas para o prompt"""
-        # Palavras-chave comuns em cripto
-        crypto_themes = {
-            "bitcoin": "Bitcoin blockchain technology",
-            "ethereum": "Ethereum smart contracts",
-            "defi": "Decentralized finance",
-            "nft": "NFT digital art",
-            "trading": "Cryptocurrency trading",
-            "mining": "Crypto mining",
-            "blockchain": "Blockchain technology",
-            "web3": "Web3 decentralization",
-            "altcoin": "Alternative cryptocurrencies",
-            "market": "Crypto market analysis",
+    def _extract_detailed_context(self, title: str, content: str) -> dict:
+        """Extrai contexto detalhado do artigo para prompt específico"""
+        text = f"{title} {content[:500]}".lower()  # Primeiros 500 chars do conteúdo
+        
+        # Detectar criptomoeda/projeto específico
+        crypto_projects = {
+            "bitcoin": {
+                "subject": "Bitcoin",
+                "elements": ["Bitcoin symbol", "blockchain network", "digital gold"],
+                "style": "Bold and iconic",
+                "color_scheme": "Orange and gold tones",
+                "focus": "Bitcoin's dominance and value",
+                "mood": "Confident and established"
+            },
+            "ethereum": {
+                "subject": "Ethereum",
+                "elements": ["Ethereum logo concept", "smart contracts", "decentralized apps"],
+                "style": "Futuristic and technological",
+                "color_scheme": "Purple and blue gradients",
+                "focus": "Smart contract innovation",
+                "mood": "Innovative and progressive"
+            },
+            "solana": {
+                "subject": "Solana",
+                "elements": ["High-speed network", "scalability", "modern blockchain"],
+                "style": "Fast and dynamic",
+                "color_scheme": "Purple and teal gradients",
+                "focus": "Speed and performance",
+                "mood": "Energetic and modern"
+            },
+            "cardano": {
+                "subject": "Cardano",
+                "elements": ["Scientific approach", "proof of stake", "sustainability"],
+                "style": "Academic and methodical",
+                "color_scheme": "Blue and white tones",
+                "focus": "Research-driven development",
+                "mood": "Trustworthy and scientific"
+            },
+            "polkadot": {
+                "subject": "Polkadot",
+                "elements": ["Interoperability", "parachains", "cross-chain"],
+                "style": "Connected and modular",
+                "color_scheme": "Pink and purple tones",
+                "focus": "Blockchain connectivity",
+                "mood": "Collaborative and innovative"
+            },
+            "ripple": {
+                "subject": "Ripple/XRP",
+                "elements": ["Cross-border payments", "banking integration", "liquidity"],
+                "style": "Professional and corporate",
+                "color_scheme": "Blue and silver tones",
+                "focus": "Financial infrastructure",
+                "mood": "Professional and efficient"
+            },
+            "dogecoin": {
+                "subject": "Dogecoin",
+                "elements": ["Community-driven", "meme culture", "accessibility"],
+                "style": "Fun and approachable",
+                "color_scheme": "Gold and playful colors",
+                "focus": "Community and adoption",
+                "mood": "Lighthearted and accessible"
+            },
+            "defi": {
+                "subject": "DeFi (Decentralized Finance)",
+                "elements": ["Liquidity pools", "yield farming", "decentralized exchanges"],
+                "style": "Interconnected and flowing",
+                "color_scheme": "Green and blue gradients",
+                "focus": "Financial freedom and innovation",
+                "mood": "Revolutionary and empowering"
+            },
+            "nft": {
+                "subject": "NFTs (Non-Fungible Tokens)",
+                "elements": ["Digital art", "unique tokens", "collectibles"],
+                "style": "Artistic and creative",
+                "color_scheme": "Vibrant and diverse colors",
+                "focus": "Digital ownership and creativity",
+                "mood": "Creative and unique"
+            },
+            "regulation": {
+                "subject": "Crypto Regulation",
+                "elements": ["Government buildings", "legal documents", "compliance"],
+                "style": "Formal and authoritative",
+                "color_scheme": "Blue and gray professional tones",
+                "focus": "Legal framework and compliance",
+                "mood": "Serious and official"
+            },
+            "sec": {
+                "subject": "SEC and Crypto Regulation",
+                "elements": ["Government oversight", "legal framework", "compliance"],
+                "style": "Formal and institutional",
+                "color_scheme": "Navy blue and white",
+                "focus": "Regulatory compliance",
+                "mood": "Authoritative and serious"
+            },
+            "etf": {
+                "subject": "Crypto ETF",
+                "elements": ["Traditional finance", "institutional investment", "market access"],
+                "style": "Professional and institutional",
+                "color_scheme": "Blue and gold corporate colors",
+                "focus": "Institutional adoption",
+                "mood": "Professional and mainstream"
+            },
+            "mining": {
+                "subject": "Crypto Mining",
+                "elements": ["Mining rigs", "computational power", "energy"],
+                "style": "Industrial and powerful",
+                "color_scheme": "Dark with electric blue accents",
+                "focus": "Computational infrastructure",
+                "mood": "Powerful and industrial"
+            },
+            "stablecoin": {
+                "subject": "Stablecoins",
+                "elements": ["Price stability", "fiat backing", "reliable value"],
+                "style": "Stable and balanced",
+                "color_scheme": "Green and white clean tones",
+                "focus": "Stability and reliability",
+                "mood": "Trustworthy and stable"
+            },
+            "airdrop": {
+                "subject": "Crypto Airdrop",
+                "elements": ["Token distribution", "rewards", "community incentives"],
+                "style": "Generous and exciting",
+                "color_scheme": "Gold and bright colors",
+                "focus": "Community rewards and distribution",
+                "mood": "Exciting and rewarding"
+            },
+            "trading": {
+                "subject": "Crypto Trading",
+                "elements": ["Charts", "candlesticks", "market analysis"],
+                "style": "Dynamic and analytical",
+                "color_scheme": "Green and red with dark background",
+                "focus": "Market movements and analysis",
+                "mood": "Dynamic and analytical"
+            },
+            "market": {
+                "subject": "Crypto Market",
+                "elements": ["Price charts", "market trends", "global economy"],
+                "style": "Data-driven and global",
+                "color_scheme": "Blue and green financial colors",
+                "focus": "Market trends and economics",
+                "mood": "Analytical and global"
+            },
+            "web3": {
+                "subject": "Web3",
+                "elements": ["Decentralization", "user ownership", "new internet"],
+                "style": "Futuristic and decentralized",
+                "color_scheme": "Cyan and purple tech colors",
+                "focus": "Decentralized internet",
+                "mood": "Revolutionary and futuristic"
+            },
+            "metaverse": {
+                "subject": "Metaverse",
+                "elements": ["Virtual worlds", "digital avatars", "immersive experiences"],
+                "style": "Immersive and 3D",
+                "color_scheme": "Neon and vibrant digital colors",
+                "focus": "Virtual reality and digital spaces",
+                "mood": "Futuristic and immersive"
+            }
         }
         
-        text = f"{title} {content}".lower()
-        
-        # Encontrar tema mais relevante
-        for keyword, theme in crypto_themes.items():
+        # Encontrar contexto mais específico
+        for keyword, context in crypto_projects.items():
             if keyword in text:
-                return theme
+                # Adicionar descrição contextual baseada no título
+                context["description"] = f"News article about {context['subject']}: {title[:100]}"
+                return context
         
-        # Tema padrão
-        return "Cryptocurrency and blockchain technology"
+        # Contexto genérico para criptomoedas (fallback)
+        return {
+            "subject": "Cryptocurrency Market",
+            "description": f"General cryptocurrency news: {title[:100]}",
+            "elements": ["Digital currencies", "blockchain technology", "crypto market"],
+            "style": "Modern and professional",
+            "color_scheme": "Blue and orange crypto colors",
+            "focus": "Cryptocurrency and blockchain innovation",
+            "mood": "Professional and informative"
+        }
     
     async def _upload_to_cloudinary(
         self, 
