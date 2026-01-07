@@ -1,273 +1,195 @@
+"""
+Image Generation Service - Premium Editorial Style
+Gera imagens premium para artigos seguindo estilo Financial Times/Bloomberg
+"""
+from typing import Optional
 from openai import OpenAI
 import cloudinary
 import cloudinary.uploader
-import requests
 from app.core.config import settings
 from app.core.logging import logger
 
-# Configurar Cloudinary
-cloudinary.config(
-    cloud_name=settings.CLOUDINARY_CLOUD_NAME,
-    api_key=settings.CLOUDINARY_API_KEY,
-    api_secret=settings.CLOUDINARY_API_SECRET
-)
 
 class ImageGenerator:
+    """Gerador de imagens premium por categoria"""
+    
+    # Prompts premium por categoria - Estilo Financial Times/Bloomberg
+    CATEGORY_PROMPTS = {
+        "bitcoin": {
+            "prompt": "A highly detailed, premium physical Bitcoin coin made of matte black metal with brushed gold accents and glowing orange circuit traces. The coin rests on a dark, polished obsidian surface reflecting subtle green financial candlestick charts in the background. Dramatic cinematic lighting, professional editorial photography style, shallow depth of field, 8k render.",
+            "colors": "orange, gold, black",
+            "mood": "solid, premium, valuable"
+        },
+        "ethereum": {
+            "prompt": "A futuristic, glowing blue and purple crystal Ethereum diamond logo hovering at the center of a complex, interconnected digital network structure. Glowing lines connect abstract geometric nodes and transparent blocks representing smart contracts. High-tech 3D concept art, clean composition, volumetric fog, octane render, 8k resolution.",
+            "colors": "blue, purple, cyan",
+            "mood": "technological, networked, innovative"
+        },
+        "altcoins": {
+            "prompt": "An isometric 3D render view of a diverse digital blockchain ecosystem. Various abstract, glowing data blocks in cyan, magenta, and orange colors connected by light streams, forming a futuristic infrastructure city. Clean tech illustration style, highly detailed, dark background, modern aesthetic, 8k.",
+            "colors": "cyan, magenta, orange",
+            "mood": "diverse, ecosystem, interconnected"
+        },
+        "defi": {
+            "prompt": "Abstract visualization of decentralized finance (DeFi). Glowing golden and blue liquid light flowing between transparent, interlocking digital gears and abstract liquidity pools. Futuristic financial concept art, clean rendering, sense of motion, no central bank imagery, 8k.",
+            "colors": "gold, blue, cyan",
+            "mood": "liquid, flowing, decentralized"
+        },
+        "regulacao": {
+            "prompt": "A minimalist 3D render of a stylized glass justice gavel resting on a digital ledger tablet with subtle blockchain patterns. Blurred background of a modern government building façade with faint data circuits. Serious tone, muted blue and grey professional lighting, editorial style, 8k.",
+            "colors": "blue, grey, silver",
+            "mood": "serious, legal, institutional"
+        },
+        "airdrop": {
+            "prompt": "Stylized digital illustration of glowing futuristic loot crates attached to digital data-parachutes, descending from a cloud network onto a glowing abstract map. Vibrant, energetic lighting, high-quality 3D render, sense of reward, 8k.",
+            "colors": "vibrant, multi-color, energetic",
+            "mood": "rewarding, community, exciting"
+        }
+    }
+    
+    # Negative prompt universal
+    NEGATIVE_PROMPT = "text, letters, watermark, blurry, low resolution, cartoon, ugly, deformed, messy, crowded, cheap neon, logos, symbols, typography"
+    
     def __init__(self):
+        """Inicializa o gerador de imagens"""
         self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        
+        # Configurar Cloudinary
+        cloudinary.config(
+            cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+            api_key=settings.CLOUDINARY_API_KEY,
+            api_secret=settings.CLOUDINARY_API_SECRET
+        )
     
-    def _extract_detailed_context(self, title: str, content: str) -> dict:
+    def _get_category_slug(self, category_name: Optional[str]) -> str:
         """
-        Extrai contexto detalhado do artigo para gerar prompt específico.
-        Analisa título e conteúdo para identificar o tema principal.
+        Converte nome de categoria para slug
+        
+        Args:
+            category_name: Nome da categoria (ex: "Bitcoin", "Regulação")
+            
+        Returns:
+            Slug da categoria (ex: "bitcoin", "regulacao")
         """
-        text = f"{title} {content[:500]}".lower()
+        if not category_name:
+            return "bitcoin"  # Default
         
-        # Contextos específicos por tema/projeto
-        crypto_projects = {
-            "ethereum": {
-                "subject": "Ethereum blockchain technology",
-                "scene": "Modern data center with glowing purple and blue server racks, holographic smart contract interfaces floating in the air",
-                "style": "Photorealistic, cinematic lighting, high-tech atmosphere",
-                "avoid": "Bitcoin symbols, BTC logos, orange coins",
-                "mood": "Innovative and cutting-edge"
-            },
-            "solana": {
-                "subject": "Solana high-speed blockchain",
-                "scene": "Futuristic network visualization with purple and teal light streams flowing at high speed through fiber optic cables",
-                "style": "Photorealistic, motion blur effects, dynamic energy",
-                "avoid": "Bitcoin symbols, BTC logos, static imagery",
-                "mood": "Fast-paced and energetic"
-            },
-            "cardano": {
-                "subject": "Cardano blockchain research",
-                "scene": "Clean modern laboratory with scientists analyzing blockchain data on transparent holographic displays, blue ambient lighting",
-                "style": "Photorealistic, professional scientific setting",
-                "avoid": "Bitcoin symbols, BTC logos, casual imagery",
-                "mood": "Scientific and trustworthy"
-            },
-            "polkadot": {
-                "subject": "Polkadot interoperability network",
-                "scene": "Multiple interconnected blockchain networks visualized as glowing pink and purple nodes connecting through space",
-                "style": "Photorealistic, cosmic background, interconnected web",
-                "avoid": "Bitcoin symbols, BTC logos, single chain imagery",
-                "mood": "Collaborative and interconnected"
-            },
-            "ripple": {
-                "subject": "Ripple cross-border payment system",
-                "scene": "Modern banking headquarters with digital payment streams flowing across world map hologram, blue and silver tones",
-                "style": "Photorealistic, corporate professional, global scale",
-                "avoid": "Bitcoin symbols, BTC logos, casual crypto imagery",
-                "mood": "Professional and efficient"
-            },
-            "xrp": {
-                "subject": "XRP digital payment network",
-                "scene": "International financial district at night with digital payment networks illuminated across skyscrapers",
-                "style": "Photorealistic, urban cityscape, blue lighting",
-                "avoid": "Bitcoin symbols, BTC logos",
-                "mood": "Global and institutional"
-            },
-            "dogecoin": {
-                "subject": "Dogecoin community cryptocurrency",
-                "scene": "Vibrant community gathering with digital gold coins floating, warm friendly atmosphere, diverse group of people",
-                "style": "Photorealistic, warm lighting, community-focused",
-                "avoid": "Bitcoin symbols, BTC logos, serious corporate imagery",
-                "mood": "Friendly and accessible"
-            },
-            "shiba": {
-                "subject": "Shiba Inu token ecosystem",
-                "scene": "Dynamic cryptocurrency trading floor with energetic traders, gold and red accent lighting",
-                "style": "Photorealistic, high energy, modern trading environment",
-                "avoid": "Bitcoin symbols, BTC logos",
-                "mood": "Energetic and community-driven"
-            },
-            "defi": {
-                "subject": "Decentralized finance ecosystem",
-                "scene": "Futuristic financial hub with floating holographic liquidity pools, green and blue data streams, people interacting with DeFi protocols",
-                "style": "Photorealistic, high-tech financial setting",
-                "avoid": "Bitcoin symbols, BTC logos, traditional banking imagery",
-                "mood": "Revolutionary and empowering"
-            },
-            "nft": {
-                "subject": "NFT digital art marketplace",
-                "scene": "Modern art gallery showcasing digital artworks on holographic displays, diverse colorful art pieces, collectors viewing",
-                "style": "Photorealistic, gallery lighting, artistic atmosphere",
-                "avoid": "Bitcoin symbols, BTC logos, generic crypto imagery",
-                "mood": "Creative and artistic"
-            },
-            "stablecoin": {
-                "subject": "Stablecoin digital currency",
-                "scene": "Secure vault with physical gold bars alongside digital currency displays, balanced scales symbolizing stability",
-                "style": "Photorealistic, secure banking environment, professional",
-                "avoid": "Bitcoin symbols, BTC logos, volatile imagery",
-                "mood": "Stable and trustworthy"
-            },
-            "airdrop": {
-                "subject": "Cryptocurrency airdrop distribution",
-                "scene": "Excited people receiving glowing digital tokens falling from above like golden rain, celebration atmosphere",
-                "style": "Photorealistic, celebratory lighting, dynamic motion",
-                "avoid": "Bitcoin symbols, BTC logos exclusively",
-                "mood": "Exciting and rewarding"
-            },
-            "sec": {
-                "subject": "SEC cryptocurrency regulation",
-                "scene": "Professional government office with officials reviewing digital asset documents, American flag, serious atmosphere",
-                "style": "Photorealistic, official government setting, formal",
-                "avoid": "Bitcoin symbols, BTC logos, casual imagery",
-                "mood": "Authoritative and serious"
-            },
-            "regulação": {
-                "subject": "Cryptocurrency regulation and compliance",
-                "scene": "Modern government building with lawmakers discussing cryptocurrency policy, legal documents, formal setting",
-                "style": "Photorealistic, professional governmental atmosphere",
-                "avoid": "Bitcoin symbols, BTC logos, informal imagery",
-                "mood": "Official and serious"
-            },
-            "etf": {
-                "subject": "Cryptocurrency ETF investment",
-                "scene": "Wall Street trading floor with cryptocurrency ETF data on multiple screens, professional traders, corporate setting",
-                "style": "Photorealistic, financial district, professional",
-                "avoid": "Bitcoin symbols exclusively, focus on institutional finance",
-                "mood": "Professional and mainstream"
-            },
-            "mining": {
-                "subject": "Cryptocurrency mining operation",
-                "scene": "Large industrial mining facility with rows of ASIC miners, cooling systems, blue LED lights, technical workers monitoring",
-                "style": "Photorealistic, industrial setting, technical atmosphere",
-                "avoid": "Bitcoin symbols exclusively, show mining hardware",
-                "mood": "Industrial and powerful"
-            },
-            "trading": {
-                "subject": "Cryptocurrency trading",
-                "scene": "Modern trading desk with multiple monitors showing candlestick charts, professional trader analyzing markets",
-                "style": "Photorealistic, trading floor atmosphere, dynamic",
-                "avoid": "Bitcoin symbols exclusively, show diverse crypto charts",
-                "mood": "Analytical and professional"
-            },
-            "web3": {
-                "subject": "Web3 decentralized internet",
-                "scene": "Futuristic digital landscape with interconnected nodes, users controlling their own data, cyan and purple lighting",
-                "style": "Photorealistic, high-tech digital world",
-                "avoid": "Bitcoin symbols, BTC logos, Web2 imagery",
-                "mood": "Revolutionary and user-empowered"
-            },
-            "metaverse": {
-                "subject": "Metaverse virtual world",
-                "scene": "Immersive virtual reality environment with avatars interacting, neon-lit digital cities, VR headsets",
-                "style": "Photorealistic, futuristic virtual world, vibrant",
-                "avoid": "Bitcoin symbols, BTC logos, flat 2D imagery",
-                "mood": "Futuristic and immersive"
-            },
-            "bitcoin": {
-                "subject": "Bitcoin digital currency",
-                "scene": "Secure digital vault with glowing golden Bitcoin represented as pure energy or light (not physical coins), blockchain network visualization",
-                "style": "Photorealistic, golden warm lighting, secure atmosphere",
-                "avoid": "Physical Bitcoin coins with B symbol, generic crypto imagery",
-                "mood": "Valuable and established"
-            }
-        }
+        # Normalizar para minúsculas e remover acentos
+        slug = category_name.lower()
+        slug = slug.replace("ç", "c").replace("ã", "a").replace("õ", "o")
         
-        # Detectar tema principal
-        for keyword, context in crypto_projects.items():
-            if keyword in text:
-                logger.info(f"Detected subject: {keyword}")
-                return context
+        # Mapear variações comuns
+        if "regula" in slug or "sec" in slug or "lei" in slug or "governo" in slug:
+            return "regulacao"
+        elif "eth" in slug:
+            return "ethereum"
+        elif "btc" in slug or "bitcoin" in slug:
+            return "bitcoin"
+        elif "defi" in slug or "descentraliz" in slug:
+            return "defi"
+        elif "airdrop" in slug:
+            return "airdrop"
+        elif "alt" in slug or "moeda" in slug:
+            return "altcoins"
         
-        # Contexto padrão genérico (evita Bitcoin)
-        logger.info("Using default generic crypto context")
-        return {
-            "subject": "Cryptocurrency and blockchain technology",
-            "scene": "Modern financial technology hub with diverse digital assets represented as flowing light streams, holographic data displays",
-            "style": "Photorealistic, professional tech atmosphere, balanced lighting",
-            "avoid": "Bitcoin symbols, BTC logos, single crypto focus",
-            "mood": "Professional and diverse"
-        }
+        return "bitcoin"  # Default fallback
     
-    def _build_realistic_prompt(self, title: str, content: str) -> str:
+    def _extract_keywords(self, title: str, content: str) -> str:
         """
-        Constrói prompt detalhado e realista baseado no contexto do artigo.
-        """
-        context = self._extract_detailed_context(title, content)
-        
-        prompt = f"""Create a photorealistic, professional image for a cryptocurrency news article.
-
-Article title: {title[:100]}
-
-SCENE DESCRIPTION:
-{context['scene']}
-
-VISUAL STYLE:
-{context['style']}
-- Cinematic composition with depth of field
-- Professional photography quality
-- Realistic lighting and shadows
-- High detail and texture
-- Modern and clean aesthetic
-
-IMPORTANT RESTRICTIONS:
-- MUST AVOID: {context['avoid']}
-- NO text overlays or captions
-- NO brand logos or trademarks
-- NO specific people's faces (use anonymous figures if needed)
-- NO cryptocurrency symbols or logos as main focus
-- Focus on the scene and atmosphere, not symbols
-
-TECHNICAL SPECS:
-- Photorealistic rendering
-- Landscape orientation (16:9 ratio)
-- High contrast for web readability
-- Professional color grading
-
-MOOD: {context['mood']}
-
-The image should feel like a professional stock photo for financial/tech journalism, not abstract crypto art."""
-
-        logger.info(f"Generated realistic prompt for subject: {context['subject']}")
-        return prompt
-    
-    async def generate_and_upload_image(self, title: str, content: str) -> str:
-        """
-        Gera imagem usando DALL-E 3 e faz upload para Cloudinary.
+        Extrai palavras-chave relevantes do título e conteúdo
         
         Args:
             title: Título do artigo
             content: Conteúdo do artigo
             
         Returns:
+            String com palavras-chave principais
+        """
+        # Palavras-chave relevantes para cripto
+        relevant_terms = [
+            "price surge", "market crash", "adoption", "regulation",
+            "innovation", "partnership", "launch", "upgrade",
+            "security breach", "institutional investment", "ETF",
+            "halving", "staking", "mining", "trading volume",
+            "all-time high", "bear market", "bull run"
+        ]
+        
+        text = (title + " " + content[:500]).lower()
+        
+        # Encontrar termos relevantes
+        found_terms = [term for term in relevant_terms if term in text]
+        
+        if found_terms:
+            return ", ".join(found_terms[:2])  # Máximo 2 termos
+        
+        # Fallback: pegar primeiras palavras significativas do título
+        words = title.split()[:3]
+        return " ".join(words) if words else ""
+    
+    async def generate_and_upload_image(
+        self,
+        title: str,
+        content: str,
+        category_name: Optional[str] = None
+    ) -> str:
+        """
+        Gera imagem premium contextual e faz upload para Cloudinary
+        
+        Args:
+            title: Título do artigo
+            content: Conteúdo do artigo
+            category_name: Nome da categoria do artigo
+            
+        Returns:
             URL da imagem no Cloudinary
         """
         try:
-            logger.info(f"Gerando imagem para: {title[:50]}...")
+            logger.info(f"Gerando imagem premium para: {title[:50]}...")
             
-            # Gerar prompt realista
-            prompt = self._build_realistic_prompt(title, content)
+            # Determinar categoria
+            category_slug = self._get_category_slug(category_name)
+            category_config = self.CATEGORY_PROMPTS.get(
+                category_slug,
+                self.CATEGORY_PROMPTS["bitcoin"]  # Fallback
+            )
+            
+            # Usar prompt premium da categoria
+            base_prompt = category_config["prompt"]
+            
+            # Adicionar contexto do artigo ao prompt (sutilmente)
+            keywords = self._extract_keywords(title, content)
+            context_hint = f" The scene subtly reflects the theme of: {keywords}." if keywords else ""
+            
+            final_prompt = base_prompt + context_hint
+            
+            logger.info(f"Image prompt - Category: {category_slug}, Theme: {keywords if keywords else 'default'}")
             
             # Gerar imagem com DALL-E 3
             response = self.client.images.generate(
                 model="dall-e-3",
-                prompt=prompt,
-                size="1792x1024",  # Landscape format
-                quality="standard",
+                prompt=final_prompt,
+                size="1792x1024",  # 16:9 aspect ratio
+                quality="hd",
                 n=1,
             )
             
             image_url = response.data[0].url
             logger.info(f"Imagem gerada: {image_url}")
             
-            # Fazer upload para Cloudinary
-            upload_response = cloudinary.uploader.upload(
+            # Upload para Cloudinary
+            upload_result = cloudinary.uploader.upload(
                 image_url,
                 folder="vivacripto/posts",
                 format="webp",
-                quality="auto:good",
+                quality="auto:best",
                 fetch_format="auto"
             )
             
-            cloudinary_url = upload_response['secure_url']
+            cloudinary_url = upload_result["secure_url"]
             logger.info(f"Imagem enviada: {cloudinary_url}")
             
             return cloudinary_url
             
         except Exception as e:
-            logger.error(f"Erro ao gerar imagem: {str(e)}")
+            logger.error(f"Erro ao gerar/enviar imagem: {type(e).__name__}: {e}")
             raise
