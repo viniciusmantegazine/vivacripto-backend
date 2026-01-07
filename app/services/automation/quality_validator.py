@@ -20,9 +20,11 @@ class QualityValidator:
     MIN_WORD_COUNT = 100
     MAX_WORD_COUNT = 300
     MIN_TITLE_LENGTH = 30
-    MAX_TITLE_LENGTH = 70
+    MAX_TITLE_LENGTH = 100  # Aumentado de 70 para 100
     MIN_EXCERPT_LENGTH = 80
-    MAX_EXCERPT_LENGTH = 150
+    MAX_EXCERPT_LENGTH = 200  # Aumentado de 150 para 200
+    MIN_META_LENGTH = 120
+    MAX_META_LENGTH = 180  # Aumentado de 160 para 180
     
     def validate_article(self, article: Dict) -> Tuple[bool, List[str]]:
         """
@@ -102,7 +104,7 @@ class QualityValidator:
         return True, ""
     
     def _validate_title(self, article: Dict) -> Tuple[bool, str]:
-        """Valida o título do artigo"""
+        """Valida o título do artigo (com truncamento automático)"""
         title = article.get("title", "")
         
         if not title:
@@ -113,13 +115,15 @@ class QualityValidator:
         if title_length < self.MIN_TITLE_LENGTH:
             return False, f"Título muito curto ({title_length} caracteres, mínimo {self.MIN_TITLE_LENGTH})"
         
+        # Truncar automaticamente se muito longo
         if title_length > self.MAX_TITLE_LENGTH:
-            return False, f"Título muito longo ({title_length} caracteres, máximo {self.MAX_TITLE_LENGTH})"
+            article["title"] = title[:self.MAX_TITLE_LENGTH].rsplit(' ', 1)[0] + "..."
+            logger.info(f"Título truncado de {title_length} para {len(article['title'])} caracteres")
         
         return True, ""
     
     def _validate_excerpt(self, article: Dict) -> Tuple[bool, str]:
-        """Valida o excerpt do artigo"""
+        """Valida o excerpt do artigo (com truncamento automático)"""
         excerpt = article.get("excerpt", "")
         
         if not excerpt:
@@ -130,13 +134,15 @@ class QualityValidator:
         if excerpt_length < self.MIN_EXCERPT_LENGTH:
             return False, f"Excerpt muito curto ({excerpt_length} caracteres)"
         
+        # Truncar automaticamente se muito longo
         if excerpt_length > self.MAX_EXCERPT_LENGTH:
-            return False, f"Excerpt muito longo ({excerpt_length} caracteres)"
+            article["excerpt"] = excerpt[:self.MAX_EXCERPT_LENGTH].rsplit(' ', 1)[0] + "..."
+            logger.info(f"Excerpt truncado de {excerpt_length} para {len(article['excerpt'])} caracteres")
         
         return True, ""
     
     def _validate_meta_description(self, article: Dict) -> Tuple[bool, str]:
-        """Valida a meta description"""
+        """Valida a meta description (com truncamento automático)"""
         meta_desc = article.get("meta_description", "")
         
         if not meta_desc:
@@ -144,11 +150,13 @@ class QualityValidator:
         
         meta_length = len(meta_desc)
         
-        if meta_length < 120:
+        if meta_length < self.MIN_META_LENGTH:
             return False, f"Meta description muito curta ({meta_length} caracteres)"
         
-        if meta_length > 160:
-            return False, f"Meta description muito longa ({meta_length} caracteres)"
+        # Truncar automaticamente se muito longa
+        if meta_length > self.MAX_META_LENGTH:
+            article["meta_description"] = meta_desc[:self.MAX_META_LENGTH].rsplit(' ', 1)[0] + "..."
+            logger.info(f"Meta description truncada de {meta_length} para {len(article['meta_description'])} caracteres")
         
         return True, ""
     
