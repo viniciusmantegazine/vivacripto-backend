@@ -24,7 +24,8 @@ from app.core.config import settings
 class NewsPipeline:
     """Pipeline de automação de notícias"""
     
-    MAX_POSTS_PER_DAY = 5  # Gerar apenas 1 notícia por execução
+    MAX_POSTS_PER_DAY = 10  # Limite diário de publicações
+    POSTS_PER_EXECUTION = 1  # Publicar apenas 1 notícia por chamada do endpoint
     
     def __init__(self):
         self.aggregator = NewsAggregator()
@@ -93,10 +94,11 @@ class NewsPipeline:
                 logger.info(report["message"])
                 return report
             
-            # 4. Limitar ao número de posts restantes do dia
+            # 4. Limitar a 1 notícia por execução
             remaining_slots = await self._get_remaining_daily_slots(db)
-            unique_news = unique_news[:remaining_slots]
-            logger.info(f"Processando {len(unique_news)} notícias (slots disponíveis: {remaining_slots})")
+            posts_to_generate = min(self.POSTS_PER_EXECUTION, remaining_slots, len(unique_news))
+            unique_news = unique_news[:posts_to_generate]
+            logger.info(f"Processando {posts_to_generate} notícia(s) (slots disponíveis hoje: {remaining_slots})")
             
             # 5. Gerar e publicar artigos
             logger.info("\n[FASE 3] Gerando e publicando artigos...")
