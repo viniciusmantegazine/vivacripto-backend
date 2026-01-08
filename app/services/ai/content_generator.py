@@ -264,27 +264,36 @@ Escreva o artigo agora:"""
             "**Artigo:**",
         ]
         
-        # Remover prefixos linha por linha
+        # Remover prefixos linha por linha, PRESERVANDO quebras duplas
         lines = content.split('\n')
         cleaned_lines = []
         
         for line in lines:
             line_stripped = line.strip()
             
+            # Se linha está vazia, preservar para manter quebras de parágrafo
+            if not line_stripped:
+                cleaned_lines.append('')
+                continue
+            
             # Verificar se linha começa com prefixo proibido
-            is_forbidden = False
             for prefix in forbidden_prefixes:
                 if line_stripped.startswith(prefix):
                     # Remover o prefixo mas manter o resto
                     line = line_stripped[len(prefix):].strip()
-                    is_forbidden = True
                     logger.warning(f"Removido prefixo proibido: {prefix}")
                     break
             
-            if line.strip():  # Adicionar apenas linhas não vazias
-                cleaned_lines.append(line)
+            cleaned_lines.append(line)
         
-        return '\n'.join(cleaned_lines)
+        # Juntar linhas preservando estrutura
+        result = '\n'.join(cleaned_lines)
+        
+        # Remover múltiplas quebras consecutivas (mais de 2)
+        import re
+        result = re.sub(r'\n{3,}', '\n\n', result)
+        
+        return result.strip()
     
     async def _generate_seo_title(self, content: str) -> Optional[str]:
         """Gera título otimizado para SEO"""
