@@ -16,9 +16,9 @@ class QualityValidator:
         "blockchain", "defi", "nft", "token", "moeda digital"
     ]
     
-    # Limites de qualidade
-    MIN_WORD_COUNT = 100
-    MAX_WORD_COUNT = 300
+    # Limites de qualidade v2.0 - Estrutura flexível
+    MIN_WORD_COUNT = 250  # Aumentado de 100 para 250
+    MAX_WORD_COUNT = 450  # Aumentado de 300 para 450 (margem de 50 palavras)
     MIN_TITLE_LENGTH = 30
     MAX_TITLE_LENGTH = 100  # Aumentado de 70 para 100
     MIN_EXCERPT_LENGTH = 80
@@ -161,23 +161,34 @@ class QualityValidator:
         return True, ""
     
     def _validate_content_structure(self, article: Dict) -> Tuple[bool, str]:
-        """Valida a estrutura do conteúdo (parágrafos, formatação)"""
+        """Valida a estrutura do conteúdo v2.0 - Validação flexível baseada em qualidade narrativa"""
         content = article.get("content_markdown", "")
         
         # Debug: Mostrar conteúdo bruto
-        logger.debug(f"Validando estrutura. Conteúdo bruto (primeiros 200 chars): {content[:200]}")
+        logger.debug(f"Validando estrutura v2.0. Conteúdo bruto (primeiros 200 chars): {content[:200]}")
         
-        # Verificar se tem pelo menos 2 parágrafos
-        paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
+        # 1. Verificar se começa com H2 (manchete interna)
+        if not content.strip().startswith("##"):
+            logger.warning(f"REJEITADO: Conteúdo não começa com H2 (manchete interna)")
+            return False, "Conteúdo deve começar com manchete interna (H2)"
+        
+        # 2. Verificar se tem pelo menos 2 quebras duplas (mínimo 3 blocos: H2 + 2 parágrafos)
+        double_breaks = content.count('\n\n')
+        if double_breaks < 2:
+            logger.warning(f"REJEITADO: Apenas {double_breaks} quebra(s) dupla(s) encontrada(s)")
+            return False, "Conteúdo deve ter pelo menos 2 quebras duplas entre parágrafos"
+        
+        # 3. Contar parágrafos (excluindo H2)
+        paragraphs = [p.strip() for p in content.split('\n\n') if p.strip() and not p.strip().startswith('##')]
         
         # Debug: Mostrar parágrafos encontrados
-        logger.debug(f"Parágrafos encontrados: {len(paragraphs)}")
+        logger.debug(f"Parágrafos encontrados (excluindo H2): {len(paragraphs)}")
         for i, p in enumerate(paragraphs, 1):
             logger.debug(f"  Parágrafo {i} (primeiros 80 chars): {p[:80]}")
         
         if len(paragraphs) < 2:
             logger.warning(f"REJEITADO: Apenas {len(paragraphs)} parágrafo(s) encontrado(s). Conteúdo: {content[:300]}")
-            return False, "Conteúdo deve ter pelo menos 2 parágrafos"
+            return False, "Conteúdo deve ter pelo menos 2 parágrafos (além da manchete)"
         
         # Verificar se não é apenas uma lista
         if content.strip().startswith('-') or content.strip().startswith('*'):

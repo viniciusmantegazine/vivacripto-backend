@@ -1,6 +1,6 @@
 """
-AI Content Generator Service
-Gera conteúdo de notícias usando OpenAI GPT-4
+AI Content Generator Service v2.0
+Gera conteúdo de notícias usando OpenAI GPT-4 com estrutura flexível
 """
 from typing import Dict, Optional
 from openai import AsyncOpenAI
@@ -11,35 +11,38 @@ from app.core.config import settings
 
 
 class ContentGenerator:
-    """Gerador de conteúdo com IA - Editor-Chefe Sênior"""
+    """Gerador de conteúdo com IA v2.0 - Editor-Chefe Sênior com estrutura flexível"""
     
-    # System Prompt - Persona de Editor-Chefe de Criptoeconomia
-    SYSTEM_PROMPT = """Você é um Editor-Chefe Sênior especializado em Criptoeconomia, com 10+ anos de experiência em jornalismo financeiro e tecnológico.
+    # System Prompt v2.0 - Persona de Editor-Chefe de Criptoeconomia
+    SYSTEM_PROMPT = """Você é um Editor-Chefe Sênior especializado em Criptoeconomia, com mais de 10 anos de experiência em jornalismo financeiro e tecnológico. Sua missão é transformar dados brutos e notícias de fontes externas em artigos jornalísticos aprofundados, claros e imparciais, adequados para um público diversificado que vai de iniciantes a veteranos do mercado cripto.
 
-PERFIL PROFISSIONAL:
-- Domínio técnico: Blockchain, DeFi, Smart Contracts, Tokenomics
-- Estilo editorial: Jornalístico, imparcial, mas com vocabulário nativo do setor
-- Referências: Bloomberg, Financial Times, CoinDesk, The Block
-- Idioma: Português brasileiro (BR)
+**PERFIL EDITORIAL:**
+- **Estilo:** Jornalístico, analítico e educativo. Pense em uma fusão entre Bloomberg (dados e análise financeira), The Verge (tecnologia acessível) e CoinDesk (expertise em cripto).
+- **Tom:** Adapte o tom à complexidade do assunto. Seja direto e factual para breaking news, mais analítico para tendências de mercado, e educativo para temas técnicos.
+- **Idioma:** Português brasileiro (BR), com vocabulário preciso mas acessível. Use termos técnicos quando necessário, mas sempre explique conceitos complexos.
 
-COMPETÊNCIAS EDITORIAIS:
-✓ Síntese de múltiplas fontes em narrativa única e coesa
-✓ Contextualização técnica e econômica
-✓ Análise de impacto (preço, adoção, regulação)
-✓ Verificação de consistência de dados numéricos
-✓ Escrita clara e profunda (nunca rasa)
+**PRINCÍPIOS EDITORIAIS FUNDAMENTAIS:**
 
-PROIBIÇÕES ESTRITAS:
-✗ JAMAIS escrever metadados visíveis: "Título:", "Resumo:", "Corpo:", "Meta:"
-✗ JAMAIS fazer recomendações financeiras ou calls de trade
-✗ JAMAIS usar clickbait excessivo
-✗ JAMAIS traduzir literalmente - sempre reescrever com ângulo próprio
-✗ JAMAIS gerar múltiplos textos fragmentados sobre o mesmo tema
+1. **Contexto é Rei:** Nunca se limite a resumir a fonte. Sempre enriqueça a notícia com contexto histórico, técnico e de mercado. Responda à pergunta fundamental: "Por que isso importa para o leitor?".
 
-FORMATO DE OUTPUT:
-- Apenas Markdown puro (H2, negrito, listas)
-- Sem prefixos de metadados
-- Pronto para renderização direta no frontend"""
+2. **Narrativa Coesa:** Construa uma história com começo, meio e fim. Não apenas liste fatos de forma fragmentada. O texto deve fluir naturalmente de uma ideia para outra.
+
+3. **Profundidade e Clareza:** Explique conceitos complexos de forma simples, sem ser superficial. Se mencionar "Halving", explique brevemente o que é. Se falar de "ETF", contextualize para quem não conhece.
+
+4. **Imparcialidade e Credibilidade:** Apresente os fatos de forma objetiva. Evite linguagem sensacionalista ou especulativa. Quando houver incerteza, deixe isso claro.
+
+**PROIBIÇÕES ESTRITAS:**
+- **JAMAIS** fazer recomendações financeiras ou sugerir ações de compra/venda.
+- **JAMAIS** usar clickbait excessivo ou linguagem sensacionalista.
+- **JAMAIS** iniciar o texto com metadados visíveis como "Título:", "Resumo:", "Corpo:", "Artigo:", etc.
+- **JAMAIS** traduzir literalmente de fontes em inglês. Sempre reescreva com um ângulo editorial próprio.
+
+**FORMATO DE SAÍDA:**
+- Markdown puro, pronto para renderização direta no frontend.
+- Use H2 (##) para o subtítulo interno da matéria.
+- Use **negrito** para destacar conceitos-chave ou dados importantes.
+- Use listas quando apropriado para organizar informações estruturadas.
+- Use quebras de linha duplas (\\n\\n) entre parágrafos para garantir legibilidade."""
 
     def __init__(self):
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
@@ -60,7 +63,7 @@ FORMATO DE OUTPUT:
             description = source_news.get("description", "")
             source = source_news.get("source", "")
             
-            logger.info(f"Gerando artigo para: {title[:50]}...")
+            logger.info(f"Gerando artigo v2.0 para: {title[:50]}...")
             
             # Gerar conteúdo principal
             content = await self._generate_content(title, description, source)
@@ -92,7 +95,7 @@ FORMATO DE OUTPUT:
                 "source_name": source,
             }
             
-            logger.info(f"Artigo gerado com sucesso: {article['title']}")
+            logger.info(f"Artigo v2.0 gerado com sucesso: {article['title']}")
             return article
         
         except Exception as e:
@@ -105,101 +108,68 @@ FORMATO DE OUTPUT:
         description: str,
         source: str
     ) -> Optional[str]:
-        """Gera o conteúdo principal do artigo com síntese editorial"""
+        """Gera o conteúdo principal do artigo com estrutura flexível v2.0"""
         
-        user_prompt = f"""ENTRADA DE DADOS:
+        user_prompt = f"""**ENTRADA DE DADOS:**
 
-Fonte: {source}
-Título original: {title}
-Descrição: {description}
-
-═══════════════════════════════════════════════════════════════
-
-TAREFA EDITORIAL:
-
-1. ANÁLISE SEMÂNTICA:
-   - Identifique o tema central desta notícia
-   - Se houver múltiplos fatos relacionados ao mesmo tópico, SINTETIZE tudo em UMA matéria única e profunda
-   - NÃO fragmente em textos pequenos
-
-2. ESTRUTURA OBRIGATÓRIA DO ARTIGO:
-   
-   ⚠️ ATENÇÃO: O artigo DEVE ter EXATAMENTE 3 parágrafos distintos, separados por quebras de linha duplas (\n\n).
-   
-   **Manchete interna (H2):**
-   - Crie um subtítulo atrativo (sem clickbait excessivo)
-   - Deve capturar a essência da notícia
-   
-   **PARÁGRAFO 1 - O GANCHO (Obrigatório):**
-   - Lead jornalístico direto: Quem? O quê? Quando? Onde?
-   - Resumo do fato principal em 2-3 frases
-   - Seja objetivo e impactante
-   
-   **PARÁGRAFO 2 - DETALHE/CONTEXTO (Obrigatório):**
-   - Expansão da notícia com detalhes técnicos
-   - Se a notícia original for curta, ENRIQUEÇA explicando conceitos técnicos
-   - Exemplos: Se mencionar ETF, explique brevemente o que é; se falar de Halving, contextualize
-   - Adicione histórico ou falas relevantes quando disponível
-   - NUNCA resuma demais - sempre expanda para dar substância
-   
-   **PARÁGRAFO 3 - IMPACTO/CONCLUSÃO (Obrigatório):**
-   - Análise de impacto: Como isso afeta o mercado?
-   - Responda: "Por que isso importa para o preço ou para a tecnologia?"
-   - Contexto de mercado (bull/bear market, sentimento, adoção)
-   - Perspectivas futuras quando aplicável
-   
-   **REGRA DE EXPANSÃO (Anti-Laconismo):**
-   ⚠️ Se o texto de entrada for muito curto, NÃO resuma.
-   ⚠️ Em vez disso, ENRIQUEÇA adicionando:
-      - Definições breves dos termos citados
-      - Contexto histórico do projeto/moeda
-      - Comparações com eventos similares
-      - Dados de mercado relevantes
-   ⚠️ Objetivo: Garantir que o texto final tenha substância e passe na validação
-
-3. PROFUNDIDADE:
-   - Alvo: 200-250 palavras (aumentado para garantir substância)
-   - NUNCA seja raso - aprofunde no "porquê" e "impacto"
-   - Use vocabulário nativo: bull market, suporte, resistência, adoção, regulação
-   - Prefira explicar a resumir
-
-4. FORMATAÇÃO MARKDOWN ESTRITA:
-   ⚠️ CRÍTICO: Use quebras de linha duplas (\n\n) entre TODOS os parágrafos
-   ⚠️ O validador Python usa content.split('\n\n') para contar parágrafos
-   ⚠️ Sem quebras duplas = rejeição automática
-   
-   Formatação permitida:
-   - Use **negrito** para conceitos-chave
-   - Use listas quando apropriado
-   - Mantenha cada parágrafo com 3-5 linhas
-   
-   Exemplo de estrutura correta:
-   ```
-   ## Título Atrativo
-   
-   Parágrafo 1 com lead jornalístico. Texto do gancho.
-   
-   Parágrafo 2 com contexto e detalhes técnicos. Explicação enriquecida.
-   
-   Parágrafo 3 com análise de impacto. Por que isso importa.
-   ```
-
-5. SANITIZAÇÃO CRÍTICA:
-   ⚠️ ATENÇÃO: Comece DIRETAMENTE pelo conteúdo.
-   ⚠️ NÃO escreva: "Título:", "Resumo:", "Corpo:", "Artigo:", ou qualquer prefixo de metadado.
-   ⚠️ Apenas o texto Markdown puro, pronto para renderizar.
-
-6. CHECKLIST FINAL (Antes de enviar):
-   ✓ Tem exatamente 3 parágrafos?
-   ✓ Cada parágrafo está separado por quebra dupla (\n\n)?
-   ✓ Cada parágrafo tem 3+ linhas?
-   ✓ Total de palavras está entre 200-250?
-   ✓ Sem prefixos de metadados?
-   ✓ Markdown formatado corretamente?
+- **Fonte:** {source}
+- **Título Original:** {title}
+- **Descrição/Conteúdo:** {description}
 
 ═══════════════════════════════════════════════════════════════
 
-Escreva o artigo agora:"""
+**TAREFA EDITORIAL: PRODUZIR UMA NOTÍCIA COMPLETA E APROFUNDADA**
+
+**1. Análise e Ângulo Editorial:**
+   - Identifique o fato central e o ângulo mais relevante para o leitor brasileiro.
+   - Se houver múltiplas informações relacionadas ao mesmo tema, sintetize tudo em uma narrativa única e coesa.
+   - Determine o tipo de notícia: breaking news, análise de mercado, regulação, tecnologia, ou adoção institucional.
+
+**2. Estrutura Narrativa Flexível:**
+
+   A estrutura do artigo deve ser **adaptada ao conteúdo**, não forçada em um molde fixo. Use entre 3 e 5 parágrafos conforme necessário para desenvolver adequadamente a notícia.
+
+   **Manchete Interna (H2):**
+   - Crie um subtítulo impactante e informativo que resuma o ângulo da matéria.
+   - Deve ser atrativo, mas não clickbait. Foque no valor informativo.
+
+   **Parágrafo 1: O Gancho (Lead Jornalístico):**
+   - Responda de forma clara e direta: **Quem? O quê? Quando? Onde? Por quê?**
+   - Apresente o fato mais importante logo no início, seguindo a pirâmide invertida do jornalismo.
+   - Este parágrafo deve ser suficiente para o leitor entender o essencial da notícia.
+
+   **Parágrafos 2-3 (ou 2-4): O Contexto e a Profundidade:**
+   - **Desenvolva a notícia.** Adicione detalhes, dados numéricos, citações (se disponíveis) e informações de suporte.
+   - **Enriqueça o conteúdo.** Se a fonte for curta ou superficial, expanda explicando os conceitos técnicos mencionados:
+     - Se mencionar "ETF", explique brevemente o que é um ETF e por que é relevante para cripto.
+     - Se falar de "Halving", contextualize o evento e seu impacto histórico no preço.
+     - Se citar a "SEC", explique seu papel regulatório.
+   - Forneça contexto histórico ou de mercado para situar o leitor. Compare com eventos similares do passado, se relevante.
+   - Use dados concretos sempre que possível (preços, porcentagens, datas).
+
+   **Parágrafo Final: A Análise e o Impacto:**
+   - Conclua com a análise editorial: **"Por que isso é importante?"**
+   - Qual o impacto potencial no mercado, na tecnologia, na regulação ou para os investidores?
+   - Ofereça uma perspectiva sobre os próximos passos ou desdobramentos futuros, quando aplicável.
+   - Evite especulação excessiva, mas forneça uma conclusão que ajude o leitor a entender a relevância da notícia.
+
+**3. Requisitos de Qualidade:**
+   - **Profundidade:** O artigo final deve ter entre **250 e 400 palavras** para garantir substância e valor informativo. Prefira a qualidade à brevidade.
+   - **Clareza:** Use uma linguagem que seja compreensível tanto para iniciantes quanto para veteranos do mercado cripto. Explique jargões quando necessário.
+   - **Coesão:** O texto deve fluir naturalmente. Use conectivos e transições entre parágrafos para criar uma narrativa coesa.
+   - **Formatação:** Use quebras de linha duplas (\\n\\n) entre os parágrafos para garantir a legibilidade no frontend.
+
+**4. Checklist de Auto-Verificação (Antes de Finalizar):**
+   - ✓ O artigo flui como uma narrativa coesa, não como uma lista de fatos?
+   - ✓ A importância e o impacto do evento estão claros para o leitor?
+   - ✓ O conteúdo é educativo e informativo, não apenas um resumo da fonte?
+   - ✓ O texto está livre de jargões desnecessários, ou explica os que são essenciais?
+   - ✓ O lead responde às perguntas fundamentais (quem, o quê, quando, onde, por quê)?
+   - ✓ O texto está livre de metadados visíveis no início?
+
+═══════════════════════════════════════════════════════════════
+
+**Escreva o artigo agora, começando diretamente pela manchete interna (H2).**"""
 
         try:
             response = await self.client.chat.completions.create(
@@ -209,24 +179,24 @@ Escreva o artigo agora:"""
                     {"role": "user", "content": user_prompt}
                 ],
                 temperature=0.7,
-                max_tokens=600,  # Aumentado para permitir conteúdo mais profundo
+                max_tokens=800,  # Aumentado de 600 para 800 para permitir artigos de até 400 palavras
             )
             
             content = response.choices[0].message.content.strip()
             
             # Debug: Mostrar conteúdo bruto da IA
             logger.debug(f"Conteúdo bruto da IA (primeiros 300 chars): {content[:300]}")
-            logger.debug(f"Conteúdo bruto da IA (completo): {content}")
             
             # Sanitização adicional (failsafe)
             content = self._sanitize_content(content)
             
             # Debug: Mostrar conteúdo após sanitização
-            logger.debug(f"Conteúdo após sanitização: {content}")
+            logger.debug(f"Conteúdo após sanitização (primeiros 300 chars): {content[:300]}")
             
             # Verificar quebras de linha
             double_breaks = content.count('\n\n')
-            logger.debug(f"Quebras duplas (\\n\\n) encontradas: {double_breaks}")
+            word_count = len(content.split())
+            logger.info(f"Artigo gerado - Quebras duplas: {double_breaks}, Palavras: {word_count}")
             
             return content
         
