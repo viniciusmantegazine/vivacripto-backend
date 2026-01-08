@@ -214,8 +214,19 @@ Escreva o artigo agora:"""
             
             content = response.choices[0].message.content.strip()
             
+            # Debug: Mostrar conteúdo bruto da IA
+            logger.debug(f"Conteúdo bruto da IA (primeiros 300 chars): {content[:300]}")
+            logger.debug(f"Conteúdo bruto da IA (completo): {content}")
+            
             # Sanitização adicional (failsafe)
             content = self._sanitize_content(content)
+            
+            # Debug: Mostrar conteúdo após sanitização
+            logger.debug(f"Conteúdo após sanitização: {content}")
+            
+            # Verificar quebras de linha
+            double_breaks = content.count('\n\n')
+            logger.debug(f"Quebras duplas (\\n\\n) encontradas: {double_breaks}")
             
             return content
         

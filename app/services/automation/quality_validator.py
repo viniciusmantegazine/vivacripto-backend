@@ -164,10 +164,19 @@ class QualityValidator:
         """Valida a estrutura do conteúdo (parágrafos, formatação)"""
         content = article.get("content_markdown", "")
         
+        # Debug: Mostrar conteúdo bruto
+        logger.debug(f"Validando estrutura. Conteúdo bruto (primeiros 200 chars): {content[:200]}")
+        
         # Verificar se tem pelo menos 2 parágrafos
         paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
         
+        # Debug: Mostrar parágrafos encontrados
+        logger.debug(f"Parágrafos encontrados: {len(paragraphs)}")
+        for i, p in enumerate(paragraphs, 1):
+            logger.debug(f"  Parágrafo {i} (primeiros 80 chars): {p[:80]}")
+        
         if len(paragraphs) < 2:
+            logger.warning(f"REJEITADO: Apenas {len(paragraphs)} parágrafo(s) encontrado(s). Conteúdo: {content[:300]}")
             return False, "Conteúdo deve ter pelo menos 2 parágrafos"
         
         # Verificar se não é apenas uma lista
