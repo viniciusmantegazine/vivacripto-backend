@@ -25,6 +25,7 @@ class QualityValidator:
     MAX_EXCERPT_LENGTH = 200  # Aumentado de 150 para 200
     MIN_META_LENGTH = 120
     MAX_META_LENGTH = 180  # Aumentado de 160 para 180
+    MAX_META_TITLE_LENGTH = 70  # Limite do schema PostCreate
     
     def validate_article(self, article: Dict) -> Tuple[bool, List[str]]:
         """
@@ -62,6 +63,9 @@ class QualityValidator:
         meta_valid, meta_error = self._validate_meta_description(article)
         if not meta_valid:
             errors.append(meta_error)
+        
+        # 5.5. Validar e truncar meta_title (CRÍTICO para evitar erro de validação)
+        self._validate_and_truncate_meta_title(article)
         
         # 6. Validar estrutura do conteúdo
         structure_valid, structure_error = self._validate_content_structure(article)
@@ -159,6 +163,42 @@ class QualityValidator:
             logger.info(f"Meta description truncada de {meta_length} para {len(article['meta_description'])} caracteres")
         
         return True, ""
+    
+    def _validate_and_truncate_meta_title(self, article: Dict) -> None:
+        """
+        Valida e trunca meta_title para garantir conformidade com schema PostCreate
+        
+        CRÍTICO: PostCreate.meta_title tem max_length=70
+        Se não truncar aqui, a publicação falha com ValidationError
+        
+        Args:
+            article: Artigo a ser validado (modificado in-place)
+        """
+        meta_title = article.get("meta_title", "")
+        
+        if not meta_title:
+            # Se não tem meta_title, usar título truncado
+            title = article.get("title", "")
+            if title:
+                article["meta_title"] = title[:self.MAX_META_TITLE_LENGTH]
+                logger.info(f"Meta title gerado a partir do título: {article['meta_title']}")
+            return
+        
+        meta_title_length = len(meta_title)
+        
+        # Truncar automaticamente se exceder limite
+        if meta_title_length > self.MAX_META_TITLE_LENGTH:
+            # Truncar em palavra completa para manter legibilidade
+            truncated = meta_title[:self.MAX_META_TITLE_LENGTH].rsplit(' ', 1)[0]
+            
+            # Se ficou muito curto após truncar, usar até o limite exato
+            if len(truncated) < 40:
+                truncated = meta_title[:self.MAX_META_TITLE_LENGTH]
+            
+            article["meta_title"] = truncated
+            logger.warning(f"Meta title truncado de {meta_title_length} para {len(article['meta_title'])} caracteres")
+            logger.info(f"Meta title original: {meta_title}")
+            logger.info(f"Meta title truncado: {article['meta_title']}")
     
     def _validate_content_structure(self, article: Dict) -> Tuple[bool, str]:
         """Valida a estrutura do conteúdo v2.0 - Validação flexível baseada em qualidade narrativa"""
