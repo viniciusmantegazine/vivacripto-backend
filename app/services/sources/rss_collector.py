@@ -4,6 +4,7 @@ Coleta notícias de feeds RSS de fontes confiáveis
 """
 import feedparser
 import httpx
+import asyncio
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 from loguru import logger
@@ -36,11 +37,11 @@ class RSSCollector:
     ]
     
     def __init__(self):
-        self.timeout = 30
+        self.timeout = 10  # Reduzido para 10 segundos
     
     async def collect_all(self, hours_back: int = 24) -> List[Dict]:
         """
-        Coleta notícias de todos os feeds RSS
+        Coleta notícias de todos os feeds RSS em paralelo
         
         Args:
             hours_back: Quantas horas para trás buscar notícias
@@ -51,13 +52,21 @@ class RSSCollector:
         all_news = []
         cutoff_time = datetime.now() - timedelta(hours=hours_back)
         
-        for feed_config in self.RSS_FEEDS:
-            try:
-                news = await self._collect_from_feed(feed_config, cutoff_time)
-                all_news.extend(news)
-                logger.info(f"Coletadas {len(news)} notícias de {feed_config['name']}")
-            except Exception as e:
-                logger.error(f"Erro ao coletar de {feed_config['name']}: {e}")
+        # Coletar de todos os feeds em paralelo
+        tasks = [
+            self._collect_from_feed(feed_config, cutoff_time)
+            for feed_config in self.RSS_FEEDS
+        ]
+        
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        for i, result in enumerate(results):
+            feed_name = self.RSS_FEEDS[i]['name']
+            if isinstance(result, Exception):
+                logger.error(f"Erro ao coletar de {feed_name}: {result}")
+            elif isinstance(result, list):
+                all_news.extend(result)
+                logger.info(f"Coletadas {len(result)} notícias de {feed_name}")
         
         logger.info(f"Total de {len(all_news)} notícias coletadas de RSS feeds")
         return all_news
