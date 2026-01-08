@@ -70,3 +70,76 @@ async def get_automation_status(
         "remaining_slots": remaining,
         "limit_reached": remaining == 0,
     }
+
+
+@router.post("/test-generation")
+async def test_content_generation(
+    authorization: Optional[str] = Header(None),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Endpoint de teste para gerar um artigo sem coletar notícias
+    Usado para debug da validação de parágrafos
+    """
+    # Verificar autenticação
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Token de autorização ausente")
+    
+    token = authorization.replace("Bearer ", "")
+    if token != settings.AUTOMATION_TOKEN:
+        raise HTTPException(status_code=403, detail="Token de autorização inválido")
+    
+    logger.info("Teste de geração de conteúdo iniciado")
+    
+    from app.services.ai.content_generator import ContentGenerator
+    from app.services.automation.quality_validator import QualityValidator
+    from datetime import datetime
+    
+    # Notícia fictícia para teste
+    fake_news = {
+        "source": "Test Source",
+        "source_language": "en",
+        "title": "Bitcoin Reaches New All-Time High Above $100,000",
+        "url": "https://example.com/test",
+        "description": "Bitcoin has surged past $100,000 for the first time in history, marking a significant milestone for the cryptocurrency market.",
+        "published_at": datetime.now(),
+        "collected_at": datetime.now(),
+    }
+    
+    try:
+        # Gerar conteúdo
+        content_generator = ContentGenerator()
+        article = await content_generator.generate_article(fake_news)
+        
+        if not article:
+            return {
+                "success": False,
+                "error": "Falha ao gerar artigo"
+            }
+        
+        # Validar qualidade
+        validator = QualityValidator()
+        is_valid, errors = validator.validate_article(article)
+        
+        return {
+            "success": True,
+            "article_generated": True,
+            "validation_passed": is_valid,
+            "validation_errors": errors,
+            "article_preview": {
+                "title": article.get("title", ""),
+                "excerpt": article.get("excerpt", "")[:100],
+                "content_length": len(article.get("content_markdown", "")),
+                "word_count": len(article.get("content_markdown", "").split()),
+                "paragraph_count": len([p for p in article.get("content_markdown", "").split('\n\n') if p.strip()]),
+            }
+        }
+    
+    except Exception as e:
+        logger.error(f"Erro no teste de geração: {e}")
+        import traceback
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }

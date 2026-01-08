@@ -14,7 +14,7 @@ class APICollector:
     """Coletor de notícias via APIs externas"""
     
     def __init__(self):
-        self.timeout = 30
+        self.timeout = 10  # Reduzido para 10 segundos
         self.cryptopanic_api_key = settings.CRYPTOPANIC_API_KEY
     
     async def collect_all(self, hours_back: int = 24) -> List[Dict]:
