@@ -122,36 +122,80 @@ TAREFA EDITORIAL:
    - Se houver múltiplos fatos relacionados ao mesmo tópico, SINTETIZE tudo em UMA matéria única e profunda
    - NÃO fragmente em textos pequenos
 
-2. ESTRUTURA DO ARTIGO:
+2. ESTRUTURA OBRIGATÓRIA DO ARTIGO:
+   
+   ⚠️ ATENÇÃO: O artigo DEVE ter EXATAMENTE 3 parágrafos distintos, separados por quebras de linha duplas (\n\n).
    
    **Manchete interna (H2):**
    - Crie um subtítulo atrativo (sem clickbait excessivo)
    - Deve capturar a essência da notícia
    
-   **Corpo da notícia (2-3 parágrafos):**
-   - Parágrafo 1: Lead jornalístico (O quê? Quem? Quando? Onde?)
-   - Parágrafo 2: Contexto e detalhes técnicos
-   - Parágrafo 3: Análise de impacto - responda: "Por que isso importa?"
+   **PARÁGRAFO 1 - O GANCHO (Obrigatório):**
+   - Lead jornalístico direto: Quem? O quê? Quando? Onde?
+   - Resumo do fato principal em 2-3 frases
+   - Seja objetivo e impactante
    
-   **Enriquecimento:**
-   - Se mencionar termos técnicos (Halving, Smart Contract, Layer 2), explique brevemente
-   - Se houver dados numéricos (preços, %), verifique consistência
-   - Adicione contexto de mercado quando relevante
+   **PARÁGRAFO 2 - DETALHE/CONTEXTO (Obrigatório):**
+   - Expansão da notícia com detalhes técnicos
+   - Se a notícia original for curta, ENRIQUEÇA explicando conceitos técnicos
+   - Exemplos: Se mencionar ETF, explique brevemente o que é; se falar de Halving, contextualize
+   - Adicione histórico ou falas relevantes quando disponível
+   - NUNCA resuma demais - sempre expanda para dar substância
+   
+   **PARÁGRAFO 3 - IMPACTO/CONCLUSÃO (Obrigatório):**
+   - Análise de impacto: Como isso afeta o mercado?
+   - Responda: "Por que isso importa para o preço ou para a tecnologia?"
+   - Contexto de mercado (bull/bear market, sentimento, adoção)
+   - Perspectivas futuras quando aplicável
+   
+   **REGRA DE EXPANSÃO (Anti-Laconismo):**
+   ⚠️ Se o texto de entrada for muito curto, NÃO resuma.
+   ⚠️ Em vez disso, ENRIQUEÇA adicionando:
+      - Definições breves dos termos citados
+      - Contexto histórico do projeto/moeda
+      - Comparações com eventos similares
+      - Dados de mercado relevantes
+   ⚠️ Objetivo: Garantir que o texto final tenha substância e passe na validação
 
 3. PROFUNDIDADE:
-   - Alvo: 180-220 palavras
-   - Não seja raso - aprofunde no "porquê" e "impacto"
+   - Alvo: 200-250 palavras (aumentado para garantir substância)
+   - NUNCA seja raso - aprofunde no "porquê" e "impacto"
    - Use vocabulário nativo: bull market, suporte, resistência, adoção, regulação
+   - Prefira explicar a resumir
 
-4. FORMATAÇÃO MARKDOWN:
+4. FORMATAÇÃO MARKDOWN ESTRITA:
+   ⚠️ CRÍTICO: Use quebras de linha duplas (\n\n) entre TODOS os parágrafos
+   ⚠️ O validador Python usa content.split('\n\n') para contar parágrafos
+   ⚠️ Sem quebras duplas = rejeição automática
+   
+   Formatação permitida:
    - Use **negrito** para conceitos-chave
    - Use listas quando apropriado
-   - Mantenha parágrafos curtos (2-3 linhas)
+   - Mantenha cada parágrafo com 3-5 linhas
+   
+   Exemplo de estrutura correta:
+   ```
+   ## Título Atrativo
+   
+   Parágrafo 1 com lead jornalístico. Texto do gancho.
+   
+   Parágrafo 2 com contexto e detalhes técnicos. Explicação enriquecida.
+   
+   Parágrafo 3 com análise de impacto. Por que isso importa.
+   ```
 
 5. SANITIZAÇÃO CRÍTICA:
    ⚠️ ATENÇÃO: Comece DIRETAMENTE pelo conteúdo.
    ⚠️ NÃO escreva: "Título:", "Resumo:", "Corpo:", "Artigo:", ou qualquer prefixo de metadado.
    ⚠️ Apenas o texto Markdown puro, pronto para renderizar.
+
+6. CHECKLIST FINAL (Antes de enviar):
+   ✓ Tem exatamente 3 parágrafos?
+   ✓ Cada parágrafo está separado por quebra dupla (\n\n)?
+   ✓ Cada parágrafo tem 3+ linhas?
+   ✓ Total de palavras está entre 200-250?
+   ✓ Sem prefixos de metadados?
+   ✓ Markdown formatado corretamente?
 
 ═══════════════════════════════════════════════════════════════
 
