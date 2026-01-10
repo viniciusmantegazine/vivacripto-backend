@@ -12,7 +12,7 @@ import logging
 from abc import ABC, abstractmethod
 import uuid
 
-from similarity_engine import SimilarityFactory, SimilarityResult
+from .similarity_engine import SimilarityFactory, SimilarityResult
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
