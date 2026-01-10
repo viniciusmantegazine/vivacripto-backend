@@ -11,8 +11,8 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 
 # revision identifiers, used by Alembic.
-revision = '002_dedup_history'
-down_revision = '001_initial_migration'
+revision = '002'
+down_revision = '001'
 branch_labels = None
 depends_on = None
 
