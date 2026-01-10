@@ -68,6 +68,10 @@ class Settings(BaseSettings):
     DAILY_POST_LIMIT: int = 10
     AUTOMATION_INTERVAL_MINUTES: int = 30
     
+    # Deduplication
+    DEDUPLICATION_THRESHOLD: float = 0.80
+    DEDUPLICATION_ENGINE: str = "embedding"  # Options: levenshtein, tfidf, embedding, hybrid
+    
     # External APIs
     CRYPTOPANIC_API_KEY: str = ""
     

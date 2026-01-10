@@ -91,6 +91,9 @@ class Post(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
+    # Deduplication tracking
+    deduplication_history = Column(JSONB, nullable=True, server_default='[]')
+    
     # Relationships
     author = relationship("Author", back_populates="posts")
     category = relationship("Category", back_populates="posts")

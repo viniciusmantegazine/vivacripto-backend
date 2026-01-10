@@ -4,20 +4,22 @@ Orquestra todo o fluxo de automação de notícias
 """
 from typing import List, Dict
 from datetime import datetime, timedelta
+from uuid import UUID
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 import markdown
 import httpx
+import sentry_sdk
 
 from app.services.sources.news_aggregator import NewsAggregator
-from app.services.automation.deduplication import DeduplicationService
+from app.services.deduplication import DuplicateDetector, NewsAssignment, ActionType, PostRepositoryImpl
 from app.services.ai.content_generator import ContentGenerator
 from app.services.ai.image_generator import ImageGenerator
 from app.services.automation.quality_validator import QualityValidator
 from app.services.ai.category_classifier import category_classifier
 from app.crud.crud_post import crud_post
 from app.db.models import Category
-from app.schemas.post import PostCreate
+from app.schemas.post import PostCreate, PostUpdate
 from app.core.config import settings
 
 
@@ -29,7 +31,6 @@ class NewsPipeline:
     
     def __init__(self):
         self.aggregator = NewsAggregator()
-        self.deduplicator = DeduplicationService()
         self.content_generator = ContentGenerator()
         self.image_generator = ImageGenerator()
         self.validator = QualityValidator()
@@ -50,9 +51,10 @@ class NewsPipeline:
             "started_at": start_time,
             "status": "running",
             "collected": 0,
-            "filtered": 0,
-            "generated": 0,
+            "processed": 0,
             "published": 0,
+            "updated": 0,
+            "review_manual": 0,
             "failed": 0,
             "errors": [],
         }
@@ -83,36 +85,35 @@ class NewsPipeline:
                 logger.info(report["message"])
                 return report
             
-            # 3. Filtrar e deduplic ar
-            logger.info("\n[FASE 2] Filtrando e removendo duplicatas...")
-            unique_news = await self.deduplicator.filter_and_deduplicate(news_items, db)
-            report["filtered"] = len(unique_news)
+            # 3. Processar com detector de duplicatas
+            logger.info("\n[FASE 2] Verificando duplicatas e processando notícias...")
             
-            if not unique_news:
-                report["status"] = "completed"
-                report["message"] = "Todas as notícias eram duplicadas ou irrelevantes"
-                logger.info(report["message"])
-                return report
+            # Inicializar detector com repositório
+            repo = PostRepositoryImpl(db)
+            detector = DuplicateDetector(
+                repository=repo,
+                similarity_threshold=getattr(settings, 'DEDUPLICATION_THRESHOLD', 0.80),
+                engine_type=getattr(settings, 'DEDUPLICATION_ENGINE', 'embedding')
+            )
             
-            # 4. Limitar a 1 notícia por execução
+            # Limitar processamento
             remaining_slots = await self._get_remaining_daily_slots(db)
-            posts_to_generate = min(self.POSTS_PER_EXECUTION, remaining_slots, len(unique_news))
-            unique_news = unique_news[:posts_to_generate]
-            logger.info(f"Processando {posts_to_generate} notícia(s) (slots disponíveis hoje: {remaining_slots})")
+            posts_to_process = min(self.POSTS_PER_EXECUTION, remaining_slots, len(news_items))
+            logger.info(f"Processando até {posts_to_process} notícia(s) (slots disponíveis: {remaining_slots})")
             
-            # 5. Gerar e publicar artigos
-            logger.info("\n[FASE 3] Gerando e publicando artigos...")
-            for i, source_news in enumerate(unique_news, 1):
+            processed_count = 0
+            
+            for i, source_news in enumerate(news_items[:posts_to_process], 1):
                 try:
-                    logger.info(f"\n--- Artigo {i}/{len(unique_news)} ---")
+                    logger.info(f"\n--- Notícia {i}/{posts_to_process} ---")
+                    logger.info(f"Título: {source_news.get('title', '')[:80]}...")
                     
-                    # Gerar conteúdo
+                    # Gerar artigo primeiro
                     article = await self.content_generator.generate_article(source_news)
                     if not article:
+                        logger.warning("Falha ao gerar artigo")
                         report["failed"] += 1
                         continue
-                    
-                    report["generated"] += 1
                     
                     # Validar qualidade
                     is_valid, errors = self.validator.validate_article(article)
@@ -122,41 +123,87 @@ class NewsPipeline:
                         report["errors"].extend(errors)
                         continue
                     
-                    # Gerar imagem
-                    image_url = await self.image_generator.generate_and_upload_image(
-                        article["title"],
-                        article["content_markdown"]
+                    # Criar NewsAssignment para o detector
+                    assignment = NewsAssignment(
+                        titulo=article["title"],
+                        resumo=article.get("excerpt", ""),
+                        conteudo=article["content_markdown"],
+                        fonte=source_news.get("source_name", ""),
+                        timestamp=datetime.utcnow().isoformat()
                     )
-                    if image_url:
-                        article["featured_image_url"] = image_url
                     
-                    # Publicar
-                    published = await self._publish_article(article, db)
-                    if published:
-                        report["published"] += 1
-                        logger.info(f"✓ Artigo publicado: {article['title']}")
-                    else:
-                        report["failed"] += 1
+                    # Verificar duplicatas
+                    check_result = await detector.check_duplicate(assignment)
+                    
+                    if check_result.acao == ActionType.CREATE_NEW:
+                        logger.info(f"✨ Ação: CRIAR NOVO POST")
+                        
+                        # Publicar artigo
+                        published = await self._publish_article(article, db)
+                        if published:
+                            report["published"] += 1
+                            processed_count += 1
+                            logger.info(f"✓ Artigo publicado com sucesso")
+                        else:
+                            report["failed"] += 1
+                    
+                    elif check_result.acao == ActionType.UPDATE_EXISTING:
+                        logger.info(f"➕ Ação: ATUALIZAR POST EXISTENTE (ID: {check_result.post_existente_id})")
+                        
+                        # Atualizar post existente com novo conteúdo
+                        updated = await self._update_existing_post(
+                            check_result.post_existente_id,
+                            article,
+                            db
+                        )
+                        if updated:
+                            report["updated"] += 1
+                            processed_count += 1
+                            logger.info(f"✓ Post atualizado com sucesso")
+                        else:
+                            report["failed"] += 1
+                    
+                    elif check_result.acao == ActionType.REVIEW_MANUAL:
+                        logger.warning(f"⚠️ Ação: REVISÃO MANUAL NECESSÁRIA")
+                        logger.warning(f"Similaridade máxima: {check_result.similaridade_maxima:.2f}")
+                        logger.warning(f"Candidatos similares: {len(check_result.candidatos_similares)}")
+                        
+                        report["review_manual"] += 1
+                        
+                        # Enviar para Sentry para análise
+                        sentry_sdk.capture_message(
+                            f"Pauta para revisão manual: {assignment.titulo}",
+                            level="warning",
+                            extras={
+                                "similaridade": check_result.similaridade_maxima,
+                                "candidatos": check_result.candidatos_similares,
+                                "titulo": assignment.titulo
+                            }
+                        )
                 
                 except Exception as e:
                     logger.error(f"Erro ao processar notícia: {e}")
+                    import traceback
+                    logger.error(f"Traceback: {traceback.format_exc()}")
                     report["failed"] += 1
                     report["errors"].append(str(e))
             
-            # 6. Revalidar frontend (ISR)
-            if report["published"] > 0:
+            # 4. Revalidar frontend se houver mudanças
+            if (report["published"] + report["updated"]) > 0:
                 await self._revalidate_frontend()
             
             report["status"] = "completed"
+            report["processed"] = processed_count
             report["completed_at"] = datetime.now()
             report["duration_seconds"] = (report["completed_at"] - start_time).total_seconds()
             
             logger.info("\n" + "=" * 60)
             logger.info("PIPELINE CONCLUÍDO")
             logger.info(f"Coletadas: {report['collected']}")
-            logger.info(f"Filtradas: {report['filtered']}")
-            logger.info(f"Geradas: {report['generated']}")
+            logger.info(f"Processadas: {report['processed']}")
             logger.info(f"Publicadas: {report['published']}")
+            logger.info(f"Atualizadas: {report['updated']}")
+            logger.info(f"Revisão Manual: {report['review_manual']}")
             logger.info(f"Falhas: {report['failed']}")
             logger.info(f"Duração: {report['duration_seconds']:.1f}s")
             logger.info("=" * 60)
@@ -165,6 +212,8 @@ class NewsPipeline:
         
         except Exception as e:
             logger.error(f"Erro fatal no pipeline: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             report["status"] = "error"
             report["error"] = str(e)
             return report
@@ -221,6 +270,12 @@ class NewsPipeline:
                 db.add(category)
                 await db.flush()
             
+            # Gerar imagem
+            image_url = await self.image_generator.generate_and_upload_image(
+                article["title"],
+                article["content_markdown"]
+            )
+            
             # Criar post
             post_data = PostCreate(
                 title=article["title"],
@@ -228,7 +283,7 @@ class NewsPipeline:
                 content_markdown=article["content_markdown"],
                 content_html=content_html,
                 excerpt=article.get("excerpt"),
-                featured_image_url=article.get("featured_image_url"),
+                featured_image_url=image_url or article.get("featured_image_url"),
                 status="published",
                 published_at=datetime.now(),
                 meta_title=article.get("meta_title"),
@@ -244,6 +299,37 @@ class NewsPipeline:
         
         except Exception as e:
             logger.error(f"Erro ao publicar artigo: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            await db.rollback()
+            return False
+    
+    async def _update_existing_post(self, post_id: str, article: Dict, db: AsyncSession) -> bool:
+        """Atualiza um post existente com novo conteúdo"""
+        try:
+            # Converter markdown para HTML
+            content_html = markdown.markdown(
+                article["content_markdown"],
+                extensions=['extra', 'codehilite']
+            )
+            
+            # Atualizar post
+            post_update = PostUpdate(
+                content_markdown=article["content_markdown"],
+                content_html=content_html,
+                updated_at=datetime.now()
+            )
+            
+            await crud_post.update_post(db, post_id=UUID(post_id), post_in=post_update)
+            await db.commit()
+            
+            logger.info(f"Post {post_id} atualizado com novo conteúdo")
+            return True
+        
+        except Exception as e:
+            logger.error(f"Erro ao atualizar post: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             await db.rollback()
             return False
     
