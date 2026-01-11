@@ -228,7 +228,7 @@ class DuplicateDetector:
         logger.info(f"Verificando pauta: {assignment.id}")
         
         # Buscar posts das últimas 24 horas
-        recent_posts = self.repository.get_posts_last_24h()
+        recent_posts = await self.repository.get_posts_last_24h()
         
         if not recent_posts:
             logger.info("Nenhum post recente encontrado. Criando novo.")
