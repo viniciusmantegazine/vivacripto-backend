@@ -276,7 +276,18 @@ class NewsPipeline:
                 article["content_markdown"]
             )
             
-            # Criar post
+            # Criar post com validação de tamanho dos campos meta
+            meta_title = article.get("meta_title", "")
+            meta_description = article.get("meta_description", "")
+            
+            # Truncar meta_title para 70 caracteres
+            if meta_title and len(meta_title) > 70:
+                meta_title = meta_title[:67] + "..."
+            
+            # Truncar meta_description para 160 caracteres
+            if meta_description and len(meta_description) > 160:
+                meta_description = meta_description[:157] + "..."
+            
             post_data = PostCreate(
                 title=article["title"],
                 slug=article["slug"],
@@ -286,8 +297,8 @@ class NewsPipeline:
                 featured_image_url=image_url or article.get("featured_image_url"),
                 status="published",
                 published_at=datetime.now(),
-                meta_title=article.get("meta_title"),
-                meta_description=article.get("meta_description"),
+                meta_title=meta_title or None,
+                meta_description=meta_description or None,
                 canonical_url=None,
                 category_id=category.id,
             )
