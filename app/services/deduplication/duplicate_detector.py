@@ -215,7 +215,7 @@ class DuplicateDetector:
             f"review_threshold={review_threshold:.0%}"
         )
     
-    def check_duplicate(self, assignment: NewsAssignment) -> DuplicateCheckResult:
+    async def check_duplicate(self, assignment: NewsAssignment) -> DuplicateCheckResult:
         """
         Verifica se uma pauta é duplicata de algum post existente
         
