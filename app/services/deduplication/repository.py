@@ -81,6 +81,6 @@ class PostRepositoryImpl(PostRepository):
             data_criacao=post_model.created_at.isoformat(),
             data_atualizacao=post_model.updated_at.isoformat(),
             fonte="",  # O modelo Post não tem fonte, pode ser adicionado se necessário
-            tags=[str(tag.name) for tag in post_model.tags] if post_model.tags else [],
+            tags=[],  # Tags não são necessárias para detecção de duplicatas
             historico_atualizacoes=[]  # Será implementado quando o campo for adicionado ao modelo
         )
