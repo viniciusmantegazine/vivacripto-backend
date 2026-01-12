@@ -96,6 +96,47 @@ async def health_check(db: AsyncSession = Depends(get_db)):
     }
 
 
+@router.get("/ready")
+async def readiness_check(db: AsyncSession = Depends(get_db)):
+    """
+    Kubernetes-style readiness probe.
+    Returns 200 if the service is ready to receive traffic.
+    Returns 503 if critical dependencies are unhealthy.
+    """
+    from fastapi.responses import JSONResponse
+
+    database = await check_database(db)
+    redis_status = await check_redis()
+
+    db_ready = database.get("status") == "healthy"
+    redis_ready = redis_status.get("status") in ("healthy", "not_configured")
+
+    if db_ready and redis_ready:
+        return {"status": "ready", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+    return JSONResponse(
+        status_code=503,
+        content={
+            "status": "not_ready",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "checks": {
+                "database": database,
+                "redis": redis_status,
+            },
+        },
+    )
+
+
+@router.get("/live")
+async def liveness_check():
+    """
+    Kubernetes-style liveness probe.
+    Returns 200 if the process is alive.
+    This is a lightweight check that doesn't hit external services.
+    """
+    return {"status": "alive", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
 @router.get("/detailed")
 async def detailed_health_check(db: AsyncSession = Depends(get_db)):
     """

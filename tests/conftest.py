@@ -9,17 +9,17 @@ from uuid import uuid4
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import create_engine, event
+from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.models import Base, Category, Post, Author
+from app.db.models import Author, Base, Category, Post, Tag
 
 
 # ============================================================================
 # Database Fixtures
 # ============================================================================
+
 
 @pytest.fixture(scope="session")
 def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
@@ -70,6 +70,7 @@ async def db_session(async_db_engine) -> AsyncGenerator[AsyncSession, None]:
 # Model Fixtures
 # ============================================================================
 
+
 @pytest_asyncio.fixture
 async def test_category(db_session: AsyncSession) -> Category:
     """Create a test category."""
@@ -100,9 +101,24 @@ async def test_author(db_session: AsyncSession) -> Author:
 
 
 @pytest_asyncio.fixture
+async def test_tag(db_session: AsyncSession) -> Tag:
+    """Create a test tag."""
+    tag = Tag(
+        id=uuid4(),
+        name="Crypto",
+        slug="crypto",
+    )
+    db_session.add(tag)
+    await db_session.commit()
+    await db_session.refresh(tag)
+    return tag
+
+
+@pytest_asyncio.fixture
 async def test_post(
     db_session: AsyncSession,
     test_category: Category,
+    test_author: Author,
 ) -> Post:
     """Create a test post."""
     post = Post(
@@ -115,6 +131,29 @@ async def test_post(
         status="published",
         published_at=datetime.now(timezone.utc),
         category_id=test_category.id,
+        author_id=test_author.id,
+    )
+    db_session.add(post)
+    await db_session.commit()
+    await db_session.refresh(post)
+    return post
+
+
+@pytest_asyncio.fixture
+async def test_draft_post(
+    db_session: AsyncSession,
+    test_category: Category,
+) -> Post:
+    """Create a test draft post."""
+    post = Post(
+        id=uuid4(),
+        title="Draft Post Title",
+        slug="draft-post-title",
+        content_markdown="# Draft Content\n\nThis is draft content.",
+        content_html="<h1>Draft Content</h1><p>This is draft content.</p>",
+        excerpt="This is a draft excerpt.",
+        status="draft",
+        category_id=test_category.id,
     )
     db_session.add(post)
     await db_session.commit()
@@ -126,6 +165,7 @@ async def test_post(
 # Mock Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def mock_openai():
     """Mock OpenAI client for testing."""
@@ -136,8 +176,14 @@ def mock_openai():
         # Mock chat completions
         completion = MagicMock()
         completion.choices = [MagicMock()]
-        completion.choices[0].message.content = '{"title": "Test", "content": "Test content"}'
+        completion.choices[0].message.content = "## Test Article\n\nThis is a test article about Bitcoin."
         client.chat.completions.create = AsyncMock(return_value=completion)
+
+        # Mock image generation
+        image_response = MagicMock()
+        image_response.data = [MagicMock()]
+        image_response.data[0].url = "https://oaidalleapiprodscus.blob.core.windows.net/test.png"
+        client.images.generate = AsyncMock(return_value=image_response)
 
         yield client
 
@@ -185,8 +231,31 @@ def mock_redis():
 
 
 # ============================================================================
+# API Client Fixtures
+# ============================================================================
+
+
+@pytest_asyncio.fixture
+async def api_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+    """Create an async HTTP client for API testing."""
+    from app.db.base import get_db
+    from app.main import app
+
+    async def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        yield client
+
+    app.dependency_overrides.clear()
+
+
+# ============================================================================
 # Helper Functions
 # ============================================================================
+
 
 def create_test_post_data(
     title: str = "Test Post",
@@ -213,4 +282,17 @@ def create_test_article_data() -> dict:
         "excerpt": "Bitcoin surges to new heights.",
         "meta_title": "Bitcoin ATH - VivaCripto",
         "meta_description": "Breaking: Bitcoin reaches new all-time high.",
+    }
+
+
+def create_test_news_item() -> dict:
+    """Create test news item for pipeline tests."""
+    return {
+        "source": "CoinDesk",
+        "source_language": "en",
+        "title": "Bitcoin Breaks $100,000 For First Time",
+        "url": "https://coindesk.com/test-article",
+        "description": "Bitcoin has surpassed $100,000 for the first time, marking a historic milestone.",
+        "published_at": datetime.now(timezone.utc),
+        "collected_at": datetime.now(timezone.utc),
     }
