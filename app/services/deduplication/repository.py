@@ -59,12 +59,11 @@ class PostRepositoryImpl(PostRepository):
 
     async def update_post(self, post_dataclass: PublishedPost) -> None:
         """Atualiza um post existente."""
-        # Atualizar o conteúdo e o histórico de deduplicação
+        # Atualizar o conteúdo (updated_at é atualizado automaticamente pelo ORM)
         post_update_schema = PostUpdate(
             content_markdown=post_dataclass.conteudo,
-            updated_at=datetime.fromisoformat(post_dataclass.data_atualizacao)
         )
-        
+
         await crud_post.update_post(
             self.db,
             post_id=UUID(post_dataclass.id),

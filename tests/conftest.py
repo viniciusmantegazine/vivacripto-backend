@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.models import Base, Category, Post, User
+from app.db.models import Base, Category, Post, Author
 
 
 # ============================================================================
@@ -85,19 +85,18 @@ async def test_category(db_session: AsyncSession) -> Category:
 
 
 @pytest_asyncio.fixture
-async def test_user(db_session: AsyncSession) -> User:
-    """Create a test user."""
-    user = User(
+async def test_author(db_session: AsyncSession) -> Author:
+    """Create a test author."""
+    author = Author(
         id=uuid4(),
-        email="test@example.com",
-        hashed_password="hashed_password_here",
-        full_name="Test User",
-        is_active=True,
+        name="Test Author",
+        bio="A test author for unit tests.",
+        avatar_url="https://example.com/avatar.jpg",
     )
-    db_session.add(user)
+    db_session.add(author)
     await db_session.commit()
-    await db_session.refresh(user)
-    return user
+    await db_session.refresh(author)
+    return author
 
 
 @pytest_asyncio.fixture

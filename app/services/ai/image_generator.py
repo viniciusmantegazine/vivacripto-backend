@@ -2,20 +2,27 @@
 Image Generation Service - Data Visualization Style v5.0
 Gera visualizações de dados abstratas e sofisticadas com estética de terminal financeiro
 """
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
-from openai import OpenAI
+
+from openai import AsyncOpenAI
 import cloudinary
 import cloudinary.uploader
+
 from app.core.config import settings
 from app.core.logging import logger
+
+# ThreadPool para operações síncronas do Cloudinary
+_cloudinary_executor = ThreadPoolExecutor(max_workers=3)
 
 
 class ImageGenerator:
     """Gerador de imagens v5.0 - Visualização de dados abstratos"""
-    
+
     def __init__(self):
-        """Inicializa o gerador de imagens"""
-        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        """Inicializa o gerador de imagens com cliente assíncrono"""
+        self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         
         # Configurar Cloudinary
         cloudinary.config(
@@ -81,28 +88,32 @@ COLOR PALETTE: Dark monochromatic (charcoal gray, deep navy blue) with precise a
 QUALITY: 8k rendering, high complexity, futuristic UI style, no text."""
             
             logger.debug(f"Prompt v5.0 (primeiros 200 chars): {prompt[:200]}...")
-            
-            # Gerar imagem com DALL-E 3
-            response = self.client.images.generate(
+
+            # Gerar imagem com DALL-E 3 (async)
+            response = await self.client.images.generate(
                 model="dall-e-3",
                 prompt=prompt,
                 size="1792x1024",  # Widescreen 16:9 para header de artigo
                 quality="hd",
                 n=1
             )
-            
+
             image_url = response.data[0].url
             logger.info(f"Imagem gerada com sucesso: {image_url}")
-            
-            # Upload para Cloudinary
-            upload_result = cloudinary.uploader.upload(
-                image_url,
-                folder="vivacripto/articles",
-                transformation=[
-                    {'width': 1200, 'height': 630, 'crop': 'fill', 'gravity': 'center', 'quality': 'auto:good'}
-                ]
+
+            # Upload para Cloudinary (executar em thread pool para não bloquear)
+            loop = asyncio.get_event_loop()
+            upload_result = await loop.run_in_executor(
+                _cloudinary_executor,
+                lambda: cloudinary.uploader.upload(
+                    image_url,
+                    folder="vivacripto/articles",
+                    transformation=[
+                        {'width': 1200, 'height': 630, 'crop': 'fill', 'gravity': 'center', 'quality': 'auto:good'}
+                    ]
+                )
             )
-            
+
             cloudinary_url = upload_result['secure_url']
             logger.info(f"Upload para Cloudinary concluído: {cloudinary_url}")
             

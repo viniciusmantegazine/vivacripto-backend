@@ -124,8 +124,14 @@ async def test_content_generation(
 
     except Exception as e:
         logger.error(f"Erro no teste de geração: {e}")
-        return {
+        # Em produção, não expor traceback para evitar information disclosure
+        from app.core.config import settings
+        error_response = {
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": "Erro interno ao gerar conteúdo de teste"
         }
+        # Apenas incluir detalhes em modo debug
+        if settings.DEBUG:
+            error_response["error_detail"] = str(e)
+            error_response["traceback"] = traceback.format_exc()
+        return error_response

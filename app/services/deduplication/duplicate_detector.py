@@ -323,22 +323,22 @@ class DuplicateDetector:
                 motivo=f"Conteúdo suficientemente diferente (max: {max_similarity:.0%})"
             )
     
-    def process_assignment(
+    async def process_assignment(
         self,
         assignment: NewsAssignment
     ) -> Tuple[DuplicateCheckResult, Optional[PublishedPost]]:
         """
         Processa uma pauta completa: verifica duplicata e toma ação
-        
+
         Args:
             assignment: Pauta de notícia
-        
+
         Returns:
             Tupla (resultado_verificacao, post_criado_ou_atualizado)
         """
-        # Verificar duplicata
-        check_result = self.check_duplicate(assignment)
-        
+        # Verificar duplicata (async)
+        check_result = await self.check_duplicate(assignment)
+
         if check_result.acao == ActionType.CREATE_NEW:
             # Criar novo post
             new_post = PublishedPost(
@@ -351,45 +351,45 @@ class DuplicateDetector:
                 fonte=assignment.fonte,
                 tags=self._extract_tags(assignment)
             )
-            
-            self.repository.save_post(new_post)
+
+            await self.repository.save_post(new_post)
             logger.info(f"Novo post criado: {new_post.id}")
-            
+
             return check_result, new_post
-        
+
         elif check_result.acao == ActionType.UPDATE_EXISTING:
             # Atualizar post existente
-            existing_post = self.repository.get_post_by_id(
+            existing_post = await self.repository.get_post_by_id(
                 check_result.post_existente_id
             )
-            
+
             if existing_post is None:
                 logger.error(
                     f"Post {check_result.post_existente_id} não encontrado"
                 )
                 return check_result, None
-            
+
             # Adicionar atualização ao histórico
             update = PostUpdate(
-                timestamp=datetime.now().isoformat(),
+                timestamp=datetime.now(timezone.utc).isoformat(),
                 tipo_atualizacao="nova_informacao",
                 conteudo_adicionado=assignment.conteudo,
                 fonte=assignment.fonte,
                 resumo_mudancas=f"Atualizado com informação de {assignment.fonte}"
             )
-            
+
             existing_post.historico_atualizacoes.append(update)
-            existing_post.data_atualizacao = datetime.now().isoformat()
-            
+            existing_post.data_atualizacao = datetime.now(timezone.utc).isoformat()
+
             # Complementar conteúdo se necessário
             if assignment.conteudo not in existing_post.conteudo:
                 existing_post.conteudo += f"\n\n[Atualização - {assignment.fonte}]\n{assignment.conteudo}"
-            
-            self.repository.update_post(existing_post)
+
+            await self.repository.update_post(existing_post)
             logger.info(f"Post atualizado: {existing_post.id}")
-            
+
             return check_result, existing_post
-        
+
         else:
             # Revisão manual
             logger.warning(
@@ -447,18 +447,18 @@ class PipelineOrchestrator:
         self.auto_publish = auto_publish
         self.processing_log: List[Dict] = []
     
-    def process_batch(self, assignments: List[NewsAssignment]) -> Dict:
+    async def process_batch(self, assignments: List[NewsAssignment]) -> Dict:
         """
         Processa um lote de pautas
-        
+
         Args:
             assignments: Lista de pautas para processar
-        
+
         Returns:
             Resumo do processamento
         """
         logger.info(f"Processando lote de {len(assignments)} pautas")
-        
+
         results = {
             "total": len(assignments),
             "criados": 0,
@@ -466,27 +466,27 @@ class PipelineOrchestrator:
             "revisao_manual": 0,
             "detalhes": []
         }
-        
+
         for assignment in assignments:
             try:
-                check_result, post = self.detector.process_assignment(assignment)
-                
+                check_result, post = await self.detector.process_assignment(assignment)
+
                 results["detalhes"].append(check_result.to_dict())
-                
+
                 if check_result.acao == ActionType.CREATE_NEW:
                     results["criados"] += 1
                 elif check_result.acao == ActionType.UPDATE_EXISTING:
                     results["atualizados"] += 1
                 else:
                     results["revisao_manual"] += 1
-                
+
             except Exception as e:
                 logger.error(f"Erro ao processar pauta {assignment.id}: {e}")
                 results["detalhes"].append({
                     "pauta_id": assignment.id,
                     "erro": str(e)
                 })
-        
+
         # Resumo
         logger.info(
             f"Lote processado: "
@@ -494,7 +494,7 @@ class PipelineOrchestrator:
             f"{results['atualizados']} atualizados, "
             f"{results['revisao_manual']} para revisão"
         )
-        
+
         return results
     
     def get_processing_log(self) -> List[Dict]:
