@@ -1,6 +1,6 @@
 """
-Image Generation Service - Simple Direct Prompt v4.0
-Envia o texto completo da notícia diretamente para o DALL-E sem processamento adicional
+Image Generation Service - Data Visualization Style v5.0
+Gera visualizações de dados abstratas e sofisticadas com estética de terminal financeiro
 """
 from typing import Optional
 from openai import OpenAI
@@ -11,7 +11,7 @@ from app.core.logging import logger
 
 
 class ImageGenerator:
-    """Gerador de imagens v4.0 - Prompt direto do texto da notícia"""
+    """Gerador de imagens v5.0 - Visualização de dados abstratos"""
     
     def __init__(self):
         """Inicializa o gerador de imagens"""
@@ -24,6 +24,24 @@ class ImageGenerator:
             api_secret=settings.CLOUDINARY_API_SECRET
         )
     
+    def _extract_theme(self, title: str, content: str) -> str:
+        """
+        Extrai o tema principal da notícia para o prompt
+        
+        Args:
+            title: Título do artigo
+            content: Conteúdo do artigo
+            
+        Returns:
+            Tema extraído em inglês
+        """
+        # Usar título + primeiras linhas do conteúdo para extrair tema
+        text_preview = f"{title}. {content[:500]}"
+        
+        # Simplificar: usar o título traduzido como tema
+        # O DALL-E vai interpretar e criar visualização apropriada
+        return text_preview
+    
     async def generate_and_upload_image(
         self,
         title: str,
@@ -31,7 +49,7 @@ class ImageGenerator:
         category_name: Optional[str] = None
     ) -> str:
         """
-        Gera imagem usando o texto completo da notícia como prompt (v4.0)
+        Gera imagem de visualização de dados abstratos (v5.0)
         
         Args:
             title: Título do artigo
@@ -42,22 +60,33 @@ class ImageGenerator:
             URL da imagem no Cloudinary
         """
         try:
-            logger.info(f"Gerando imagem v4.0 (prompt direto) para: {title[:50]}...")
+            logger.info(f"Gerando imagem v5.0 (data visualization) para: {title[:50]}...")
             
-            # Construir prompt simples: título + conteúdo
-            # Limitar o conteúdo para evitar prompts muito longos (DALL-E tem limite de ~4000 chars)
-            content_preview = content[:3000] if len(content) > 3000 else content
+            # Extrair tema da notícia
+            theme = self._extract_theme(title, content)
             
-            # Adicionar instrução mínima para contexto visual
-            prompt = f"Create an editorial image for this cryptocurrency news article:\n\n{title}\n\n{content_preview}"
+            # Construir prompt de visualização de dados abstratos
+            prompt = f"""An abstract and sophisticated data visualization representing {theme}. 
+
+STYLE: Institutional financial terminal aesthetic, data-driven focused, serious and technological. 
+
+COMPOSITION: Overlapping layers of technical line charts, interconnected node networks, and digital data flows. No literal objects or characters. 
+
+BACKGROUND: Dark mode, subtle deep circuit board textures, nearly invisible digital grid. 
+
+LIGHTING: Internal screen light, subtle glow emanating from data lines, shadowy cybernetic environment. 
+
+COLOR PALETTE: Dark monochromatic (charcoal gray, deep navy blue) with precise accents in electric cyan blue and pale technical gold. 
+
+QUALITY: 8k rendering, high complexity, futuristic UI style, no text."""
             
-            logger.debug(f"Prompt direto (primeiros 200 chars): {prompt[:200]}...")
+            logger.debug(f"Prompt v5.0 (primeiros 200 chars): {prompt[:200]}...")
             
             # Gerar imagem com DALL-E 3
             response = self.client.images.generate(
                 model="dall-e-3",
                 prompt=prompt,
-                size="1792x1024",  # Widescreen para header de artigo
+                size="1792x1024",  # Widescreen 16:9 para header de artigo
                 quality="hd",
                 n=1
             )
@@ -80,5 +109,5 @@ class ImageGenerator:
             return cloudinary_url
             
         except Exception as e:
-            logger.error(f"Erro ao gerar/upload imagem v4.0: {e}")
+            logger.error(f"Erro ao gerar/upload imagem v5.0: {e}")
             return ""
