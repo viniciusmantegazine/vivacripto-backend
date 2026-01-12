@@ -140,6 +140,12 @@ class Settings(BaseSettings):
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    # Database Pool Settings
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 20
+    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_RECYCLE: int = 1800  # Recycle connections after 30 minutes
+
     # Automation
     DAILY_POST_LIMIT: int = 10
     AUTOMATION_INTERVAL_MINUTES: int = 30

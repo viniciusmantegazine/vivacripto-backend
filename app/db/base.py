@@ -1,24 +1,27 @@
 """
 Database configuration and session management
 """
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
-from app.core.config import settings
-from app.db.base_class import Base
 
-# Create async engine
+from app.core.config import settings
+from app.db.base_class import Base  # noqa: F401
+
+# Create async engine with optimized pool settings
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=False,
+    echo=settings.DEBUG,  # Log SQL only in debug mode
     future=True,
-    pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=10,
-    pool_timeout=30,
-    pool_recycle=3600,
+    pool_pre_ping=True,  # Test connections before use
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
+    pool_timeout=settings.DB_POOL_TIMEOUT,
+    pool_recycle=settings.DB_POOL_RECYCLE,
     connect_args={
         "server_settings": {"application_name": "vivacripto-api"},
         "timeout": 10,
+        # Prepared statements for better performance
+        "prepared_statement_cache_size": 256,
     }
 )
 
@@ -33,7 +36,29 @@ AsyncSessionLocal = sessionmaker(
 
 
 async def get_db() -> AsyncSession:
-    """Dependency to get database session"""
+    """
+    Dependency to get database session.
+
+    Usage:
+        @router.get("/items")
+        async def get_items(db: AsyncSession = Depends(get_db)):
+            ...
+    """
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
+
+
+async def get_db_context():
+    """
+    Get database session as async context manager.
+
+    Usage:
+        async with get_db_context() as db:
+            ...
+    """
     async with AsyncSessionLocal() as session:
         try:
             yield session

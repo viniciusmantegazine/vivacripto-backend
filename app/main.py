@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from app.api.v1.api import api_router
+from app.core.cache import close_cache, init_cache
 from app.core.config import settings
 from app.core.exceptions import AppException
 from app.core.logging import logger, set_request_context, setup_logging
@@ -25,9 +26,11 @@ async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
     logger.info("Iniciando VivaCripto API...")
+    await init_cache()
     yield
     # Shutdown
     logger.info("Encerrando VivaCripto API...")
+    await close_cache()
 
 
 app = FastAPI(
