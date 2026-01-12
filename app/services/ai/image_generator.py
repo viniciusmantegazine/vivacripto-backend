@@ -48,7 +48,8 @@ class ImageGenerator:
             # Limitar o conteúdo para evitar prompts muito longos (DALL-E tem limite de ~4000 chars)
             content_preview = content[:3000] if len(content) > 3000 else content
             
-            prompt = f"{title}\n\n{content_preview}"
+            # Adicionar instrução mínima para contexto visual
+            prompt = f"Create an editorial image for this cryptocurrency news article:\n\n{title}\n\n{content_preview}"
             
             logger.debug(f"Prompt direto (primeiros 200 chars): {prompt[:200]}...")
             
