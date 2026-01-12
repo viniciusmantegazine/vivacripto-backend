@@ -6,6 +6,7 @@ Utiliza serviços especializados para cada etapa do processo.
 import traceback
 from datetime import datetime, timezone
 from typing import Dict
+from uuid import uuid4
 
 import httpx
 import sentry_sdk
@@ -13,6 +14,7 @@ from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.metrics import MetricsCollector
 from app.crud.crud_post import crud_post
 from app.services.ai.content_generator import ContentGenerator
 from app.services.ai.image_generator import ImageGenerator
@@ -52,16 +54,20 @@ class NewsPipeline:
     async def run(self, db: AsyncSession) -> Dict:
         """
         Executa o pipeline completo de automação
-        
+
         Returns:
-            Relatório da execução com estatísticas
+            Relatório da execução com estatísticas e métricas de performance
         """
+        run_id = str(uuid4())[:8]
+        metrics = MetricsCollector(run_id)
+
         logger.info("=" * 60)
-        logger.info("INICIANDO PIPELINE DE AUTOMAÇÃO DE NOTÍCIAS")
+        logger.info(f"INICIANDO PIPELINE DE AUTOMAÇÃO DE NOTÍCIAS [run_id={run_id}]")
         logger.info("=" * 60)
-        
+
         start_time = datetime.now(timezone.utc)
         report = {
+            "run_id": run_id,
             "started_at": start_time,
             "status": "running",
             "collected": 0,
@@ -72,7 +78,7 @@ class NewsPipeline:
             "failed": 0,
             "errors": [],
         }
-        
+
         try:
             # 1. Verificar limite diário
             logger.info("Verificando limite diário de posts...")
@@ -81,62 +87,70 @@ class NewsPipeline:
                 report["message"] = f"Limite diário de {self.MAX_POSTS_PER_DAY} posts atingido"
                 logger.warning(report["message"])
                 return report
-            
-            # 2. Coletar notícias
+
+            # 2. Coletar notícias (com métricas)
             logger.info("\n[FASE 1] Coletando notícias das fontes...")
             try:
-                news_items = await self.aggregator.collect_news(hours_back=24)
+                with metrics.measure("collection"):
+                    news_items = await self.aggregator.collect_news(hours_back=24)
+                metrics.metrics.news_collected = len(news_items)
                 report["collected"] = len(news_items)
             except Exception as e:
                 logger.error(f"Erro ao coletar notícias: {type(e).__name__}: {e}")
-                import traceback
-                logger.error(f"Traceback: {traceback.format_exc()}")
+                metrics.record_error(f"Collection failed: {e}")
                 raise
-            
+
             if not news_items:
                 report["status"] = "completed"
                 report["message"] = "Nenhuma notícia nova encontrada"
                 logger.info(report["message"])
+                metrics.finalize()
+                metrics.log_summary()
+                report["metrics"] = metrics.get_metrics_dict()
                 return report
-            
+
             # 3. Processar com detector de duplicatas
             logger.info("\n[FASE 2] Verificando duplicatas e processando notícias...")
-            
-            # Inicializar detector com repositório
+
             repo = PostRepositoryImpl(db)
             detector = DuplicateDetector(
                 repository=repo,
                 similarity_threshold=getattr(settings, 'DEDUPLICATION_THRESHOLD', 0.80),
                 engine_type=getattr(settings, 'DEDUPLICATION_ENGINE', 'embedding')
             )
-            
-            # Limitar processamento
+
             remaining_slots = await self._get_remaining_daily_slots(db)
             posts_to_process = min(self.POSTS_PER_EXECUTION, remaining_slots, len(news_items))
             logger.info(f"Processando até {posts_to_process} notícia(s) (slots disponíveis: {remaining_slots})")
-            
+
             processed_count = 0
-            
+
             for i, source_news in enumerate(news_items[:posts_to_process], 1):
                 try:
                     logger.info(f"\n--- Notícia {i}/{posts_to_process} ---")
                     logger.info(f"Título: {source_news.get('title', '')[:80]}...")
-                    
-                    # Gerar artigo primeiro
-                    article = await self.content_generator.generate_article(source_news)
+
+                    # Gerar artigo (com métricas)
+                    with metrics.measure("content_generation", title=source_news.get('title', '')[:50]):
+                        article = await self.content_generator.generate_article(source_news)
+
                     if not article:
                         logger.warning("Falha ao gerar artigo")
+                        metrics.record_failure()
                         report["failed"] += 1
                         continue
-                    
-                    # Validar qualidade
+
+                    # Validar qualidade (com métricas)
                     is_valid, errors = self.validator.validate_article(article)
+                    metrics.record_validation(is_valid)
+
                     if not is_valid:
                         logger.warning(f"Artigo reprovado: {', '.join(errors)}")
+                        metrics.record_failure()
                         report["failed"] += 1
                         report["errors"].extend(errors)
                         continue
-                    
+
                     # Criar NewsAssignment para o detector
                     assignment = NewsAssignment(
                         titulo=article["title"],
@@ -145,74 +159,86 @@ class NewsPipeline:
                         fonte=source_news.get("source_name", ""),
                         timestamp=datetime.now(timezone.utc).isoformat()
                     )
-                    
-                    # Verificar duplicatas
-                    check_result = await detector.check_duplicate(assignment)
-                    
+
+                    # Verificar duplicatas (com métricas)
+                    with metrics.measure("deduplication"):
+                        check_result = await detector.check_duplicate(assignment)
+
                     if check_result.acao == ActionType.CREATE_NEW:
                         logger.info("✨ Ação: CRIAR NOVO POST")
 
-                        # Publicar artigo usando o serviço dedicado
                         published = await self.publisher.publish_article(article, db)
                         if published:
+                            metrics.record_publish()
                             report["published"] += 1
                             processed_count += 1
                             logger.info("✓ Artigo publicado com sucesso")
                         else:
+                            metrics.record_failure()
                             report["failed"] += 1
 
                     elif check_result.acao == ActionType.UPDATE_EXISTING:
                         logger.info(
                             f"➕ Ação: ATUALIZAR POST EXISTENTE (ID: {check_result.post_existente_id})"
                         )
+                        metrics.metrics.duplicates_found += 1
 
-                        # Atualizar post existente usando o serviço dedicado
                         updated = await self.publisher.update_article(
                             check_result.post_existente_id, article, db
                         )
                         if updated:
+                            metrics.record_update()
                             report["updated"] += 1
                             processed_count += 1
                             logger.info(f"✓ Post atualizado com sucesso")
                         else:
+                            metrics.record_failure()
                             report["failed"] += 1
-                    
+
                     elif check_result.acao == ActionType.REVIEW_MANUAL:
                         logger.warning(f"⚠️ Ação: REVISÃO MANUAL NECESSÁRIA")
                         logger.warning(f"Similaridade máxima: {check_result.similaridade_maxima:.2f}")
                         logger.warning(f"Candidatos similares: {len(check_result.candidatos_similares)}")
-                        
+
+                        metrics.record_skip()
                         report["review_manual"] += 1
-                        
-                        # Enviar para Sentry para análise
+
                         sentry_sdk.capture_message(
                             f"Pauta para revisão manual: {assignment.titulo}",
                             level="warning",
                             extras={
+                                "run_id": run_id,
                                 "similaridade": check_result.similaridade_maxima,
                                 "candidatos": check_result.candidatos_similares,
                                 "titulo": assignment.titulo
                             }
                         )
-                
+
                 except Exception as e:
                     logger.error(f"Erro ao processar notícia: {e}")
-                    import traceback
                     logger.error(f"Traceback: {traceback.format_exc()}")
+                    metrics.record_error(str(e))
+                    metrics.record_failure()
                     report["failed"] += 1
                     report["errors"].append(str(e))
-            
+
             # 4. Revalidar frontend se houver mudanças
             if (report["published"] + report["updated"]) > 0:
                 await self._revalidate_frontend()
-            
+
+            # Finalizar métricas
+            metrics.finalize()
+            metrics.log_summary()
+
             report["status"] = "completed"
             report["processed"] = processed_count
             report["completed_at"] = datetime.now(timezone.utc)
             report["duration_seconds"] = (report["completed_at"] - start_time).total_seconds()
-            
+            report["metrics"] = metrics.get_metrics_dict()
+
             logger.info("\n" + "=" * 60)
             logger.info("PIPELINE CONCLUÍDO")
+            logger.info(f"Run ID: {run_id}")
             logger.info(f"Coletadas: {report['collected']}")
             logger.info(f"Processadas: {report['processed']}")
             logger.info(f"Publicadas: {report['published']}")
@@ -221,15 +247,17 @@ class NewsPipeline:
             logger.info(f"Falhas: {report['failed']}")
             logger.info(f"Duração: {report['duration_seconds']:.1f}s")
             logger.info("=" * 60)
-            
+
             return report
-        
+
         except Exception as e:
             logger.error(f"Erro fatal no pipeline: {e}")
-            import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
+            metrics.record_error(f"Fatal error: {e}")
+            metrics.finalize()
             report["status"] = "error"
             report["error"] = str(e)
+            report["metrics"] = metrics.get_metrics_dict()
             return report
     
     async def _check_daily_limit(self, db: AsyncSession) -> bool:
