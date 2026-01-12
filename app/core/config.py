@@ -2,13 +2,20 @@
 Application configuration settings
 """
 import warnings
-from typing import ClassVar, List
-from pydantic_settings import BaseSettings
-from pydantic import validator
+from typing import Any, ClassVar, List
+
+from pydantic import field_validator, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings"""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
 
     # Project
     PROJECT_NAME: str = "VivaCripto API"
@@ -24,8 +31,9 @@ class Settings(BaseSettings):
         "https://www.vivacripto.com.br",
     ]
 
-    @validator("CORS_ORIGINS", pre=True)
-    def assemble_cors_origins(cls, v):
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v: Any) -> List[str]:
         if isinstance(v, str):
             return [i.strip() for i in v.split(",")]
         return v
@@ -33,8 +41,9 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/vivacripto"
 
-    @validator("DATABASE_URL", pre=True)
-    def assemble_database_url(cls, v):
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def assemble_database_url(cls, v: Any) -> str:
         """Ensure DATABASE_URL uses asyncpg driver"""
         if isinstance(v, str):
             # Convert postgres:// to postgresql://
@@ -66,92 +75,88 @@ class Settings(BaseSettings):
         "",
     ]
 
-    @validator("SECRET_KEY")
-    def validate_secret_key(cls, v, values):
-        """Valida que SECRET_KEY não usa valores inseguros"""
-        if v in cls._INSECURE_DEFAULTS:
-            if values.get("DEBUG", False):
+    @model_validator(mode="after")
+    def validate_security_settings(self) -> "Settings":
+        """Valida que tokens de segurança não usam valores inseguros"""
+        # Validar SECRET_KEY
+        if self.SECRET_KEY in self._INSECURE_DEFAULTS:
+            if self.DEBUG:
                 warnings.warn(
                     "SECRET_KEY usando valor inseguro! Configure uma chave segura para produção.",
                     UserWarning,
                     stacklevel=2
                 )
-                return v or "dev-secret-key-not-for-production-use-only"
-            raise ValueError(
-                "SECRET_KEY inválida! Configure uma chave secreta segura no arquivo .env. "
-                "Gere uma com: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
-            )
-        if len(v) < 32:
+                self.SECRET_KEY = self.SECRET_KEY or "dev-secret-key-not-for-production-use-only"
+            else:
+                raise ValueError(
+                    "SECRET_KEY inválida! Configure uma chave secreta segura no arquivo .env. "
+                    'Gere uma com: python -c "import secrets; print(secrets.token_urlsafe(32))"'
+                )
+        elif len(self.SECRET_KEY) < 32:
             raise ValueError("SECRET_KEY deve ter pelo menos 32 caracteres")
-        return v
 
-    @validator("AUTOMATION_TOKEN")
-    def validate_automation_token(cls, v, values):
-        """Valida que AUTOMATION_TOKEN não usa valores inseguros"""
-        if v in cls._INSECURE_DEFAULTS:
-            if values.get("DEBUG", False):
+        # Validar AUTOMATION_TOKEN
+        if self.AUTOMATION_TOKEN in self._INSECURE_DEFAULTS:
+            if self.DEBUG:
                 warnings.warn(
                     "AUTOMATION_TOKEN usando valor inseguro! Configure um token seguro para produção.",
                     UserWarning,
                     stacklevel=2
                 )
-                return v or "dev-automation-token-not-for-production"
-            raise ValueError(
-                "AUTOMATION_TOKEN inválido! Configure um token seguro no arquivo .env. "
-                "Gere um com: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
-            )
-        if len(v) < 32:
+                self.AUTOMATION_TOKEN = self.AUTOMATION_TOKEN or "dev-automation-token-not-for-production"
+            else:
+                raise ValueError(
+                    "AUTOMATION_TOKEN inválido! Configure um token seguro no arquivo .env. "
+                    'Gere um com: python -c "import secrets; print(secrets.token_urlsafe(32))"'
+                )
+        elif len(self.AUTOMATION_TOKEN) < 32:
             raise ValueError("AUTOMATION_TOKEN deve ter pelo menos 32 caracteres")
-        return v
 
-    @validator("REVALIDATE_SECRET")
-    def validate_revalidate_secret(cls, v, values):
-        """Valida que REVALIDATE_SECRET não usa valores inseguros"""
-        if v in cls._INSECURE_DEFAULTS:
-            if values.get("DEBUG", False):
+        # Validar REVALIDATE_SECRET
+        if self.REVALIDATE_SECRET in self._INSECURE_DEFAULTS:
+            if self.DEBUG:
                 warnings.warn(
                     "REVALIDATE_SECRET usando valor inseguro! Configure um secret seguro para produção.",
                     UserWarning,
                     stacklevel=2
                 )
-                return v or "dev-revalidate-secret-not-for-production"
-            raise ValueError(
-                "REVALIDATE_SECRET inválido! Configure um secret seguro no arquivo .env. "
-                "Gere um com: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
-            )
-        return v
-    
+                self.REVALIDATE_SECRET = self.REVALIDATE_SECRET or "dev-revalidate-secret-not-for-production"
+            else:
+                raise ValueError(
+                    "REVALIDATE_SECRET inválido! Configure um secret seguro no arquivo .env. "
+                    'Gere um com: python -c "import secrets; print(secrets.token_urlsafe(32))"'
+                )
+
+        return self
+
     # OpenAI
     OPENAI_API_KEY: str = ""
-    
+
     # Cloudinary
     CLOUDINARY_CLOUD_NAME: str = ""
     CLOUDINARY_API_KEY: str = ""
     CLOUDINARY_API_SECRET: str = ""
-    
+
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
-    
+
     # Automation
     DAILY_POST_LIMIT: int = 10
     AUTOMATION_INTERVAL_MINUTES: int = 30
-    
+    POSTS_PER_EXECUTION: int = 1
+
     # Deduplication
     DEDUPLICATION_THRESHOLD: float = 0.80
     DEDUPLICATION_ENGINE: str = "embedding"  # Options: levenshtein, tfidf, embedding, hybrid
-    
+
     # External APIs
     CRYPTOPANIC_API_KEY: str = ""
-    
+
     # Frontend
     FRONTEND_URL: str = "http://localhost:3000"
-    
+
     # Sentry
     SENTRY_DSN: str = ""
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
 
 
 settings = Settings()

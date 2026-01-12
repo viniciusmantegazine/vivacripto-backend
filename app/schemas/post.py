@@ -2,9 +2,13 @@
 Pydantic schemas for Post model
 """
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Literal, Optional
 from uuid import UUID
-from pydantic import BaseModel, Field, validator
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+# Status permitidos para posts
+PostStatus = Literal["draft", "published", "archived"]
 
 
 class TagBase(BaseModel):
@@ -15,11 +19,10 @@ class TagBase(BaseModel):
 
 class TagRead(TagBase):
     """Tag read schema"""
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class CategoryBase(BaseModel):
@@ -30,11 +33,10 @@ class CategoryBase(BaseModel):
 
 class CategoryRead(CategoryBase):
     """Category read schema"""
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class AuthorBase(BaseModel):
@@ -46,11 +48,10 @@ class AuthorBase(BaseModel):
 
 class AuthorRead(AuthorBase):
     """Author read schema"""
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class PostBase(BaseModel):
@@ -70,15 +71,9 @@ class PostCreate(PostBase):
     """Post creation schema"""
     category_id: Optional[UUID] = None
     author_id: Optional[UUID] = None
-    tag_ids: Optional[List[UUID]] = []
-    status: str = "draft"
+    tag_ids: List[UUID] = Field(default_factory=list)
+    status: PostStatus = "draft"
     published_at: Optional[datetime] = None
-    
-    @validator("status")
-    def validate_status(cls, v):
-        if v not in ["draft", "published", "archived"]:
-            raise ValueError("Status must be draft, published, or archived")
-        return v
 
 
 class PostUpdate(BaseModel):
@@ -88,20 +83,16 @@ class PostUpdate(BaseModel):
     content_html: Optional[str] = None
     excerpt: Optional[str] = Field(None, max_length=300)
     featured_image_url: Optional[str] = None
-    status: Optional[str] = None
+    status: Optional[PostStatus] = None
     category_id: Optional[UUID] = None
     meta_title: Optional[str] = Field(None, max_length=70)
     meta_description: Optional[str] = Field(None, max_length=160)
-    
-    @validator("status")
-    def validate_status(cls, v):
-        if v and v not in ["draft", "published", "archived"]:
-            raise ValueError("Status must be draft, published, or archived")
-        return v
 
 
 class PostRead(PostBase):
     """Post read schema"""
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     status: str
     published_at: Optional[datetime] = None
@@ -110,9 +101,6 @@ class PostRead(PostBase):
     author: Optional[AuthorRead] = None
     category: Optional[CategoryRead] = None
     tags: List[TagRead] = []
-    
-    class Config:
-        from_attributes = True
 
 
 class PostList(BaseModel):

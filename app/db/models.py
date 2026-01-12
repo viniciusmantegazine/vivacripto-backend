@@ -2,11 +2,16 @@
 SQLAlchemy database models
 """
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Table, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from app.db.base_class import Base
+
+
+def utc_now() -> datetime:
+    """Retorna datetime atual com timezone UTC (substitui utc_now deprecated)."""
+    return datetime.now(timezone.utc)
 
 
 # Association table for many-to-many relationship between posts and tags
@@ -26,8 +31,8 @@ class Author(Base):
     name = Column(String(255), nullable=False)
     bio = Column(Text)
     avatar_url = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
     
     # Relationships
     posts = relationship("Post", back_populates="author")
@@ -40,7 +45,7 @@ class Category(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(100), nullable=False, unique=True)
     slug = Column(String(100), nullable=False, unique=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
     
     # Relationships
     posts = relationship("Post", back_populates="category")
@@ -53,7 +58,7 @@ class Tag(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(100), nullable=False, unique=True)
     slug = Column(String(100), nullable=False, unique=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
     
     # Relationships
     posts = relationship("Post", secondary=post_tags, back_populates="tags")
@@ -88,8 +93,8 @@ class Post(Base):
     canonical_url = Column(String(255))
     
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
     
     # Deduplication tracking
     deduplication_history = Column(JSONB, nullable=True, server_default='[]')
@@ -112,7 +117,7 @@ class NewsletterSubscriber(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = Column(String(255), nullable=False, unique=True)
     is_active = Column(Boolean, nullable=False, default=True)
-    subscribed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    subscribed_at = Column(DateTime, default=utc_now, nullable=False)
     unsubscribed_at = Column(DateTime)
 
 
@@ -125,4 +130,4 @@ class AutomationLog(Base):
     level = Column(String(20), nullable=False)
     message = Column(Text, nullable=False)
     log_metadata = Column(JSONB)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)

@@ -41,8 +41,9 @@ class NewsPipeline:
     5. Publicação/Atualização (ArticlePublisher)
     """
 
-    MAX_POSTS_PER_DAY = 10  # Limite diário de publicações
-    POSTS_PER_EXECUTION = 1  # Publicar apenas 1 notícia por chamada do endpoint
+    # Usar configurações de settings (com fallback para valores padrão)
+    MAX_POSTS_PER_DAY = settings.DAILY_POST_LIMIT
+    POSTS_PER_EXECUTION = settings.POSTS_PER_EXECUTION
 
     def __init__(self):
         self.aggregator = NewsAggregator()

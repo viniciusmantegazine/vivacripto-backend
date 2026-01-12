@@ -2,9 +2,11 @@
 AI Content Generator Service v2.0
 Gera conteúdo de notícias usando OpenAI GPT-4 com estrutura flexível
 """
+import re
 from typing import Dict, Optional
-from openai import AsyncOpenAI
+
 from loguru import logger
+from openai import AsyncOpenAI
 from slugify import slugify
 
 from app.core.config import settings
@@ -258,11 +260,10 @@ class ContentGenerator:
         
         # Juntar linhas preservando estrutura
         result = '\n'.join(cleaned_lines)
-        
+
         # Remover múltiplas quebras consecutivas (mais de 2)
-        import re
         result = re.sub(r'\n{3,}', '\n\n', result)
-        
+
         return result.strip()
     
     async def _generate_seo_title(self, content: str) -> Optional[str]:
