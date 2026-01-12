@@ -1,7 +1,8 @@
 """
 Security utilities for authentication and authorization
 """
-from datetime import datetime, timedelta
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -21,10 +22,10 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     """Create JWT access token"""
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    
+        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
@@ -53,12 +54,33 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
+def secure_compare(provided_token: str, expected_token: str) -> bool:
+    """
+    Compara dois tokens de forma segura contra timing attacks.
+    Usa comparação em tempo constante para evitar vazamento de informações.
+    """
+    if not provided_token or not expected_token:
+        return False
+    return secrets.compare_digest(provided_token.encode(), expected_token.encode())
+
+
 async def verify_automation_token(credentials: HTTPAuthorizationCredentials = Security(security)):
-    """Verify automation service token"""
+    """
+    Verifica o token de automação de forma segura.
+    Usa comparação em tempo constante para prevenir timing attacks.
+    """
     token = credentials.credentials
-    if token != settings.AUTOMATION_TOKEN:
+    if not secure_compare(token, settings.AUTOMATION_TOKEN):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid automation token",
         )
     return True
+
+
+def verify_revalidate_secret(provided_secret: str) -> bool:
+    """
+    Verifica o secret de revalidação de forma segura.
+    Usa comparação em tempo constante para prevenir timing attacks.
+    """
+    return secure_compare(provided_secret, settings.REVALIDATE_SECRET)

@@ -1,15 +1,50 @@
 """
 CRUD operations for Post model
 """
+import re
+from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID
+
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from datetime import datetime
 
 from app.db.models import Post, Tag
 from app.schemas.post import PostCreate, PostUpdate
+
+
+def sanitize_search_query(query: str) -> str:
+    """
+    Sanitiza a query de busca para evitar ataques de wildcard DoS.
+    Remove ou escapa caracteres especiais do SQL LIKE.
+
+    Args:
+        query: String de busca fornecida pelo usuário
+
+    Returns:
+        String sanitizada segura para uso em ILIKE
+    """
+    if not query:
+        return ""
+
+    # Remove espaços extras
+    query = query.strip()
+
+    # Escapa caracteres especiais do LIKE (%, _, \)
+    query = query.replace("\\", "\\\\")
+    query = query.replace("%", "\\%")
+    query = query.replace("_", "\\_")
+
+    # Remove caracteres de controle e não-imprimíveis
+    query = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', query)
+
+    # Limita o tamanho para evitar queries muito pesadas
+    max_length = 200
+    if len(query) > max_length:
+        query = query[:max_length]
+
+    return query
 
 
 async def get_recent_posts(db: AsyncSession, since: datetime) -> List[Post]:
@@ -92,7 +127,7 @@ async def create_post(db: AsyncSession, post_in: PostCreate) -> Post:
     
     # Set published_at if status is published
     if post_dict.get('status') == 'published' and not post_dict.get('published_at'):
-        post_dict['published_at'] = datetime.utcnow()
+        post_dict['published_at'] = datetime.now(timezone.utc)
     
     # Create post
     db_post = Post(**post_dict)
@@ -120,7 +155,7 @@ async def update_post(db: AsyncSession, post_id: UUID, post_in: PostUpdate) -> O
     
     # Update published_at if status changes to published
     if update_data.get('status') == 'published' and db_post.status != 'published':
-        update_data['published_at'] = datetime.utcnow()
+        update_data['published_at'] = datetime.now(timezone.utc)
     
     for field, value in update_data.items():
         setattr(db_post, field, value)
@@ -144,20 +179,30 @@ async def delete_post(db: AsyncSession, post_id: UUID) -> bool:
 
 
 async def search_posts(db: AsyncSession, query: str, limit: int = 10) -> List[Post]:
-    """Search posts by title or content"""
+    """
+    Search posts by title or content.
+    A query é sanitizada para prevenir ataques de wildcard DoS.
+    """
+    # Sanitiza a query para evitar ataques
+    safe_query = sanitize_search_query(query)
+
+    # Se a query ficou vazia após sanitização, retorna lista vazia
+    if not safe_query:
+        return []
+
     search_query = select(Post).options(
         selectinload(Post.author),
         selectinload(Post.category),
         selectinload(Post.tags)
     ).where(
         or_(
-            Post.title.ilike(f"%{query}%"),
-            Post.content_markdown.ilike(f"%{query}%")
+            Post.title.ilike(f"%{safe_query}%"),
+            Post.content_markdown.ilike(f"%{safe_query}%")
         )
     ).where(Post.status == 'published').limit(limit)
-    
+
     result = await db.execute(search_query)
-    return result.scalars().all()
+    return list(result.scalars().all())
 
 
 class CRUDPost:

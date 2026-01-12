@@ -1,19 +1,22 @@
 """
 Newsletter API endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.db.base import get_db
 from app.db.models import NewsletterSubscriber
 from app.schemas.newsletter import NewsletterSubscribe, NewsletterSubscriberRead
+from app.core.rate_limiter import limiter, RATE_LIMITS
 
 router = APIRouter()
 
 
 @router.post("/subscribe", response_model=NewsletterSubscriberRead, status_code=status.HTTP_201_CREATED)
+@limiter.limit(RATE_LIMITS["newsletter"])
 async def subscribe_newsletter(
+    request: Request,
     subscriber_in: NewsletterSubscribe,
     db: AsyncSession = Depends(get_db),
 ):

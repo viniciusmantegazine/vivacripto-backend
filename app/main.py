@@ -9,7 +9,8 @@ from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.api.v1.api import api_router
-from app.core.logging import setup_logging
+from app.core.logging import setup_logging, logger
+from app.core.rate_limiter import setup_rate_limiting
 
 # Setup logging
 setup_logging()
@@ -19,10 +20,10 @@ setup_logging()
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
-    print("🚀 Starting VivaCripto API...")
+    logger.info("Iniciando VivaCripto API...")
     yield
     # Shutdown
-    print("👋 Shutting down VivaCripto API...")
+    logger.info("Encerrando VivaCripto API...")
 
 
 app = FastAPI(
@@ -35,13 +36,23 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware
+# Rate limiting (deve vir antes dos outros middlewares)
+setup_rate_limiting(app)
+
+# CORS middleware - métodos e headers restritos por segurança
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Origin",
+        "X-Requested-With",
+    ],
+    expose_headers=["X-RateLimit-Limit", "X-RateLimit-Remaining", "Retry-After"],
 )
 
 # Include API router

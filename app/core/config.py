@@ -1,19 +1,21 @@
 """
 Application configuration settings
 """
-from typing import List
+import warnings
+from typing import ClassVar, List
 from pydantic_settings import BaseSettings
 from pydantic import validator
 
 
 class Settings(BaseSettings):
     """Application settings"""
-    
+
     # Project
     PROJECT_NAME: str = "VivaCripto API"
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
-    
+    DEBUG: bool = False
+
     # CORS
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
@@ -21,16 +23,16 @@ class Settings(BaseSettings):
         "https://vivacripto.com.br",
         "https://www.vivacripto.com.br",
     ]
-    
+
     @validator("CORS_ORIGINS", pre=True)
     def assemble_cors_origins(cls, v):
         if isinstance(v, str):
             return [i.strip() for i in v.split(",")]
         return v
-    
+
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/vivacripto"
-    
+
     @validator("DATABASE_URL", pre=True)
     def assemble_database_url(cls, v):
         """Ensure DATABASE_URL uses asyncpg driver"""
@@ -38,20 +40,86 @@ class Settings(BaseSettings):
             # Convert postgres:// to postgresql://
             if v.startswith("postgres://"):
                 v = v.replace("postgres://", "postgresql://", 1)
-            
+
             # Add +asyncpg if not present
             if "postgresql://" in v and "+asyncpg" not in v:
                 v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
         return v
-    
+
     # Security
-    SECRET_KEY: str = "your-secret-key-change-in-production"
+    SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
-    
+
     # Service Tokens
-    AUTOMATION_TOKEN: str = "automation-service-token-change-in-production"
-    REVALIDATE_SECRET: str = "revalidation-secret-change-in-production"
+    AUTOMATION_TOKEN: str = ""
+    REVALIDATE_SECRET: str = ""
+
+    # Lista de valores inseguros que não devem ser usados em produção
+    _INSECURE_DEFAULTS: ClassVar[List[str]] = [
+        "your-secret-key-change-in-production",
+        "automation-service-token-change-in-production",
+        "revalidation-secret-change-in-production",
+        "secret",
+        "changeme",
+        "password",
+        "",
+    ]
+
+    @validator("SECRET_KEY")
+    def validate_secret_key(cls, v, values):
+        """Valida que SECRET_KEY não usa valores inseguros"""
+        if v in cls._INSECURE_DEFAULTS:
+            if values.get("DEBUG", False):
+                warnings.warn(
+                    "SECRET_KEY usando valor inseguro! Configure uma chave segura para produção.",
+                    UserWarning,
+                    stacklevel=2
+                )
+                return v or "dev-secret-key-not-for-production-use-only"
+            raise ValueError(
+                "SECRET_KEY inválida! Configure uma chave secreta segura no arquivo .env. "
+                "Gere uma com: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+            )
+        if len(v) < 32:
+            raise ValueError("SECRET_KEY deve ter pelo menos 32 caracteres")
+        return v
+
+    @validator("AUTOMATION_TOKEN")
+    def validate_automation_token(cls, v, values):
+        """Valida que AUTOMATION_TOKEN não usa valores inseguros"""
+        if v in cls._INSECURE_DEFAULTS:
+            if values.get("DEBUG", False):
+                warnings.warn(
+                    "AUTOMATION_TOKEN usando valor inseguro! Configure um token seguro para produção.",
+                    UserWarning,
+                    stacklevel=2
+                )
+                return v or "dev-automation-token-not-for-production"
+            raise ValueError(
+                "AUTOMATION_TOKEN inválido! Configure um token seguro no arquivo .env. "
+                "Gere um com: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+            )
+        if len(v) < 32:
+            raise ValueError("AUTOMATION_TOKEN deve ter pelo menos 32 caracteres")
+        return v
+
+    @validator("REVALIDATE_SECRET")
+    def validate_revalidate_secret(cls, v, values):
+        """Valida que REVALIDATE_SECRET não usa valores inseguros"""
+        if v in cls._INSECURE_DEFAULTS:
+            if values.get("DEBUG", False):
+                warnings.warn(
+                    "REVALIDATE_SECRET usando valor inseguro! Configure um secret seguro para produção.",
+                    UserWarning,
+                    stacklevel=2
+                )
+                return v or "dev-revalidate-secret-not-for-production"
+            raise ValueError(
+                "REVALIDATE_SECRET inválido! Configure um secret seguro no arquivo .env. "
+                "Gere um com: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+            )
+        return v
     
     # OpenAI
     OPENAI_API_KEY: str = ""

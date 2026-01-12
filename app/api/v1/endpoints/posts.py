@@ -3,20 +3,23 @@ Posts API endpoints
 """
 from typing import Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.base import get_db
 from app.crud import crud_post
 from app.schemas.post import PostCreate, PostUpdate, PostRead, PostList
 from app.core.security import verify_automation_token
+from app.core.rate_limiter import limiter, RATE_LIMITS
 from math import ceil
 
 router = APIRouter()
 
 
 @router.get("", response_model=PostList)
+@limiter.limit(RATE_LIMITS["public_read"])
 async def list_posts(
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
     status: Optional[str] = Query(None),
@@ -34,9 +37,9 @@ async def list_posts(
         status=status,
         category_id=category_id,
     )
-    
+
     total_pages = ceil(total / page_size) if total > 0 else 0
-    
+
     return PostList(
         items=posts,
         total=total,
@@ -47,8 +50,10 @@ async def list_posts(
 
 
 @router.get("/search")
+@limiter.limit(RATE_LIMITS["search"])
 async def search_posts(
-    q: str = Query(..., min_length=2),
+    request: Request,
+    q: str = Query(..., min_length=2, max_length=200),
     limit: int = Query(10, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
 ):
