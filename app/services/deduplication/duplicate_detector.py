@@ -5,18 +5,16 @@ Orquestra o pipeline de verificação de similaridade e decisão
 
 from dataclasses import dataclass, field, asdict
 from typing import List, Dict, Optional, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 import json
-import logging
 from abc import ABC, abstractmethod
 import uuid
 
 from .similarity_engine import SimilarityFactory, SimilarityResult
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Usar logger centralizado do projeto
+from app.core.logging import logger
 
 
 class ActionType(Enum):
@@ -508,17 +506,17 @@ class PipelineOrchestrator:
 if __name__ == "__main__":
     # Criar repositório em memória
     repo = InMemoryPostRepository()
-    
+
     # Criar detector
     detector = DuplicateDetector(
         repository=repo,
         similarity_threshold=0.80,
         engine_type="hybrid"
     )
-    
+
     # Criar orquestrador
     orchestrator = PipelineOrchestrator(detector)
-    
+
     # Simular pautas
     assignments = [
         NewsAssignment(
@@ -526,29 +524,29 @@ if __name__ == "__main__":
             resumo="Instituição financeira tradicional firma acordo com exchange de criptomoedas",
             conteudo="Bank of America e Coinbase anunciaram uma parceria estratégica...",
             fonte="CoinDesk",
-            timestamp=datetime.now().isoformat()
+            timestamp=datetime.now(timezone.utc).isoformat()
         ),
         NewsAssignment(
             titulo="Coinbase e Bank of America firmam acordo histórico",
             resumo="Duas gigantes do setor financeiro se unem para criptomoedas",
             conteudo="Em um movimento que surpreendeu o mercado, Coinbase e Bank of America...",
             fonte="Bloomberg",
-            timestamp=datetime.now().isoformat()
+            timestamp=datetime.now(timezone.utc).isoformat()
         ),
         NewsAssignment(
             titulo="Bitcoin atinge novo recorde acima de 100 mil dólares",
             resumo="Criptomoeda mais valiosa ultrapassa marca histórica",
             conteudo="Bitcoin atingiu hoje um novo recorde histórico...",
             fonte="Reuters",
-            timestamp=datetime.now().isoformat()
+            timestamp=datetime.now(timezone.utc).isoformat()
         )
     ]
-    
+
     # Processar lote
-    print("\n" + "=" * 70)
-    print("PROCESSAMENTO DE LOTE DE PAUTAS")
-    print("=" * 70)
-    
+    logger.info("=" * 70)
+    logger.info("PROCESSAMENTO DE LOTE DE PAUTAS")
+    logger.info("=" * 70)
+
     results = orchestrator.process_batch(assignments)
-    
-    print("\n" + json.dumps(results, indent=2, ensure_ascii=False))
+
+    logger.info(json.dumps(results, indent=2, ensure_ascii=False))

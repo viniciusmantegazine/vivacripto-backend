@@ -3,7 +3,7 @@ News Automation Pipeline
 Orquestra todo o fluxo de automação de notícias
 """
 from typing import List, Dict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,7 +46,7 @@ class NewsPipeline:
         logger.info("INICIANDO PIPELINE DE AUTOMAÇÃO DE NOTÍCIAS")
         logger.info("=" * 60)
         
-        start_time = datetime.now()
+        start_time = datetime.now(timezone.utc)
         report = {
             "started_at": start_time,
             "status": "running",
@@ -129,7 +129,7 @@ class NewsPipeline:
                         resumo=article.get("excerpt", ""),
                         conteudo=article["content_markdown"],
                         fonte=source_news.get("source_name", ""),
-                        timestamp=datetime.utcnow().isoformat()
+                        timestamp=datetime.now(timezone.utc).isoformat()
                     )
                     
                     # Verificar duplicatas
@@ -194,7 +194,7 @@ class NewsPipeline:
             
             report["status"] = "completed"
             report["processed"] = processed_count
-            report["completed_at"] = datetime.now()
+            report["completed_at"] = datetime.now(timezone.utc)
             report["duration_seconds"] = (report["completed_at"] - start_time).total_seconds()
             
             logger.info("\n" + "=" * 60)
@@ -222,7 +222,7 @@ class NewsPipeline:
         """Verifica se o limite diário de posts foi atingido"""
         try:
             logger.debug("Consultando posts de hoje no banco de dados...")
-            today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
             today_posts = await crud_post.get_recent_posts(db, since=today_start)
             logger.debug(f"Posts hoje: {len(today_posts)}/{self.MAX_POSTS_PER_DAY}")
             return len(today_posts) < self.MAX_POSTS_PER_DAY
@@ -231,10 +231,10 @@ class NewsPipeline:
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             raise
-    
+
     async def _get_remaining_daily_slots(self, db: AsyncSession) -> int:
         """Retorna quantos posts ainda podem ser publicados hoje"""
-        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         today_posts = await crud_post.get_recent_posts(db, since=today_start)
         return max(0, self.MAX_POSTS_PER_DAY - len(today_posts))
     
@@ -296,14 +296,14 @@ class NewsPipeline:
                 excerpt=article.get("excerpt"),
                 featured_image_url=image_url or article.get("featured_image_url"),
                 status="published",
-                published_at=datetime.now(),
+                published_at=datetime.now(timezone.utc),
                 meta_title=meta_title or None,
                 meta_description=meta_description or None,
                 canonical_url=None,
                 category_id=category.id,
             )
             
-            await crud_post.create_post(db, post_data)
+            await crud_post.create_post(db, post_data, auto_commit=False)
             await db.commit()
             
             return True
@@ -328,10 +328,10 @@ class NewsPipeline:
             post_update = PostUpdate(
                 content_markdown=article["content_markdown"],
                 content_html=content_html,
-                updated_at=datetime.now()
+                updated_at=datetime.now(timezone.utc)
             )
             
-            await crud_post.update_post(db, post_id=UUID(post_id), post_in=post_update)
+            await crud_post.update_post(db, post_id=UUID(post_id), post_in=post_update, auto_commit=False)
             await db.commit()
             
             logger.info(f"Post {post_id} atualizado com novo conteúdo")

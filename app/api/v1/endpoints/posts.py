@@ -1,9 +1,11 @@
 """
 Posts API endpoints
 """
+from math import ceil
 from typing import Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.base import get_db
@@ -11,7 +13,7 @@ from app.crud import crud_post
 from app.schemas.post import PostCreate, PostUpdate, PostRead, PostList
 from app.core.security import verify_automation_token
 from app.core.rate_limiter import limiter, RATE_LIMITS
-from math import ceil
+from app.core.exceptions import NotFoundError, DuplicateError
 
 router = APIRouter()
 
@@ -74,10 +76,7 @@ async def get_post(
     """
     post = await crud_post.get_post_by_id(db=db, post_id=post_id)
     if not post:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Post not found"
-        )
+        raise NotFoundError("Post", post_id)
     return post
 
 
@@ -91,10 +90,7 @@ async def get_post_by_slug(
     """
     post = await crud_post.get_post_by_slug(db=db, slug=slug)
     if not post:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Post not found"
-        )
+        raise NotFoundError("Post", slug)
     return post
 
 
@@ -110,11 +106,8 @@ async def create_post(
     # Check if slug already exists
     existing_post = await crud_post.get_post_by_slug(db=db, slug=post_in.slug)
     if existing_post:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Post with this slug already exists"
-        )
-    
+        raise DuplicateError("Post", "slug", post_in.slug)
+
     post = await crud_post.create_post(db=db, post_in=post_in)
     return post
 
@@ -131,10 +124,7 @@ async def update_post(
     """
     post = await crud_post.update_post(db=db, post_id=post_id, post_in=post_in)
     if not post:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Post not found"
-        )
+        raise NotFoundError("Post", post_id)
     return post
 
 
@@ -149,8 +139,5 @@ async def delete_post(
     """
     success = await crud_post.delete_post(db=db, post_id=post_id)
     if not success:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Post not found"
-        )
+        raise NotFoundError("Post", post_id)
     return None

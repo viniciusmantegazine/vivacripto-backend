@@ -8,11 +8,9 @@ from typing import Tuple, List, Dict, Optional
 from dataclasses import dataclass
 import math
 from collections import Counter
-import logging
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Usar logger centralizado do projeto
+from app.core.logging import logger
 
 
 @dataclass
@@ -375,37 +373,37 @@ if __name__ == "__main__":
     text1 = "Bank of America e Coinbase anunciam parceria estratégica para criptomoedas"
     text2 = "Coinbase e Bank of America firmam acordo sobre moedas digitais"
     text3 = "Bitcoin atinge novo recorde histórico acima de 100 mil dólares"
-    
+
     # Testar diferentes motores
-    print("=" * 70)
-    print("TESTE DE SIMILARIDADE")
-    print("=" * 70)
-    
-    print(f"\nTexto 1: {text1}")
-    print(f"Texto 2: {text2}")
-    print(f"Texto 3: {text3}")
-    
+    logger.info("=" * 70)
+    logger.info("TESTE DE SIMILARIDADE")
+    logger.info("=" * 70)
+
+    logger.info(f"Texto 1: {text1}")
+    logger.info(f"Texto 2: {text2}")
+    logger.info(f"Texto 3: {text3}")
+
     # Levenshtein
-    print("\n--- Levenshtein ---")
+    logger.info("--- Levenshtein ---")
     lev = SimilarityFactory.create("levenshtein")
     result = lev.calculate(text1, text2)
-    print(f"Similaridade (1 vs 2): {result.score:.2%}")
+    logger.info(f"Similaridade (1 vs 2): {result.score:.2%}")
     result = lev.calculate(text1, text3)
-    print(f"Similaridade (1 vs 3): {result.score:.2%}")
-    
+    logger.info(f"Similaridade (1 vs 3): {result.score:.2%}")
+
     # TF-IDF
-    print("\n--- TF-IDF ---")
+    logger.info("--- TF-IDF ---")
     tfidf = SimilarityFactory.create("tfidf")
     result = tfidf.calculate(text1, text2)
-    print(f"Similaridade (1 vs 2): {result.score:.2%}")
+    logger.info(f"Similaridade (1 vs 2): {result.score:.2%}")
     result = tfidf.calculate(text1, text3)
-    print(f"Similaridade (1 vs 3): {result.score:.2%}")
-    
+    logger.info(f"Similaridade (1 vs 3): {result.score:.2%}")
+
     # Hybrid
-    print("\n--- Hybrid ---")
+    logger.info("--- Hybrid ---")
     hybrid = SimilarityFactory.create("hybrid")
     result = hybrid.calculate(text1, text2)
-    print(f"Similaridade (1 vs 2): {result.score:.2%}")
-    print(f"Detalhes: {result.details}")
+    logger.info(f"Similaridade (1 vs 2): {result.score:.2%}")
+    logger.info(f"Detalhes: {result.details}")
     result = hybrid.calculate(text1, text3)
-    print(f"Similaridade (1 vs 3): {result.score:.2%}")
+    logger.info(f"Similaridade (1 vs 3): {result.score:.2%}")

@@ -2,7 +2,7 @@
 Implementação concreta do PostRepository para o VivaCripto Backend
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
 
@@ -27,7 +27,7 @@ class PostRepositoryImpl(PostRepository):
 
     async def get_posts_last_24h(self) -> List[PublishedPost]:
         """Busca posts publicados nas últimas 24 horas usando o crud_post."""
-        since_time = datetime.utcnow() - timedelta(hours=24)
+        since_time = datetime.now(timezone.utc) - timedelta(hours=24)
         
         # A função get_recent_posts já existe no crud_post.py
         recent_posts_models = await crud_post.get_recent_posts(self.db, since=since_time)

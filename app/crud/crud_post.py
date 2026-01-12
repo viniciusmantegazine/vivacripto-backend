@@ -117,52 +117,74 @@ async def get_posts(
     return posts, total
 
 
-async def create_post(db: AsyncSession, post_in: PostCreate) -> Post:
-    """Create a new post"""
+async def create_post(db: AsyncSession, post_in: PostCreate, auto_commit: bool = True) -> Post:
+    """
+    Create a new post.
+
+    Args:
+        db: Database session
+        post_in: Post data
+        auto_commit: If True, commits transaction automatically. Set to False
+                     when using within a larger transaction (Unit of Work pattern).
+    """
     # Extract tag IDs
     tag_ids = post_in.tag_ids if hasattr(post_in, 'tag_ids') else []
-    
+
     # Create post dict without tag_ids
     post_dict = post_in.model_dump(exclude={'tag_ids'})
-    
+
     # Set published_at if status is published
     if post_dict.get('status') == 'published' and not post_dict.get('published_at'):
         post_dict['published_at'] = datetime.now(timezone.utc)
-    
+
     # Create post
     db_post = Post(**post_dict)
-    
+
     # Add tags if provided
     if tag_ids:
         tag_result = await db.execute(select(Tag).where(Tag.id.in_(tag_ids)))
         tags = tag_result.scalars().all()
         db_post.tags = tags
-    
+
     db.add(db_post)
-    await db.commit()
-    await db.refresh(db_post)
-    
+
+    if auto_commit:
+        await db.commit()
+        await db.refresh(db_post)
+
     return db_post
 
 
-async def update_post(db: AsyncSession, post_id: UUID, post_in: PostUpdate) -> Optional[Post]:
-    """Update a post"""
+async def update_post(
+    db: AsyncSession, post_id: UUID, post_in: PostUpdate, auto_commit: bool = True
+) -> Optional[Post]:
+    """
+    Update a post.
+
+    Args:
+        db: Database session
+        post_id: Post ID to update
+        post_in: Update data
+        auto_commit: If True, commits transaction automatically. Set to False
+                     when using within a larger transaction (Unit of Work pattern).
+    """
     db_post = await get_post_by_id(db, post_id)
     if not db_post:
         return None
-    
+
     update_data = post_in.model_dump(exclude_unset=True)
-    
+
     # Update published_at if status changes to published
     if update_data.get('status') == 'published' and db_post.status != 'published':
         update_data['published_at'] = datetime.now(timezone.utc)
-    
+
     for field, value in update_data.items():
         setattr(db_post, field, value)
-    
-    await db.commit()
-    await db.refresh(db_post)
-    
+
+    if auto_commit:
+        await db.commit()
+        await db.refresh(db_post)
+
     return db_post
 
 
@@ -227,11 +249,15 @@ class CRUDPost:
     ) -> tuple[List[Post], int]:
         return await get_posts(db, skip, limit, status, category_id)
     
-    async def create_post(self, db: AsyncSession, post_in: PostCreate) -> Post:
-        return await create_post(db, post_in)
-    
-    async def update_post(self, db: AsyncSession, post_id: UUID, post_in: PostUpdate) -> Optional[Post]:
-        return await update_post(db, post_id, post_in)
+    async def create_post(
+        self, db: AsyncSession, post_in: PostCreate, auto_commit: bool = True
+    ) -> Post:
+        return await create_post(db, post_in, auto_commit)
+
+    async def update_post(
+        self, db: AsyncSession, post_id: UUID, post_in: PostUpdate, auto_commit: bool = True
+    ) -> Optional[Post]:
+        return await update_post(db, post_id, post_in, auto_commit)
     
     async def delete_post(self, db: AsyncSession, post_id: UUID) -> bool:
         return await delete_post(db, post_id)

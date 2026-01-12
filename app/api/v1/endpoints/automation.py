@@ -2,12 +2,16 @@
 Automation API Endpoints
 Endpoints para disparar e gerenciar a automação de notícias
 """
+import traceback
 from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.base import get_db
 from app.services.automation.news_pipeline import NewsPipeline
+from app.services.ai.content_generator import ContentGenerator
+from app.services.automation.quality_validator import QualityValidator
 from app.core.logging import logger
 from app.core.security import verify_automation_token
 from app.core.rate_limiter import limiter, RATE_LIMITS
@@ -77,10 +81,6 @@ async def test_content_generation(
     Usado para debug da validação de parágrafos
     """
     logger.info("Teste de geração de conteúdo iniciado")
-
-    from app.services.ai.content_generator import ContentGenerator
-    from app.services.automation.quality_validator import QualityValidator
-    import traceback
 
     # Notícia fictícia para teste
     fake_news = {
