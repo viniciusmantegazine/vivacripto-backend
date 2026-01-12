@@ -1,39 +1,53 @@
 """
 News Automation Pipeline
-Orquestra todo o fluxo de automação de notícias
+Orquestra todo o fluxo de automação de notícias.
+Utiliza serviços especializados para cada etapa do processo.
 """
-from typing import List, Dict
-from datetime import datetime, timedelta, timezone
-from uuid import UUID
-from loguru import logger
-from sqlalchemy.ext.asyncio import AsyncSession
-import markdown
+import traceback
+from datetime import datetime, timezone
+from typing import Dict
+
 import httpx
 import sentry_sdk
+from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.sources.news_aggregator import NewsAggregator
-from app.services.deduplication import DuplicateDetector, NewsAssignment, ActionType, PostRepositoryImpl
+from app.core.config import settings
+from app.crud.crud_post import crud_post
 from app.services.ai.content_generator import ContentGenerator
 from app.services.ai.image_generator import ImageGenerator
+from app.services.automation.article_publisher import ArticlePublisher
 from app.services.automation.quality_validator import QualityValidator
-from app.services.ai.category_classifier import category_classifier
-from app.crud.crud_post import crud_post
-from app.db.models import Category
-from app.schemas.post import PostCreate, PostUpdate
-from app.core.config import settings
+from app.services.deduplication import (
+    ActionType,
+    DuplicateDetector,
+    NewsAssignment,
+    PostRepositoryImpl,
+)
+from app.services.sources.news_aggregator import NewsAggregator
 
 
 class NewsPipeline:
-    """Pipeline de automação de notícias"""
-    
+    """
+    Pipeline de automação de notícias.
+
+    Orquestra o fluxo completo:
+    1. Coleta de notícias (NewsAggregator)
+    2. Geração de conteúdo (ContentGenerator)
+    3. Validação de qualidade (QualityValidator)
+    4. Detecção de duplicatas (DuplicateDetector)
+    5. Publicação/Atualização (ArticlePublisher)
+    """
+
     MAX_POSTS_PER_DAY = 10  # Limite diário de publicações
     POSTS_PER_EXECUTION = 1  # Publicar apenas 1 notícia por chamada do endpoint
-    
+
     def __init__(self):
         self.aggregator = NewsAggregator()
         self.content_generator = ContentGenerator()
         self.image_generator = ImageGenerator()
         self.validator = QualityValidator()
+        self.publisher = ArticlePublisher(self.image_generator)
     
     async def run(self, db: AsyncSession) -> Dict:
         """
@@ -136,25 +150,25 @@ class NewsPipeline:
                     check_result = await detector.check_duplicate(assignment)
                     
                     if check_result.acao == ActionType.CREATE_NEW:
-                        logger.info(f"✨ Ação: CRIAR NOVO POST")
-                        
-                        # Publicar artigo
-                        published = await self._publish_article(article, db)
+                        logger.info("✨ Ação: CRIAR NOVO POST")
+
+                        # Publicar artigo usando o serviço dedicado
+                        published = await self.publisher.publish_article(article, db)
                         if published:
                             report["published"] += 1
                             processed_count += 1
-                            logger.info(f"✓ Artigo publicado com sucesso")
+                            logger.info("✓ Artigo publicado com sucesso")
                         else:
                             report["failed"] += 1
-                    
+
                     elif check_result.acao == ActionType.UPDATE_EXISTING:
-                        logger.info(f"➕ Ação: ATUALIZAR POST EXISTENTE (ID: {check_result.post_existente_id})")
-                        
-                        # Atualizar post existente com novo conteúdo
-                        updated = await self._update_existing_post(
-                            check_result.post_existente_id,
-                            article,
-                            db
+                        logger.info(
+                            f"➕ Ação: ATUALIZAR POST EXISTENTE (ID: {check_result.post_existente_id})"
+                        )
+
+                        # Atualizar post existente usando o serviço dedicado
+                        updated = await self.publisher.update_article(
+                            check_result.post_existente_id, article, db
                         )
                         if updated:
                             report["updated"] += 1
@@ -234,116 +248,12 @@ class NewsPipeline:
 
     async def _get_remaining_daily_slots(self, db: AsyncSession) -> int:
         """Retorna quantos posts ainda podem ser publicados hoje"""
-        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start = datetime.now(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
         today_posts = await crud_post.get_recent_posts(db, since=today_start)
         return max(0, self.MAX_POSTS_PER_DAY - len(today_posts))
-    
-    async def _publish_article(self, article: Dict, db: AsyncSession) -> bool:
-        """Publica um artigo no banco de dados"""
-        try:
-            # Converter markdown para HTML
-            content_html = markdown.markdown(
-                article["content_markdown"],
-                extensions=['extra', 'codehilite']
-            )
-            
-            # Classificar categoria automaticamente
-            category_slug = category_classifier.classify(
-                title=article["title"],
-                content=article["content_markdown"],
-                excerpt=article.get("excerpt", "")
-            )
-            
-            # Buscar categoria no banco
-            from sqlalchemy import select
-            result = await db.execute(
-                select(Category).where(Category.slug == category_slug)
-            )
-            category = result.scalar_one_or_none()
-            
-            if not category:
-                logger.warning(f"Category '{category_slug}' not found in database, creating...")
-                category = Category(
-                    name=category_classifier.get_category_name(category_slug),
-                    slug=category_slug
-                )
-                db.add(category)
-                await db.flush()
-            
-            # Gerar imagem
-            image_url = await self.image_generator.generate_and_upload_image(
-                article["title"],
-                article["content_markdown"]
-            )
-            
-            # Criar post com validação de tamanho dos campos meta
-            meta_title = article.get("meta_title", "")
-            meta_description = article.get("meta_description", "")
-            
-            # Truncar meta_title para 70 caracteres
-            if meta_title and len(meta_title) > 70:
-                meta_title = meta_title[:67] + "..."
-            
-            # Truncar meta_description para 160 caracteres
-            if meta_description and len(meta_description) > 160:
-                meta_description = meta_description[:157] + "..."
-            
-            post_data = PostCreate(
-                title=article["title"],
-                slug=article["slug"],
-                content_markdown=article["content_markdown"],
-                content_html=content_html,
-                excerpt=article.get("excerpt"),
-                featured_image_url=image_url or article.get("featured_image_url"),
-                status="published",
-                published_at=datetime.now(timezone.utc),
-                meta_title=meta_title or None,
-                meta_description=meta_description or None,
-                canonical_url=None,
-                category_id=category.id,
-            )
-            
-            await crud_post.create_post(db, post_data, auto_commit=False)
-            await db.commit()
-            
-            return True
-        
-        except Exception as e:
-            logger.error(f"Erro ao publicar artigo: {e}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            await db.rollback()
-            return False
-    
-    async def _update_existing_post(self, post_id: str, article: Dict, db: AsyncSession) -> bool:
-        """Atualiza um post existente com novo conteúdo"""
-        try:
-            # Converter markdown para HTML
-            content_html = markdown.markdown(
-                article["content_markdown"],
-                extensions=['extra', 'codehilite']
-            )
-            
-            # Atualizar post
-            post_update = PostUpdate(
-                content_markdown=article["content_markdown"],
-                content_html=content_html,
-                updated_at=datetime.now(timezone.utc)
-            )
-            
-            await crud_post.update_post(db, post_id=UUID(post_id), post_in=post_update, auto_commit=False)
-            await db.commit()
-            
-            logger.info(f"Post {post_id} atualizado com novo conteúdo")
-            return True
-        
-        except Exception as e:
-            logger.error(f"Erro ao atualizar post: {e}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            await db.rollback()
-            return False
-    
+
     async def _revalidate_frontend(self):
         """Revalida o frontend Next.js (ISR)"""
         try:

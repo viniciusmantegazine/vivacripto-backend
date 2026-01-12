@@ -48,9 +48,16 @@ def sanitize_search_query(query: str) -> str:
 
 
 async def get_recent_posts(db: AsyncSession, since: datetime) -> List[Post]:
-    """Get posts created since a specific date"""
+    """Get posts created since a specific date."""
     result = await db.execute(
-        select(Post).where(Post.created_at >= since)
+        select(Post)
+        .options(
+            selectinload(Post.author),
+            selectinload(Post.category),
+            selectinload(Post.tags),
+        )
+        .where(Post.created_at >= since)
+        .order_by(Post.created_at.desc())
     )
     return list(result.scalars().all())
 
