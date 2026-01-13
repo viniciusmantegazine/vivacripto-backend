@@ -137,8 +137,8 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: str = ""
     CLOUDINARY_API_SECRET: str = ""
 
-    # Redis
-    REDIS_URL: str = "redis://localhost:6379/0"
+    # Redis (optional - leave empty to disable caching)
+    REDIS_URL: str = ""
 
     # Database Pool Settings
     DB_POOL_SIZE: int = 10
