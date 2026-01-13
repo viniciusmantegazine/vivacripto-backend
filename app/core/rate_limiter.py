@@ -32,11 +32,18 @@ def get_client_ip(request: Request) -> str:
 
 
 # Criar instância do limiter
-# Em produção, usar Redis como storage. Em desenvolvimento, usar memória.
+# Usar Redis como storage se configurado, caso contrário usar memória.
+def _get_storage_uri() -> str:
+    """Retorna a URI de storage para o rate limiter."""
+    if settings.REDIS_URL:
+        return settings.REDIS_URL
+    return "memory://"
+
+
 limiter = Limiter(
     key_func=get_client_ip,
     default_limits=["200/minute"],  # Limite global padrão
-    storage_uri=settings.REDIS_URL if not settings.DEBUG else "memory://",
+    storage_uri=_get_storage_uri(),
     strategy="fixed-window",
 )
 
