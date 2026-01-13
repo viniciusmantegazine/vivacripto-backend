@@ -241,11 +241,9 @@ async def obter_configuracao():
     **Retorno:**
     - Threshold de similaridade
     - Tipo de engine utilizado
-    - Thresholds de revisão manual
     """
     return {
         "similarity_threshold": detector.similarity_threshold,
-        "review_threshold": detector.review_threshold,
         "engine_type": detector.engine_type,
         "available_engines": ["levenshtein", "tfidf", "embedding", "hybrid"]
     }

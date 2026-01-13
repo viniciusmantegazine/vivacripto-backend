@@ -21,7 +21,6 @@ class ActionType(Enum):
     """Tipos de ação possíveis"""
     CREATE_NEW = "criar"
     UPDATE_EXISTING = "atualizar"
-    REVIEW_MANUAL = "revisar_manualmente"
 
 
 @dataclass
@@ -188,29 +187,25 @@ class DuplicateDetector:
         self,
         repository: PostRepository,
         similarity_threshold: float = 0.80,
-        engine_type: str = "hybrid",
-        review_threshold: float = 0.60
+        engine_type: str = "hybrid"
     ):
         """
         Inicializa o detector
-        
+
         Args:
             repository: Repositório de posts
             similarity_threshold: Threshold para considerar duplicata (padrão 80%)
             engine_type: Tipo de motor de similaridade
-            review_threshold: Threshold para revisão manual (entre 60-80%)
         """
         self.repository = repository
         self.similarity_threshold = similarity_threshold
-        self.review_threshold = review_threshold
         self.similarity_engine = SimilarityFactory.create(engine_type)
         self.engine_type = engine_type
-        
+
         logger.info(
             f"DuplicateDetector inicializado: "
             f"engine={engine_type}, "
-            f"threshold={similarity_threshold:.0%}, "
-            f"review_threshold={review_threshold:.0%}"
+            f"threshold={similarity_threshold:.0%}"
         )
     
     async def check_duplicate(self, assignment: NewsAssignment) -> DuplicateCheckResult:
@@ -292,23 +287,8 @@ class DuplicateDetector:
                 motivo=f"Duplicata detectada com {max_similarity:.0%} de similaridade"
             )
         
-        elif max_similarity >= self.review_threshold:
-            # Similaridade intermediária - revisar manualmente
-            logger.info(
-                f"Similaridade intermediária detectada: {max_similarity:.2%}. "
-                f"Requer revisão manual."
-            )
-            
-            return DuplicateCheckResult(
-                pauta_id=assignment.id,
-                acao=ActionType.REVIEW_MANUAL,
-                similaridade_maxima=max_similarity,
-                candidatos_similares=similarities[:3],
-                motivo=f"Similaridade intermediária ({max_similarity:.0%}). Requer revisão."
-            )
-        
         else:
-            # Conteúdo suficientemente diferente - criar novo post
+            # Similaridade abaixo do threshold - criar novo post
             logger.info(
                 f"Conteúdo diferente. "
                 f"Similaridade máxima: {max_similarity:.2%}. "

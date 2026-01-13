@@ -77,7 +77,6 @@ class NewsPipeline:
             "processed": 0,
             "published": 0,
             "updated": 0,
-            "review_manual": 0,
             "failed": 0,
             "errors": [],
         }
@@ -204,25 +203,6 @@ class NewsPipeline:
                             metrics.record_failure()
                             report["failed"] += 1
 
-                    elif check_result.acao == ActionType.REVIEW_MANUAL:
-                        logger.warning(f"⚠️ Ação: REVISÃO MANUAL NECESSÁRIA")
-                        logger.warning(f"Similaridade máxima: {check_result.similaridade_maxima:.2f}")
-                        logger.warning(f"Candidatos similares: {len(check_result.candidatos_similares)}")
-
-                        metrics.record_skip()
-                        report["review_manual"] += 1
-
-                        sentry_sdk.capture_message(
-                            f"Pauta para revisão manual: {assignment.titulo}",
-                            level="warning",
-                            extras={
-                                "run_id": run_id,
-                                "similaridade": check_result.similaridade_maxima,
-                                "candidatos": check_result.candidatos_similares,
-                                "titulo": assignment.titulo
-                            }
-                        )
-
                 except Exception as e:
                     logger.error(f"Erro ao processar notícia: {e}")
                     logger.error(f"Traceback: {traceback.format_exc()}")
@@ -252,7 +232,6 @@ class NewsPipeline:
             logger.info(f"Processadas: {report['processed']}")
             logger.info(f"Publicadas: {report['published']}")
             logger.info(f"Atualizadas: {report['updated']}")
-            logger.info(f"Revisão Manual: {report['review_manual']}")
             logger.info(f"Falhas: {report['failed']}")
             logger.info(f"Duração: {report['duration_seconds']:.1f}s")
             logger.info("=" * 60)
