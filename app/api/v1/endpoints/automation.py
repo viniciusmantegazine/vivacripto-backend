@@ -66,7 +66,8 @@ async def get_automation_status(
 
     Informações sobre posts publicados hoje e limite diário
     """
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    # Usar datetime naive (sem timezone) para compatibilidade com TIMESTAMP WITHOUT TIME ZONE
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     today_posts = await crud_post.get_recent_posts(db, since=today_start)
 
     max_posts = NewsPipeline.MAX_POSTS_PER_DAY

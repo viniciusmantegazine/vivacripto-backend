@@ -265,7 +265,8 @@ class NewsPipeline:
         """Verifica se o limite diário de posts foi atingido"""
         try:
             logger.debug("Consultando posts de hoje no banco de dados...")
-            today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+            # Usar datetime naive (sem timezone) para compatibilidade com TIMESTAMP WITHOUT TIME ZONE
+            today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
             today_posts = await crud_post.get_recent_posts(db, since=today_start)
             logger.debug(f"Posts hoje: {len(today_posts)}/{self.MAX_POSTS_PER_DAY}")
             return len(today_posts) < self.MAX_POSTS_PER_DAY
@@ -277,7 +278,8 @@ class NewsPipeline:
 
     async def _get_remaining_daily_slots(self, db: AsyncSession) -> int:
         """Retorna quantos posts ainda podem ser publicados hoje"""
-        today_start = datetime.now(timezone.utc).replace(
+        # Usar datetime naive (sem timezone) para compatibilidade com TIMESTAMP WITHOUT TIME ZONE
+        today_start = datetime.utcnow().replace(
             hour=0, minute=0, second=0, microsecond=0
         )
         today_posts = await crud_post.get_recent_posts(db, since=today_start)
