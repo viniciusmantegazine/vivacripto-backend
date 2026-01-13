@@ -27,7 +27,8 @@ class PostRepositoryImpl(PostRepository):
 
     async def get_posts_last_24h(self) -> List[PublishedPost]:
         """Busca posts publicados nas últimas 24 horas usando o crud_post."""
-        since_time = datetime.now(timezone.utc) - timedelta(hours=24)
+        # Usar datetime naive (sem timezone) para compatibilidade com TIMESTAMP WITHOUT TIME ZONE
+        since_time = datetime.utcnow() - timedelta(hours=24)
         
         # A função get_recent_posts já existe no crud_post.py
         recent_posts_models = await crud_post.get_recent_posts(self.db, since=since_time)

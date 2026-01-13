@@ -249,8 +249,8 @@ class TestCRUDPost:
         )
         await crud_post.create_post(db_session, post_data)
 
-        # Get recent posts from an hour ago
-        since = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0)
+        # Get recent posts from start of today (naive datetime for DB compatibility)
+        since = datetime.utcnow().replace(hour=0, minute=0, second=0)
         recent = await crud_post.get_recent_posts(db_session, since)
 
         assert len(recent) >= 1

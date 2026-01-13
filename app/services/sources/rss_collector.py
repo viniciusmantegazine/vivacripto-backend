@@ -34,6 +34,11 @@ class RSSCollector:
             "url": "https://cryptoslate.com/feed/",
             "language": "en"
         },
+        {
+            "name": "CoinPaper",
+            "url": "https://coinpaper.com/rss/news",
+            "language": "en"
+        },
     ]
     
     def __init__(self):
