@@ -156,7 +156,7 @@ class ContentGenerator:
    - Evite especulação excessiva, mas forneça uma conclusão que ajude o leitor a entender a relevância da notícia.
 
 **3. Requisitos de Qualidade:**
-   - **Profundidade:** O artigo final deve ter entre **250 e 400 palavras** para garantir substância e valor informativo. Prefira a qualidade à brevidade.
+   - **Profundidade:** O artigo final deve ter entre **250 e 480 palavras** (MÁXIMO ABSOLUTO: 500 palavras). Prefira a qualidade à brevidade, mas respeite o limite máximo.
    - **Clareza:** Use uma linguagem que seja compreensível tanto para iniciantes quanto para veteranos do mercado cripto. Explique jargões quando necessário.
    - **Coesão:** O texto deve fluir naturalmente. Use conectivos e transições entre parágrafos para criar uma narrativa coesa.
    - **Formatação:** Use quebras de linha duplas (\\n\\n) entre os parágrafos para garantir a legibilidade no frontend.

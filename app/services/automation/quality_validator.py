@@ -17,8 +17,8 @@ class QualityValidator:
     ]
     
     # Limites de qualidade v2.0 - Estrutura flexível
-    MIN_WORD_COUNT = 250  # Aumentado de 100 para 250
-    MAX_WORD_COUNT = 450  # Aumentado de 300 para 450 (margem de 50 palavras)
+    MIN_WORD_COUNT = 250  # Mínimo para garantir substância
+    MAX_WORD_COUNT = 500  # Máximo para manter artigos concisos
     MIN_TITLE_LENGTH = 30
     MAX_TITLE_LENGTH = 100  # Aumentado de 70 para 100
     MIN_EXCERPT_LENGTH = 80

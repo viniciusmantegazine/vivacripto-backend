@@ -94,8 +94,8 @@ A bolsa de valores teve uma semana muito boa. Os resultados foram excelentes."""
 
     def test_validate_article_content_too_long(self, validator: QualityValidator, valid_article: dict):
         """Test validation fails when content is too long."""
-        # Create content with more than 450 words
-        valid_article["content_markdown"] = "## Bitcoin\n\n" + ("Bitcoin crypto blockchain defi token " * 100)
+        # Create content with more than 500 words
+        valid_article["content_markdown"] = "## Bitcoin\n\n" + ("Bitcoin crypto blockchain defi token " * 120)
 
         is_valid, errors = validator.validate_article(valid_article)
 
