@@ -35,14 +35,26 @@ async def trigger_automation(
     """
     logger.info("Automação disparada via API")
 
-    # Executar pipeline
-    pipeline = NewsPipeline()
-    report = await pipeline.run(db)
+    try:
+        # Executar pipeline
+        pipeline = NewsPipeline()
+        report = await pipeline.run(db)
 
-    return {
-        "success": report["status"] == "completed",
-        "report": report
-    }
+        return {
+            "success": report["status"] == "completed",
+            "report": report
+        }
+    except Exception as e:
+        logger.exception(f"Erro no pipeline de automação: {e}")
+        from app.core.config import settings
+        error_response = {
+            "success": False,
+            "error": "Erro interno ao executar pipeline de automação"
+        }
+        if settings.DEBUG:
+            error_response["error_detail"] = str(e)
+            error_response["traceback"] = traceback.format_exc()
+        return error_response
 
 
 @router.get("/status")
