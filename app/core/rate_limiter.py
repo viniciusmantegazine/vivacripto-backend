@@ -35,8 +35,10 @@ def get_client_ip(request: Request) -> str:
 # Usar Redis como storage se configurado, caso contrário usar memória.
 def _get_storage_uri() -> str:
     """Retorna a URI de storage para o rate limiter."""
-    if settings.REDIS_URL:
-        return settings.REDIS_URL
+    redis_url = settings.REDIS_URL
+    # Usar Redis apenas se URL estiver configurada e for válida
+    if redis_url and redis_url.startswith(("redis://", "rediss://")):
+        return redis_url
     return "memory://"
 
 
