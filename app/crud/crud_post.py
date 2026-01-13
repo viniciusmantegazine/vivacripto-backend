@@ -140,9 +140,9 @@ async def create_post(db: AsyncSession, post_in: PostCreate, auto_commit: bool =
     # Create post dict without tag_ids
     post_dict = post_in.model_dump(exclude={'tag_ids'})
 
-    # Set published_at if status is published
+    # Set published_at if status is published (naive datetime for DB compatibility)
     if post_dict.get('status') == 'published' and not post_dict.get('published_at'):
-        post_dict['published_at'] = datetime.now(timezone.utc)
+        post_dict['published_at'] = datetime.utcnow()
 
     # Create post
     db_post = Post(**post_dict)
@@ -181,9 +181,9 @@ async def update_post(
 
     update_data = post_in.model_dump(exclude_unset=True)
 
-    # Update published_at if status changes to published
+    # Update published_at if status changes to published (naive datetime for DB)
     if update_data.get('status') == 'published' and db_post.status != 'published':
-        update_data['published_at'] = datetime.now(timezone.utc)
+        update_data['published_at'] = datetime.utcnow()
 
     for field, value in update_data.items():
         setattr(db_post, field, value)

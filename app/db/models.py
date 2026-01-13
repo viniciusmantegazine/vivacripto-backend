@@ -10,8 +10,8 @@ from app.db.base_class import Base
 
 
 def utc_now() -> datetime:
-    """Retorna datetime atual com timezone UTC (substitui utc_now deprecated)."""
-    return datetime.now(timezone.utc)
+    """Retorna datetime UTC naive para compatibilidade com TIMESTAMP WITHOUT TIME ZONE."""
+    return datetime.utcnow()
 
 
 # Association table for many-to-many relationship between posts and tags

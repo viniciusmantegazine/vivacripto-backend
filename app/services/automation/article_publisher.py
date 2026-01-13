@@ -87,11 +87,11 @@ class ArticlePublisher:
             # Converter markdown para HTML
             content_html = self._convert_markdown_to_html(article["content_markdown"])
 
-            # Atualizar post
+            # Atualizar post (usar datetime naive para compatibilidade com DB)
             post_update = PostUpdate(
                 content_markdown=article["content_markdown"],
                 content_html=content_html,
-                updated_at=datetime.now(timezone.utc),
+                updated_at=datetime.utcnow(),
             )
 
             await crud_post.update_post(
@@ -199,6 +199,7 @@ class ArticlePublisher:
         if meta_description and len(meta_description) > 160:
             meta_description = meta_description[:157] + "..."
 
+        # Usar datetime naive para compatibilidade com TIMESTAMP WITHOUT TIME ZONE
         return PostCreate(
             title=article["title"],
             slug=article["slug"],
@@ -207,7 +208,7 @@ class ArticlePublisher:
             excerpt=article.get("excerpt"),
             featured_image_url=image_url or article.get("featured_image_url"),
             status="published",
-            published_at=datetime.now(timezone.utc),
+            published_at=datetime.utcnow(),
             meta_title=meta_title or None,
             meta_description=meta_description or None,
             canonical_url=None,
