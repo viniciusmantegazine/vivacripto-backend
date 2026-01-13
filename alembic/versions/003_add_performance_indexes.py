@@ -22,77 +22,23 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Index for filtering posts by status (very common filter)
-    op.create_index(
-        'ix_posts_status',
-        'posts',
-        ['status'],
-        unique=False
-    )
-
-    # Index for ordering posts by published_at (common for listing)
-    op.create_index(
-        'ix_posts_published_at_desc',
-        'posts',
-        [sa.text('published_at DESC NULLS LAST')],
-        unique=False
-    )
-
-    # Index for filtering posts by created_at (daily limit checks)
-    op.create_index(
-        'ix_posts_created_at_desc',
-        'posts',
-        [sa.text('created_at DESC')],
-        unique=False
-    )
-
-    # Composite index for common query pattern: status + published_at
-    op.create_index(
-        'ix_posts_status_published_at',
-        'posts',
-        ['status', sa.text('published_at DESC NULLS LAST')],
-        unique=False
-    )
-
-    # Index for category_id foreign key (improves JOIN performance)
-    op.create_index(
-        'ix_posts_category_id',
-        'posts',
-        ['category_id'],
-        unique=False
-    )
-
-    # Index for author_id foreign key (improves JOIN performance)
-    op.create_index(
-        'ix_posts_author_id',
-        'posts',
-        ['author_id'],
-        unique=False
-    )
-
-    # Index for automation_logs run_id (for querying logs by run)
-    op.create_index(
-        'ix_automation_logs_run_id',
-        'automation_logs',
-        ['run_id'],
-        unique=False
-    )
-
-    # Index for automation_logs created_at (for time-based queries)
-    op.create_index(
-        'ix_automation_logs_created_at',
-        'automation_logs',
-        [sa.text('created_at DESC')],
-        unique=False
-    )
+    # Use IF NOT EXISTS para evitar erro se índice já existir
+    op.execute('CREATE INDEX IF NOT EXISTS ix_posts_status ON posts (status)')
+    op.execute('CREATE INDEX IF NOT EXISTS ix_posts_published_at_desc ON posts (published_at DESC NULLS LAST)')
+    op.execute('CREATE INDEX IF NOT EXISTS ix_posts_created_at_desc ON posts (created_at DESC)')
+    op.execute('CREATE INDEX IF NOT EXISTS ix_posts_status_published_at ON posts (status, published_at DESC NULLS LAST)')
+    op.execute('CREATE INDEX IF NOT EXISTS ix_posts_category_id ON posts (category_id)')
+    op.execute('CREATE INDEX IF NOT EXISTS ix_posts_author_id ON posts (author_id)')
+    op.execute('CREATE INDEX IF NOT EXISTS ix_automation_logs_run_id ON automation_logs (run_id)')
+    op.execute('CREATE INDEX IF NOT EXISTS ix_automation_logs_created_at ON automation_logs (created_at DESC)')
 
 
 def downgrade() -> None:
-    op.drop_index('ix_automation_logs_created_at', table_name='automation_logs')
-    op.drop_index('ix_automation_logs_run_id', table_name='automation_logs')
-    op.drop_index('ix_posts_author_id', table_name='posts')
-    op.drop_index('ix_posts_category_id', table_name='posts')
-    op.drop_index('ix_posts_status_published_at', table_name='posts')
-    op.drop_index('ix_posts_created_at_desc', table_name='posts')
-    op.drop_index('ix_posts_published_at_desc', table_name='posts')
-    op.drop_index('ix_posts_status', table_name='posts')
+    op.execute('DROP INDEX IF EXISTS ix_automation_logs_created_at')
+    op.execute('DROP INDEX IF EXISTS ix_automation_logs_run_id')
+    op.execute('DROP INDEX IF EXISTS ix_posts_author_id')
+    op.execute('DROP INDEX IF EXISTS ix_posts_category_id')
+    op.execute('DROP INDEX IF EXISTS ix_posts_status_published_at')
+    op.execute('DROP INDEX IF EXISTS ix_posts_created_at_desc')
+    op.execute('DROP INDEX IF EXISTS ix_posts_published_at_desc')
+    op.execute('DROP INDEX IF EXISTS ix_posts_status')
