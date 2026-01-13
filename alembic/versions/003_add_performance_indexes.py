@@ -1,7 +1,7 @@
 """Add performance indexes for common queries
 
-Revision ID: 003_add_performance_indexes
-Revises: 002_add_deduplication_history
+Revision ID: 003
+Revises: 002
 Create Date: 2025-01-12
 
 This migration adds indexes to improve query performance for:
@@ -15,8 +15,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '003_add_performance_indexes'
-down_revision = '002_add_deduplication_history'
+revision = '003'
+down_revision = '002'
 branch_labels = None
 depends_on = None
 
