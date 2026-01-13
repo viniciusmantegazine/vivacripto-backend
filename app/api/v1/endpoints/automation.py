@@ -107,9 +107,9 @@ async def test_content_generation(
     }
 
     try:
-        # Gerar conteúdo
+        # Gerar conteúdo (usando categoria bitcoin para o teste)
         content_generator = ContentGenerator()
-        article = await content_generator.generate_article(fake_news)
+        article = await content_generator.generate_article(fake_news, category="bitcoin")
 
         if not article:
             return {

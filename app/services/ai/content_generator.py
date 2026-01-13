@@ -1,6 +1,7 @@
 """
-AI Content Generator Service v2.0
-Gera conteúdo de notícias usando OpenAI GPT-4 com estrutura flexível
+AI Content Generator Service v3.0
+Gera conteúdo de notícias usando OpenAI GPT-4 com estrutura otimizada,
+guardrails de segurança e prevenção de alucinações
 """
 import re
 from typing import Dict, Optional
@@ -12,51 +13,143 @@ from slugify import slugify
 from app.core.config import settings
 
 
+# Configurações de tom por categoria
+CATEGORY_CONFIG = {
+    "bitcoin": {
+        "tom": "Factual e analítico",
+        "foco": "impacto no mercado e adoção institucional",
+        "keywords": ["Bitcoin", "BTC", "criptomoeda"]
+    },
+    "ethereum": {
+        "tom": "Técnico e educativo",
+        "foco": "desenvolvimentos tecnológicos e ecossistema",
+        "keywords": ["Ethereum", "ETH", "smart contracts"]
+    },
+    "altcoins": {
+        "tom": "Informativo e cauteloso",
+        "foco": "novidades e contexto de mercado",
+        "keywords": ["altcoin", "criptomoeda", "token"]
+    },
+    "defi": {
+        "tom": "Educativo e técnico",
+        "foco": "explicação de protocolos e riscos",
+        "keywords": ["DeFi", "finanças descentralizadas", "protocolo"]
+    },
+    "regulacao": {
+        "tom": "Formal e analítico",
+        "foco": "impacto regulatório e contexto legal",
+        "keywords": ["regulação", "legislação", "compliance"]
+    },
+    "airdrop": {
+        "tom": "Instrucional e direto",
+        "foco": "informações práticas e requisitos",
+        "keywords": ["airdrop", "distribuição", "tokens grátis"]
+    },
+    "default": {
+        "tom": "Jornalístico equilibrado",
+        "foco": "relevância para o mercado cripto brasileiro",
+        "keywords": ["criptomoeda", "mercado cripto", "blockchain"]
+    }
+}
+
+
 class ContentGenerator:
-    """Gerador de conteúdo com IA v2.0 - Editor-Chefe Sênior com estrutura flexível"""
-    
-    # System Prompt v2.0 - Persona de Editor-Chefe de Criptoeconomia
-    SYSTEM_PROMPT = """Você é um Editor-Chefe Sênior especializado em Criptoeconomia, com mais de 10 anos de experiência em jornalismo financeiro e tecnológico. Sua missão é transformar dados brutos e notícias de fontes externas em artigos jornalísticos aprofundados, claros e imparciais, adequados para um público diversificado que vai de iniciantes a veteranos do mercado cripto.
+    """Gerador de conteúdo com IA v3.0 - Editor-Chefe com guardrails anti-alucinação"""
 
-**PERFIL EDITORIAL:**
-- **Estilo:** Jornalístico, analítico e educativo. Pense em uma fusão entre Bloomberg (dados e análise financeira), The Verge (tecnologia acessível) e CoinDesk (expertise em cripto).
-- **Tom:** Adapte o tom à complexidade do assunto. Seja direto e factual para breaking news, mais analítico para tendências de mercado, e educativo para temas técnicos.
-- **Idioma:** Português brasileiro (BR), com vocabulário preciso mas acessível. Use termos técnicos quando necessário, mas sempre explique conceitos complexos.
+    # System Prompt v3.0 - Estruturado com tags XML para melhor parsing
+    SYSTEM_PROMPT = """<persona>
+Você é o Editor-Chefe do portal VivaCripto, um veículo jornalístico especializado em criptoeconomia para o público brasileiro. Sua formação combina jornalismo financeiro (Bloomberg), tecnologia acessível (The Verge) e expertise cripto (CoinDesk).
+</persona>
 
-**PRINCÍPIOS EDITORIAIS FUNDAMENTAIS:**
+<audiencia>
+Seu leitor é brasileiro, interessado em criptomoedas, e pode ser:
+- Iniciante curioso buscando entender o mercado
+- Investidor ativo querendo se manter informado
+- Profissional de tecnologia acompanhando tendências
 
-1. **Contexto é Rei:** Nunca se limite a resumir a fonte. Sempre enriqueça a notícia com contexto histórico, técnico e de mercado. Responda à pergunta fundamental: "Por que isso importa para o leitor?".
+Escreva para TODOS esses perfis simultaneamente: claro para iniciantes, relevante para veteranos.
+</audiencia>
 
-2. **Narrativa Coesa:** Construa uma história com começo, meio e fim. Não apenas liste fatos de forma fragmentada. O texto deve fluir naturalmente de uma ideia para outra.
+<tom_de_voz>
+- DIRETO: Vá ao ponto. Cada frase deve ter propósito.
+- INFORMATIVO: Fatos > Opiniões. Dados > Especulações.
+- EDUCATIVO: Explique termos técnicos naturalmente, sem parecer didático demais.
+- NEUTRO: Sem sensacionalismo. Sem FOMO. Sem FUD.
+</tom_de_voz>
 
-3. **Profundidade e Clareza:** Explique conceitos complexos de forma simples, sem ser superficial. Se mencionar "Halving", explique brevemente o que é. Se falar de "ETF", contextualize para quem não conhece.
+<anti_patterns>
+NUNCA use estas construções robóticas ou clichês:
+- "Vale ressaltar que..."
+- "Em conclusão..."
+- "É importante mencionar que..."
+- "Conforme mencionado anteriormente..."
+- "Neste contexto..."
+- "Diante do exposto..."
+- "Sendo assim..."
+- "Por fim..."
+- "Em suma..."
+- Iniciar múltiplas frases com "Além disso"
+- Usar "the" ou anglicismos desnecessários
+- Frases que começam com "Com a/o" repetidamente
+</anti_patterns>
 
-4. **Imparcialidade e Credibilidade:** Apresente os fatos de forma objetiva. Evite linguagem sensacionalista ou especulativa. Quando houver incerteza, deixe isso claro.
+<guardrails_de_seguranca>
+🚫 PROIBIÇÕES ABSOLUTAS - VIOLAÇÃO RESULTA EM REJEIÇÃO:
 
-**PROIBIÇÕES ESTRITAS:**
-- **JAMAIS** fazer recomendações financeiras ou sugerir ações de compra/venda.
-- **JAMAIS** usar clickbait excessivo ou linguagem sensacionalista.
-- **JAMAIS** iniciar o texto com metadados visíveis como "Título:", "Resumo:", "Corpo:", "Artigo:", etc.
-- **JAMAIS** traduzir literalmente de fontes em inglês. Sempre reescreva com um ângulo editorial próprio.
+1. **DADOS INVENTADOS:**
+   - NUNCA invente preços, porcentagens, datas, valores ou estatísticas que NÃO estejam EXPLICITAMENTE na fonte fornecida.
+   - Se a fonte disser "Bitcoin subiu", NÃO escreva "Bitcoin subiu 5,3%" ou "atingiu US$ 70.000".
+   - Quando não houver dados específicos, use termos como "registrou alta", "apresentou valorização", "sofreu queda".
 
-**FORMATO DE SAÍDA:**
-- Markdown puro, pronto para renderização direta no frontend.
-- Use H2 (##) para o subtítulo interno da matéria.
-- Use **negrito** para destacar conceitos-chave ou dados importantes.
-- Use listas quando apropriado para organizar informações estruturadas.
-- Use quebras de linha duplas (\\n\\n) entre parágrafos para garantir legibilidade."""
+2. **CONSELHO FINANCEIRO (NFA - Not Financial Advice):**
+   NUNCA use linguagem que possa ser interpretada como recomendação de investimento:
+   ❌ "Investidores devem considerar..."
+   ❌ "O momento é propício para..."
+   ❌ "Especialistas recomendam comprar/vender..."
+   ❌ "É uma boa oportunidade para..."
+   ❌ "Pode ser interessante aproveitar..."
+   ✅ "A decisão de investimento cabe a cada indivíduo após própria análise."
+   ✅ "Investidores devem fazer sua própria pesquisa (DYOR)."
+
+3. **PREVISÕES ASSERTIVAS:**
+   NUNCA faça previsões de preço ou afirmações sobre o futuro como fatos:
+   ❌ "O Bitcoin vai atingir $100k"
+   ❌ "O mercado certamente vai subir"
+   ✅ "Alguns analistas projetam cenários otimistas, embora o mercado seja imprevisível."
+   ✅ "O movimento pode indicar tendência, mas mercados cripto são voláteis."
+
+4. **ATRIBUIÇÃO OBRIGATÓRIA:**
+   Quando mencionar dados específicos, SEMPRE atribua à fonte:
+   ✅ "Segundo a fonte original..."
+   ✅ "De acordo com dados divulgados..."
+   ✅ "Conforme reportado..."
+
+5. **METADADOS NO OUTPUT:**
+   NUNCA inicie o texto com prefixos como "Título:", "Resumo:", "Corpo:", "Artigo:", etc.
+</guardrails_de_seguranca>
+
+<formato_de_saida>
+- Markdown puro (renderização direta no frontend)
+- H2 (##) para subtítulo interno único da matéria
+- **Negrito** para conceitos-chave e dados importantes
+- Listas com hífen (-) quando houver 3+ itens relacionados
+- Quebras de linha duplas (\\n\\n) entre TODOS os parágrafos
+- Parágrafos com 2-4 frases cada (evite blocos muito longos)
+- Alterne frases curtas e longas para ritmo natural
+</formato_de_saida>"""
 
     def __init__(self):
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = "gpt-4o-mini"
     
-    async def generate_article(self, source_news: Dict) -> Optional[Dict]:
+    async def generate_article(self, source_news: Dict, category: str = "default") -> Optional[Dict]:
         """
-        Gera um artigo completo a partir de uma notícia fonte
-        
+        Gera um artigo completo a partir de uma notícia fonte (v3.0)
+
         Args:
             source_news: Notícia coletada das fontes
-            
+            category: Categoria do artigo para ajuste de tom (bitcoin, ethereum, defi, etc.)
+
         Returns:
             Artigo gerado com título, conteúdo, excerpt e meta tags
         """
@@ -64,28 +157,32 @@ class ContentGenerator:
             title = source_news.get("title", "")
             description = source_news.get("description", "")
             source = source_news.get("source", "")
-            
-            logger.info(f"Gerando artigo v2.0 para: {title[:50]}...")
-            
-            # Gerar conteúdo principal
-            content = await self._generate_content(title, description, source)
-            
+
+            logger.info(f"Gerando artigo v3.0 para: {title[:50]}... (categoria: {category})")
+
+            # Gerar conteúdo principal com categoria para ajuste de tom
+            content = await self._generate_content(title, description, source, category)
+
             if not content:
                 logger.warning("Falha ao gerar conteúdo")
                 return None
-            
+
+            # Obter keyword da categoria para SEO
+            cat_config = self._get_category_config(category)
+            keyword = cat_config["keywords"][0] if cat_config["keywords"] else "criptomoeda"
+
             # Gerar título otimizado para SEO
-            seo_title = await self._generate_seo_title(content)
-            
+            seo_title = await self._generate_seo_title(content, keyword)
+
             # Gerar excerpt
             excerpt = await self._generate_excerpt(content)
-            
+
             # Gerar meta description
-            meta_description = await self._generate_meta_description(content)
-            
+            meta_description = await self._generate_meta_description(content, seo_title, keyword)
+
             # Gerar slug
             slug = slugify(seo_title or title)
-            
+
             article = {
                 "title": seo_title or title,
                 "slug": slug,
@@ -95,83 +192,119 @@ class ContentGenerator:
                 "meta_description": meta_description,
                 "source_url": source_news.get("url"),
                 "source_name": source,
+                "category": category,
             }
-            
-            logger.info(f"Artigo v2.0 gerado com sucesso: {article['title']}")
+
+            logger.info(f"Artigo v3.0 gerado com sucesso: {article['title']}")
             return article
-        
+
         except Exception as e:
             logger.error(f"Erro ao gerar artigo: {e}")
             return None
     
+    def _get_category_config(self, category: str) -> Dict:
+        """Retorna configuração específica para a categoria"""
+        category_lower = category.lower() if category else "default"
+        return CATEGORY_CONFIG.get(category_lower, CATEGORY_CONFIG["default"])
+
     async def _generate_content(
-        self, 
-        title: str, 
+        self,
+        title: str,
         description: str,
-        source: str
+        source: str,
+        category: str = "default"
     ) -> Optional[str]:
-        """Gera o conteúdo principal do artigo com estrutura flexível v2.0"""
-        
-        user_prompt = f"""**ENTRADA DE DADOS:**
+        """Gera o conteúdo principal do artigo com estrutura otimizada v3.0"""
 
-- **Fonte:** {source}
-- **Título Original:** {title}
-- **Descrição/Conteúdo:** {description}
+        # Obter configuração da categoria
+        cat_config = self._get_category_config(category)
+        keyword_principal = cat_config["keywords"][0] if cat_config["keywords"] else "criptomoeda"
 
-═══════════════════════════════════════════════════════════════
+        user_prompt = f"""<dados_da_fonte>
+Fonte: {source}
+Título Original: {title}
+Conteúdo da Fonte: {description}
+Categoria: {category}
+</dados_da_fonte>
 
-**TAREFA EDITORIAL: PRODUZIR UMA NOTÍCIA COMPLETA E APROFUNDADA**
+<configuracao_editorial>
+Tom recomendado: {cat_config["tom"]}
+Foco da cobertura: {cat_config["foco"]}
+Palavra-chave principal: {keyword_principal}
+</configuracao_editorial>
 
-**1. Análise e Ângulo Editorial:**
-   - Identifique o fato central e o ângulo mais relevante para o leitor brasileiro.
-   - Se houver múltiplas informações relacionadas ao mesmo tema, sintetize tudo em uma narrativa única e coesa.
-   - Determine o tipo de notícia: breaking news, análise de mercado, regulação, tecnologia, ou adoção institucional.
+<tarefa>
+Transforme os dados acima em um artigo jornalístico completo para o portal VivaCripto, seguindo a estrutura abaixo.
+</tarefa>
 
-**2. Estrutura Narrativa Flexível:**
+<estrutura_do_artigo>
 
-   A estrutura do artigo deve ser **adaptada ao conteúdo**, não forçada em um molde fixo. Use entre 3 e 5 parágrafos conforme necessário para desenvolver adequadamente a notícia.
+## [Manchete Interna H2]
+Crie um subtítulo impactante e informativo que resuma o ângulo da matéria.
+NÃO use clickbait. Foque no valor informativo real.
 
-   **Manchete Interna (H2):**
-   - Crie um subtítulo impactante e informativo que resuma o ângulo da matéria.
-   - Deve ser atrativo, mas não clickbait. Foque no valor informativo.
+**Parágrafo 1 - Lead Jornalístico:**
+Responda de forma direta: Quem? O quê? Quando? Onde? Por quê?
+Use a técnica da pirâmide invertida - o essencial vem primeiro.
+O leitor deve entender a notícia completa apenas lendo este parágrafo.
 
-   **Parágrafo 1: O Gancho (Lead Jornalístico):**
-   - Responda de forma clara e direta: **Quem? O quê? Quando? Onde? Por quê?**
-   - Apresente o fato mais importante logo no início, seguindo a pirâmide invertida do jornalismo.
-   - Este parágrafo deve ser suficiente para o leitor entender o essencial da notícia.
+**Parágrafos 2-3 - Contexto e Profundidade:**
+Desenvolva a notícia com detalhes PRESENTES NA FONTE.
+⚠️ IMPORTANTE: Use APENAS dados que estão explicitamente na fonte fornecida.
 
-   **Parágrafos 2-3 (ou 2-4): O Contexto e a Profundidade:**
-   - **Desenvolva a notícia.** Adicione detalhes, dados numéricos, citações (se disponíveis) e informações de suporte.
-   - **Enriqueça o conteúdo.** Se a fonte for curta ou superficial, expanda explicando os conceitos técnicos mencionados:
-     - Se mencionar "ETF", explique brevemente o que é um ETF e por que é relevante para cripto.
-     - Se falar de "Halving", contextualize o evento e seu impacto histórico no preço.
-     - Se citar a "SEC", explique seu papel regulatório.
-   - Forneça contexto histórico ou de mercado para situar o leitor. Compare com eventos similares do passado, se relevante.
-   - Use dados concretos sempre que possível (preços, porcentagens, datas).
+Se a fonte mencionar termos técnicos, explique-os naturalmente:
+- ETF: Fundo negociado em bolsa que replica o desempenho de um ativo
+- Halving: Evento programado que reduz pela metade a recompensa de mineração
+- DeFi: Ecossistema de finanças descentralizadas sem intermediários tradicionais
+- Layer 2: Soluções de segunda camada para escalabilidade de blockchains
+- Staking: Processo de bloquear criptomoedas para validar transações e receber recompensas
 
-   **Parágrafo Final: A Análise e o Impacto:**
-   - Conclua com a análise editorial: **"Por que isso é importante?"**
-   - Qual o impacto potencial no mercado, na tecnologia, na regulação ou para os investidores?
-   - Ofereça uma perspectiva sobre os próximos passos ou desdobramentos futuros, quando aplicável.
-   - Evite especulação excessiva, mas forneça uma conclusão que ajude o leitor a entender a relevância da notícia.
+Adicione contexto histórico ou de mercado quando RELEVANTE e VERIFICÁVEL.
 
-**3. Requisitos de Qualidade:**
-   - **Profundidade:** O artigo final deve ter entre **250 e 480 palavras** (MÁXIMO ABSOLUTO: 500 palavras). Prefira a qualidade à brevidade, mas respeite o limite máximo.
-   - **Clareza:** Use uma linguagem que seja compreensível tanto para iniciantes quanto para veteranos do mercado cripto. Explique jargões quando necessário.
-   - **Coesão:** O texto deve fluir naturalmente. Use conectivos e transições entre parágrafos para criar uma narrativa coesa.
-   - **Formatação:** Use quebras de linha duplas (\\n\\n) entre os parágrafos para garantir a legibilidade no frontend.
+**Parágrafo Final - Impacto e Relevância:**
+Explique por que isso importa para o leitor brasileiro.
+Qual o impacto potencial para o mercado, tecnologia ou regulação?
 
-**4. Checklist de Auto-Verificação (Antes de Finalizar):**
-   - ✓ O artigo flui como uma narrativa coesa, não como uma lista de fatos?
-   - ✓ A importância e o impacto do evento estão claros para o leitor?
-   - ✓ O conteúdo é educativo e informativo, não apenas um resumo da fonte?
-   - ✓ O texto está livre de jargões desnecessários, ou explica os que são essenciais?
-   - ✓ O lead responde às perguntas fundamentais (quem, o quê, quando, onde, por quê)?
-   - ✓ O texto está livre de metadados visíveis no início?
+⚠️ REGRA CRÍTICA: NÃO faça recomendações de investimento.
+⚠️ NÃO preveja preços ou movimentos de mercado como certezas.
+✅ Limite-se a analisar possíveis desdobramentos de forma neutra.
 
-═══════════════════════════════════════════════════════════════
+</estrutura_do_artigo>
 
-**Escreva o artigo agora, começando diretamente pela manchete interna (H2).**"""
+<requisitos_tecnicos>
+- Tamanho: 250-480 palavras (MÁXIMO ABSOLUTO: 500)
+- Use a palavra-chave "{keyword_principal}" naturalmente 2-3 vezes no texto
+- Idioma: Português brasileiro fluente e natural
+- Formatação: Quebras de linha duplas (\\n\\n) entre TODOS os parágrafos
+- Estrutura: 3-5 parágrafos conforme necessidade do conteúdo
+</requisitos_tecnicos>
+
+<validacao_obrigatoria>
+Antes de finalizar, VERIFIQUE mentalmente cada item:
+
+☐ DADOS: Todos os números, preços, datas e porcentagens vieram da fonte original?
+   → Se NÃO estão na fonte, NÃO invente. Use termos vagos ("registrou alta", "apresentou queda").
+
+☐ NFA: Existe alguma frase que soa como conselho de investimento?
+   → Se SIM, reformule para tom neutro e informativo.
+
+☐ FLUÊNCIA: O texto flui naturalmente sem frases robóticas?
+   → Evite: "Vale ressaltar", "Em conclusão", "É importante mencionar".
+
+☐ CLAREZA: Um iniciante conseguiria entender? Um veterano acharia relevante?
+   → Balance profundidade técnica com acessibilidade.
+
+☐ COESÃO: O artigo tem início, meio e fim bem conectados?
+   → Use transições naturais entre parágrafos.
+
+☐ ATRIBUIÇÃO: Dados específicos estão atribuídos à fonte?
+   → Use: "Segundo informações divulgadas...", "De acordo com a fonte..."
+</validacao_obrigatoria>
+
+<output>
+Escreva APENAS o artigo final em Markdown, começando diretamente pelo H2.
+Nenhum texto adicional, prefixo ou metadado.
+</output>"""
 
         try:
             response = await self.client.chat.completions.create(
@@ -180,8 +313,8 @@ class ContentGenerator:
                     {"role": "system", "content": self.SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=0.7,
-                max_tokens=800,  # Aumentado de 600 para 800 para permitir artigos de até 400 palavras
+                temperature=0.4,  # Reduzido de 0.7 para maior precisão factual em conteúdo jornalístico
+                max_tokens=900,  # Aumentado para comportar artigos de até 500 palavras
             )
             
             content = response.choices[0].message.content.strip()
@@ -208,96 +341,152 @@ class ContentGenerator:
     
     def _sanitize_content(self, content: str) -> str:
         """
-        Remove prefixos de metadados que possam ter vazado no output
-        
+        Sanitiza o conteúdo gerado pela IA (v3.0)
+
+        Realiza:
+        1. Remoção de prefixos de metadados vazados
+        2. Detecção de frases de conselho financeiro (warning)
+        3. Detecção de frases robóticas/clichês (warning)
+        4. Normalização de formatação
+
         Args:
             content: Conteúdo bruto da IA
-            
+
         Returns:
-            Conteúdo limpo
+            Conteúdo limpo e validado
         """
-        # Lista de prefixos proibidos
+        # Lista de prefixos proibidos (metadados)
         forbidden_prefixes = [
-            "Título:",
-            "Titulo:",
-            "Resumo:",
-            "Corpo:",
-            "Artigo:",
-            "Conteúdo:",
-            "Conteudo:",
-            "Texto:",
-            "Notícia:",
-            "Noticia:",
-            "Meta:",
-            "**Título:**",
-            "**Titulo:**",
-            "**Resumo:**",
-            "**Corpo:**",
-            "**Artigo:**",
+            "Título:", "Titulo:", "Resumo:", "Corpo:", "Artigo:",
+            "Conteúdo:", "Conteudo:", "Texto:", "Notícia:", "Noticia:",
+            "Meta:", "Output:", "Resposta:",
+            "**Título:**", "**Titulo:**", "**Resumo:**",
+            "**Corpo:**", "**Artigo:**", "**Output:**",
         ]
-        
+
+        # Frases que indicam possível conselho financeiro (apenas warning)
+        nfa_red_flags = [
+            "devem considerar comprar",
+            "devem considerar vender",
+            "recomendamos",
+            "aconselhamos",
+            "é hora de comprar",
+            "é hora de vender",
+            "aproveite para",
+            "não perca a oportunidade",
+            "momento ideal para investir",
+            "você deveria investir",
+        ]
+
+        # Frases robóticas a detectar (apenas warning para log)
+        robotic_phrases = [
+            "vale ressaltar que",
+            "é importante mencionar",
+            "em conclusão",
+            "diante do exposto",
+            "neste contexto",
+            "conforme mencionado anteriormente",
+            "sendo assim",
+            "em suma",
+            "por fim,",
+        ]
+
         # Remover prefixos linha por linha, PRESERVANDO quebras duplas
         lines = content.split('\n')
         cleaned_lines = []
-        
+
         for line in lines:
             line_stripped = line.strip()
-            
+
             # Se linha está vazia, preservar para manter quebras de parágrafo
             if not line_stripped:
                 cleaned_lines.append('')
                 continue
-            
+
             # Verificar se linha começa com prefixo proibido
             for prefix in forbidden_prefixes:
                 if line_stripped.startswith(prefix):
-                    # Remover o prefixo mas manter o resto
                     line = line_stripped[len(prefix):].strip()
-                    logger.warning(f"Removido prefixo proibido: {prefix}")
+                    logger.warning(f"[Sanitização] Removido prefixo proibido: {prefix}")
                     break
-            
+
             cleaned_lines.append(line)
-        
+
         # Juntar linhas preservando estrutura
         result = '\n'.join(cleaned_lines)
 
         # Remover múltiplas quebras consecutivas (mais de 2)
         result = re.sub(r'\n{3,}', '\n\n', result)
 
+        # Verificar red flags de NFA (apenas log warning, não bloqueia)
+        content_lower = result.lower()
+        for phrase in nfa_red_flags:
+            if phrase in content_lower:
+                logger.warning(f"[NFA Alert] Detectada possível linguagem de conselho financeiro: '{phrase}'")
+
+        # Verificar frases robóticas (apenas log warning)
+        for phrase in robotic_phrases:
+            if phrase in content_lower:
+                logger.warning(f"[Qualidade] Detectada frase robótica/clichê: '{phrase}'")
+
         return result.strip()
     
-    async def _generate_seo_title(self, content: str) -> Optional[str]:
-        """Gera título otimizado para SEO"""
-        prompt = f"""Com base no artigo abaixo, crie um título otimizado para SEO:
+    async def _generate_seo_title(self, content: str, keyword: str = "criptomoeda") -> Optional[str]:
+        """Gera título otimizado para SEO (v3.0 com few-shot examples)"""
 
-{content[:500]}
+        prompt = f"""<contexto>
+Artigo: {content[:500]}
+Palavra-chave principal: {keyword}
+</contexto>
 
-REQUISITOS:
-- 50-70 caracteres
-- Inclua palavra-chave principal
-- Seja atrativo mas não clickbait
-- Em português brasileiro
-- SEM prefixos como "Título:" - apenas o título puro
+<tarefa>
+Crie um título SEO otimizado para este artigo sobre criptomoedas.
+</tarefa>
 
-Título:"""
+<requisitos>
+- 50-70 caracteres (ideal: 60)
+- Inclua "{keyword}" preferencialmente no início ou meio do título
+- Seja atrativo mas NUNCA clickbait sensacionalista
+- Use verbos de ação quando apropriado (Revela, Anuncia, Lança, Atinge, Supera)
+- Português brasileiro fluente
+</requisitos>
+
+<exemplos>
+✅ BONS títulos (use como referência de estilo):
+- "Bitcoin Atinge Máxima Histórica Após Aprovação de ETF nos EUA"
+- "Ethereum Anuncia Data do Upgrade Dencun: O Que Muda Para Usuários"
+- "SEC Processa Binance por Irregularidades: Entenda o Caso"
+- "Solana Supera Ethereum em Volume de DEX Pela Primeira Vez"
+- "Brasil Avança em Regulação Cripto: Novo Marco Legal em Discussão"
+
+❌ RUINS (NUNCA faça assim):
+- "URGENTE: Bitcoin VAI EXPLODIR! Não Perca!!!" (clickbait extremo)
+- "Notícia importante sobre Bitcoin" (genérico demais)
+- "O Mercado de Criptomoedas e as Implicações Regulatórias Internacionais..." (muito longo)
+- "Você não vai acreditar no que aconteceu com o Ethereum" (clickbait)
+</exemplos>
+
+<output>
+Retorne APENAS o título, sem aspas, prefixos ou explicações.
+</output>"""
 
         try:
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "Você é um especialista em SEO para portais de notícias."},
+                    {"role": "system", "content": "Você é um especialista em SEO para portais de notícias cripto. Crie títulos precisos, informativos e otimizados para buscadores."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.5,
-                max_tokens=50,
+                max_tokens=60,
             )
-            
+
             title = response.choices[0].message.content.strip()
-            # Remover aspas e prefixos
+            # Remover aspas e prefixos comuns
             title = title.strip('"\'')
-            title = title.replace("Título:", "").replace("Titulo:", "").strip()
+            title = re.sub(r'^(Título|Titulo|Title):\s*', '', title, flags=re.IGNORECASE).strip()
             return title
-        
+
         except Exception as e:
             logger.error(f"Erro ao gerar título SEO: {e}")
             return None
@@ -315,38 +504,72 @@ Título:"""
         
         return excerpt
     
-    async def _generate_meta_description(self, content: str) -> Optional[str]:
-        """Gera meta description para SEO"""
-        prompt = f"""Com base no artigo abaixo, crie uma meta description para SEO:
+    async def _generate_meta_description(
+        self,
+        content: str,
+        title: str = "",
+        keyword: str = "criptomoeda"
+    ) -> Optional[str]:
+        """Gera meta description para SEO (v3.0 com few-shot examples)"""
 
-{content[:500]}
+        prompt = f"""<contexto>
+Artigo: {content[:500]}
+Título SEO: {title}
+Palavra-chave: {keyword}
+</contexto>
 
-REQUISITOS:
-- 140-160 caracteres
-- Inclua palavra-chave principal
-- Seja descritivo e atrativo
-- Em português brasileiro
-- SEM prefixos - apenas a descrição pura
+<tarefa>
+Crie uma meta description SEO para este artigo sobre criptomoedas.
+</tarefa>
 
-Meta description:"""
+<requisitos>
+- 140-160 caracteres (ideal: 155)
+- Inclua "{keyword}" de forma natural
+- Resuma o VALOR do artigo para o leitor
+- Termine com curiosidade ou CTA implícito (sem "clique aqui")
+- Português brasileiro fluente
+- Complemente o título, não repita
+</requisitos>
+
+<exemplos>
+✅ BOAS meta descriptions:
+- "Entenda como a aprovação do ETF de Bitcoin nos EUA pode impactar o mercado cripto brasileiro e o que esperar nos próximos meses."
+- "SEC processa Binance por irregularidades. Veja os detalhes do caso e as possíveis consequências para investidores no Brasil."
+- "Upgrade Dencun promete reduzir taxas do Ethereum em até 90%. Saiba quando entra em vigor e como afeta suas transações."
+- "Solana registra recorde de transações e supera Ethereum em volume. Analistas avaliam se tendência deve continuar."
+
+❌ RUINS:
+- "Leia nossa notícia sobre Bitcoin. Clique aqui para saber mais." (genérico, CTA explícito)
+- "Bitcoin Bitcoin Bitcoin criptomoeda crypto moeda digital blockchain" (keyword stuffing)
+- "Notícia muito importante sobre o mercado" (vago, sem valor)
+</exemplos>
+
+<output>
+Retorne APENAS a meta description, sem aspas ou prefixos.
+</output>"""
 
         try:
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "Você é um especialista em SEO para portais de notícias."},
+                    {"role": "system", "content": "Você é um especialista em SEO para portais de notícias cripto. Crie meta descriptions que aumentam CTR nos resultados de busca."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.5,
-                max_tokens=60,
+                temperature=0.3,  # Mais conservador para meta descriptions
+                max_tokens=80,
             )
-            
+
             meta_desc = response.choices[0].message.content.strip()
-            # Remover aspas e prefixos
+            # Remover aspas e prefixos comuns
             meta_desc = meta_desc.strip('"\'')
-            meta_desc = meta_desc.replace("Meta description:", "").replace("Descrição:", "").strip()
+            meta_desc = re.sub(r'^(Meta description|Descrição|Description):\s*', '', meta_desc, flags=re.IGNORECASE).strip()
+
+            # Garantir que não exceda 160 caracteres
+            if len(meta_desc) > 160:
+                meta_desc = meta_desc[:157] + "..."
+
             return meta_desc
-        
+
         except Exception as e:
             logger.error(f"Erro ao gerar meta description: {e}")
             return None

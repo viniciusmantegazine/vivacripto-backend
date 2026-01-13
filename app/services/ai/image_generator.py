@@ -1,8 +1,10 @@
 """
-Image Generation Service - Data Visualization Style v5.0
+Image Generation Service - Data Visualization Style v6.0
 Gera visualizações de dados abstratas e sofisticadas com estética de terminal financeiro
+Inclui sanitização de temas para evitar imagens inadequadas
 """
 import asyncio
+import re
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
@@ -16,39 +18,83 @@ from app.core.logging import logger
 # ThreadPool para operações síncronas do Cloudinary
 _cloudinary_executor = ThreadPoolExecutor(max_workers=3)
 
+# Mapeamento de categorias para temas visuais abstratos (sem conteúdo literal)
+CATEGORY_VISUAL_THEMES = {
+    "bitcoin": "golden digital currency network with ascending trend lines",
+    "ethereum": "purple hexagonal smart contract ecosystem with interconnected nodes",
+    "altcoins": "multicolored constellation of digital assets and market flows",
+    "defi": "decentralized finance protocol layers with liquidity pools visualization",
+    "regulacao": "structured compliance framework with institutional data streams",
+    "airdrop": "particle distribution network with reward token flows",
+    "default": "cryptocurrency market data visualization with blockchain networks"
+}
+
+# Palavras a remover do tema para evitar imagens inadequadas
+THEME_BLOCKLIST = [
+    "hack", "hacker", "attack", "steal", "theft", "scam", "fraud",
+    "crash", "collapse", "bankrupt", "death", "dead", "kill",
+    "lawsuit", "sue", "arrest", "prison", "jail", "criminal",
+    "exploit", "vulnerability", "breach", "leak", "stolen",
+    "war", "conflict", "bomb", "terror", "violence"
+]
+
 
 class ImageGenerator:
-    """Gerador de imagens v5.0 - Visualização de dados abstratos"""
+    """Gerador de imagens v6.0 - Visualização de dados abstratos com sanitização"""
 
     def __init__(self):
         """Inicializa o gerador de imagens com cliente assíncrono"""
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-        
+
         # Configurar Cloudinary
         cloudinary.config(
             cloud_name=settings.CLOUDINARY_CLOUD_NAME,
             api_key=settings.CLOUDINARY_API_KEY,
             api_secret=settings.CLOUDINARY_API_SECRET
         )
-    
-    def _extract_theme(self, title: str, content: str) -> str:
+
+    def _sanitize_theme(self, text: str) -> str:
         """
-        Extrai o tema principal da notícia para o prompt
-        
+        Remove palavras problemáticas do tema para evitar imagens inadequadas
+
+        Args:
+            text: Texto original do tema
+
+        Returns:
+            Tema sanitizado
+        """
+        text_lower = text.lower()
+        for word in THEME_BLOCKLIST:
+            # Remover palavra e espaços adjacentes
+            text_lower = re.sub(rf'\b{word}\b', '', text_lower, flags=re.IGNORECASE)
+
+        # Limpar espaços múltiplos
+        text_lower = re.sub(r'\s+', ' ', text_lower).strip()
+        return text_lower
+
+    def _extract_theme(self, title: str, content: str, category: Optional[str] = None) -> str:
+        """
+        Extrai e sanitiza o tema principal da notícia para o prompt
+
         Args:
             title: Título do artigo
             content: Conteúdo do artigo
-            
+            category: Categoria do artigo para fallback
+
         Returns:
-            Tema extraído em inglês
+            Tema sanitizado para geração de imagem
         """
-        # Usar título + primeiras linhas do conteúdo para extrair tema
-        text_preview = f"{title}. {content[:500]}"
-        
-        # Simplificar: usar o título traduzido como tema
-        # O DALL-E vai interpretar e criar visualização apropriada
-        return text_preview
-    
+        # Sanitizar o título
+        sanitized_title = self._sanitize_theme(title)
+
+        # Se o título ficar muito curto após sanitização, usar tema da categoria
+        if len(sanitized_title) < 20:
+            category_key = category.lower() if category else "default"
+            return CATEGORY_VISUAL_THEMES.get(category_key, CATEGORY_VISUAL_THEMES["default"])
+
+        # Limitar tamanho para evitar prompt muito longo
+        return sanitized_title[:150]
+
     async def generate_and_upload_image(
         self,
         title: str,
@@ -56,38 +102,57 @@ class ImageGenerator:
         category_name: Optional[str] = None
     ) -> str:
         """
-        Gera imagem de visualização de dados abstratos (v5.0)
-        
+        Gera imagem de visualização de dados abstratos (v6.0)
+
         Args:
             title: Título do artigo
             content: Conteúdo completo do artigo
-            category_name: Nome da categoria (não usado nesta versão)
-            
+            category_name: Nome da categoria para ajuste de tema visual
+
         Returns:
             URL da imagem no Cloudinary
         """
         try:
-            logger.info(f"Gerando imagem v5.0 (data visualization) para: {title[:50]}...")
-            
-            # Extrair tema da notícia
-            theme = self._extract_theme(title, content)
-            
-            # Construir prompt de visualização de dados abstratos
-            prompt = f"""An abstract and sophisticated data visualization representing {theme}. 
+            logger.info(f"Gerando imagem v6.0 (data visualization) para: {title[:50]}...")
 
-STYLE: Institutional financial terminal aesthetic, data-driven focused, serious and technological. 
+            # Extrair e sanitizar tema da notícia
+            theme = self._extract_theme(title, content, category_name)
 
-COMPOSITION: Overlapping layers of technical line charts, interconnected node networks, and digital data flows. No literal objects or characters. 
+            # Obter tema visual da categoria como complemento
+            category_key = category_name.lower() if category_name else "default"
+            category_visual = CATEGORY_VISUAL_THEMES.get(category_key, CATEGORY_VISUAL_THEMES["default"])
 
-BACKGROUND: Dark mode, subtle deep circuit board textures, nearly invisible digital grid. 
+            # Construir prompt de visualização de dados abstratos (v6.0)
+            # IMPORTANTE: Foco em visualização ABSTRATA, nunca literal
+            prompt = f"""Create an abstract, sophisticated data visualization for a cryptocurrency news article.
 
-LIGHTING: Internal screen light, subtle glow emanating from data lines, shadowy cybernetic environment. 
+CONCEPT: {theme}
+VISUAL STYLE: {category_visual}
 
-COLOR PALETTE: Dark monochromatic (charcoal gray, deep navy blue) with precise accents in electric cyan blue and pale technical gold. 
+MANDATORY REQUIREMENTS:
+- PURELY ABSTRACT: No literal representations of people, objects, or scenes
+- DATA-DRIVEN: Focus on charts, graphs, network nodes, data flows
+- PROFESSIONAL: Institutional financial terminal aesthetic
+- NO TEXT: Do not include any text, numbers, logos, or symbols
 
-QUALITY: 8k rendering, high complexity, futuristic UI style, no text."""
-            
-            logger.debug(f"Prompt v5.0 (primeiros 200 chars): {prompt[:200]}...")
+COMPOSITION:
+- Overlapping layers of technical line charts and candlestick patterns
+- Interconnected node networks representing blockchain topology
+- Digital data streams and particle flows
+- Geometric patterns suggesting market movements
+
+BACKGROUND: Deep dark mode (#0a0a12), subtle circuit board textures, nearly invisible grid
+
+LIGHTING: Internal screen glow, subtle cyan highlights emanating from data lines, shadowy cybernetic atmosphere
+
+COLOR PALETTE:
+- Primary: Dark charcoal gray (#1a1a2e), deep navy blue (#0f0f23)
+- Accents: Electric cyan (#00d4ff), pale technical gold (#ffd700)
+- Highlights: Subtle purple (#7b2cbf) for depth
+
+QUALITY: 8k rendering, ultra high detail, futuristic UI aesthetic, cinematic composition"""
+
+            logger.debug(f"Prompt v6.0 tema: {theme[:100]}...")
 
             # Gerar imagem com DALL-E 3 (async)
             response = await self.client.images.generate(

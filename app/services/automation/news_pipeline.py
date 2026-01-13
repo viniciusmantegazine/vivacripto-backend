@@ -27,6 +27,7 @@ from app.services.deduplication import (
     PostRepositoryImpl,
 )
 from app.services.sources.news_aggregator import NewsAggregator
+from app.services.ai.category_classifier import CategoryClassifier
 
 
 class NewsPipeline:
@@ -51,6 +52,7 @@ class NewsPipeline:
         self.image_generator = ImageGenerator()
         self.validator = QualityValidator()
         self.publisher = ArticlePublisher(self.image_generator)
+        self.category_classifier = CategoryClassifier()
     
     async def run(self, db: AsyncSession) -> Dict:
         """
@@ -131,9 +133,15 @@ class NewsPipeline:
                     logger.info(f"\n--- Notícia {i}/{posts_to_process} ---")
                     logger.info(f"Título: {source_news.get('title', '')[:80]}...")
 
-                    # Gerar artigo (com métricas)
-                    with metrics.measure("content_generation", title=source_news.get('title', '')[:50]):
-                        article = await self.content_generator.generate_article(source_news)
+                    # Pré-classificar categoria para ajuste de tom na geração
+                    title = source_news.get('title', '')
+                    description = source_news.get('description', '')
+                    category = self.category_classifier.classify(title, description, "")
+                    logger.info(f"Categoria detectada: {category}")
+
+                    # Gerar artigo com categoria para ajuste de tom (com métricas)
+                    with metrics.measure("content_generation", title=title[:50]):
+                        article = await self.content_generator.generate_article(source_news, category=category)
 
                     if not article:
                         logger.warning("Falha ao gerar artigo")
