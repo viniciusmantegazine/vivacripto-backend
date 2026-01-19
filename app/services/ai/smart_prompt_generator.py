@@ -1,9 +1,15 @@
 """
-Smart Prompt Generator v1.0
-Gerador inteligente de prompts para imagens de notícias de criptomoedas
+Smart Prompt Generator v2.0 - Editorial Photography Style
+Gerador de prompts para imagens de notícias de criptomoedas no estilo EDITORIAL FOTOGRÁFICO
 
-Este módulo combina análise de contexto com elementos visuais para criar
-prompts únicos, relevantes e visualmente profissionais.
+IMPORTANTE: Este módulo gera prompts no padrão visual de CoinDesk, Cointelegraph e
+Bitcoin Magazine. NÃO gera ilustrações abstratas, redes blockchain ou efeitos futuristas.
+
+Características dos prompts gerados:
+- Elementos visuais CONCRETOS (logos, moedas, prédios, pessoas)
+- Estilo FOTOGRÁFICO profissional
+- Alta legibilidade para texto sobreposto
+- Composições limpas com hierarquia clara
 """
 
 import hashlib
@@ -16,38 +22,57 @@ from app.services.ai.news_context_analyzer import (
     NewsContextAnalyzer,
     NewsSentiment,
     NewsType,
+    EntityType,
     news_context_analyzer
 )
 from app.services.ai.visual_elements_bank import (
-    VisualComposition,
-    VisualElementsBank,
-    visual_elements_bank
+    EditorialComposition,
+    EditorialVisualElementsBank,
+    editorial_visual_elements_bank
 )
 
 
 class SmartPromptGenerator:
     """
-    Gerador inteligente de prompts para DALL-E 3
+    Gerador de prompts v2.0 - Editorial Photography Style
 
-    Combina:
-    - Análise de contexto da notícia
-    - Banco de elementos visuais
-    - Sistema de variação para evitar repetição
-    - Otimização para geração de imagens de alta qualidade
+    Gera prompts otimizados para DALL-E 3 no estilo editorial fotográfico
+    dos grandes portais de notícias de criptomoedas.
+
+    NÃO GERA:
+    - Ilustrações abstratas
+    - Redes blockchain decorativas
+    - Partículas e efeitos de luz
+    - Composições futuristas genéricas
     """
 
-    # Prefixo base para todas as imagens
-    BASE_STYLE = "Professional cryptocurrency news editorial imagery"
+    # === CONFIGURAÇÃO DO ESTILO EDITORIAL ===
 
-    # Sufixo de qualidade para todas as imagens
+    # Referência de estilo obrigatória
+    STYLE_REFERENCE = "style reference: CoinDesk and Cointelegraph editorial standard"
+
+    # Qualidade e formato
     QUALITY_SUFFIX = (
-        "cinematic lighting, ultra high detail, professional news media quality, "
-        "photorealistic rendering, editorial photography style, "
-        "no text, no watermarks, no logos, no symbols, no letters, "
+        "professional editorial photography for cryptocurrency news publication, "
+        "high quality journalism photography, "
+        "optimized for news article thumbnail, "
+        "photo-realistic, NOT abstract illustration, NOT tech art, "
+        "clean and professional aesthetic, "
+        "high contrast ensuring excellent text readability, "
+        "corporate photography quality, sharp focus on subject, "
+        "no text, no watermarks, no logos overlaid, "
         "16:9 aspect ratio, 8k resolution"
     )
 
-    # Palavras bloqueadas que podem causar rejeição ou imagens inadequadas
+    # Elementos a EVITAR (lista negativa explícita)
+    AVOID_ELEMENTS = (
+        "avoid: abstract tech backgrounds, blockchain network visualizations, "
+        "digital particles, glowing network effects, futuristic sci-fi elements, "
+        "neon cyberpunk aesthetics, matrix-style code rain, "
+        "generic tech patterns, floating geometric shapes"
+    )
+
+    # Palavras bloqueadas (segurança)
     BLOCKED_WORDS = [
         'hack', 'hacker', 'attack', 'steal', 'theft', 'scam', 'fraud',
         'crash', 'collapse', 'bankrupt', 'death', 'dead', 'kill', 'murder',
@@ -58,119 +83,26 @@ class SmartPromptGenerator:
         'drugs', 'cocaine', 'heroin', 'marijuana', 'drug',
     ]
 
-    # Templates de prompt por tipo de notícia para maior variação
-    TYPE_TEMPLATES = {
-        NewsType.PRICE: [
-            "{style}, {central}, with dynamic market visualization showing {sentiment_visual}, "
-            "{secondary}, {palette}, {mood}, {composition}, {lighting}, {background}, {quality}",
-
-            "{style}, financial data landscape featuring {central}, "
-            "market {sentiment_visual} patterns, {secondary}, "
-            "{palette}, {mood}, {composition}, {lighting}, {quality}",
-        ],
-        NewsType.REGULATION: [
-            "{style}, {central} integrated with institutional architectural elements, "
-            "{secondary}, {palette}, {mood}, {composition}, {lighting}, {background}, {quality}",
-
-            "{style}, governmental framework visualization with {central}, "
-            "regulatory structure elements, {secondary}, "
-            "{palette}, {mood}, {composition}, {lighting}, {quality}",
-        ],
-        NewsType.TECHNOLOGY: [
-            "{style}, futuristic technology showcase featuring {central}, "
-            "innovative digital infrastructure, {secondary}, "
-            "{palette}, {mood}, {composition}, {lighting}, {background}, {quality}",
-
-            "{style}, next-generation blockchain visualization with {central}, "
-            "cutting-edge protocol elements, {secondary}, "
-            "{palette}, {mood}, {composition}, {lighting}, {quality}",
-        ],
-        NewsType.ADOPTION: [
-            "{style}, expansive growth visualization featuring {central}, "
-            "mainstream integration elements, {secondary}, "
-            "{palette}, {mood}, {composition}, {lighting}, {background}, {quality}",
-
-            "{style}, connected network expansion with {central}, "
-            "adoption wave patterns, {secondary}, "
-            "{palette}, {mood}, {composition}, {lighting}, {quality}",
-        ],
-        NewsType.SECURITY: [
-            "{style}, security infrastructure featuring {central}, "
-            "protective elements and {sentiment_visual}, {secondary}, "
-            "{palette}, {mood}, {composition}, {lighting}, {background}, {quality}",
-        ],
-        NewsType.ANALYSIS: [
-            "{style}, analytical data visualization featuring {central}, "
-            "research and insight elements, {secondary}, "
-            "{palette}, {mood}, {composition}, {lighting}, {background}, {quality}",
-        ],
-        NewsType.PARTNERSHIP: [
-            "{style}, collaborative visualization featuring {central}, "
-            "synergy and connection elements, {secondary}, "
-            "{palette}, {mood}, {composition}, {lighting}, {background}, {quality}",
-        ],
-        NewsType.LAUNCH: [
-            "{style}, debut visualization featuring {central}, "
-            "launch and new beginning elements, {secondary}, "
-            "{palette}, {mood}, {composition}, {lighting}, {background}, {quality}",
-        ],
-        NewsType.LEGAL: [
-            "{style}, judicial visualization featuring {central}, "
-            "legal and courtroom elements, {secondary}, "
-            "{palette}, {mood}, {composition}, {lighting}, {background}, {quality}",
-        ],
-    }
-
-    # Visualizações de sentimento para contexto
-    SENTIMENT_VISUALS = {
-        NewsSentiment.BULLISH: [
-            "ascending momentum",
-            "upward trajectory",
-            "rising energy",
-            "growth patterns",
-            "ascending formations",
-        ],
-        NewsSentiment.BEARISH: [
-            "descending patterns",
-            "downward flow",
-            "receding energy",
-            "declining formations",
-            "contracting patterns",
-        ],
-        NewsSentiment.NEUTRAL: [
-            "balanced equilibrium",
-            "stable patterns",
-            "steady flow",
-            "analytical formations",
-            "data visualization",
-        ],
-        NewsSentiment.WARNING: [
-            "alert patterns",
-            "cautionary elements",
-            "protective barriers",
-            "security formations",
-            "warning indicators",
-        ],
-    }
-
     def __init__(
         self,
         context_analyzer: Optional[NewsContextAnalyzer] = None,
-        elements_bank: Optional[VisualElementsBank] = None
+        elements_bank: Optional[EditorialVisualElementsBank] = None
     ):
         """
-        Inicializa o gerador de prompts
+        Inicializa o gerador de prompts editoriais
 
         Args:
             context_analyzer: Analisador de contexto (usa singleton se None)
             elements_bank: Banco de elementos visuais (usa singleton se None)
         """
         self.context_analyzer = context_analyzer or news_context_analyzer
-        self.elements_bank = elements_bank or visual_elements_bank
+        self.elements_bank = elements_bank or editorial_visual_elements_bank
 
         # Cache de hashes para evitar repetição
         self._recent_prompts: list[str] = []
         self._max_cache_size = 50
+
+        logger.info("SmartPromptGenerator v2.0 (Editorial Style) inicializado")
 
     def generate_prompt(
         self,
@@ -179,7 +111,7 @@ class SmartPromptGenerator:
         category: Optional[str] = None
     ) -> str:
         """
-        Gera um prompt otimizado para DALL-E 3 baseado no contexto da notícia
+        Gera um prompt no estilo EDITORIAL FOTOGRÁFICO
 
         Args:
             title: Título da notícia
@@ -187,129 +119,143 @@ class SmartPromptGenerator:
             category: Categoria pré-definida (opcional)
 
         Returns:
-            Prompt otimizado para geração de imagem
+            Prompt otimizado para geração de imagem editorial
         """
         try:
             # 1. Analisar contexto da notícia
             context = self.context_analyzer.analyze(title, content, category)
             logger.info(
-                f"Contexto analisado para prompt: "
-                f"cat={context.category}, sent={context.sentiment.value}, "
-                f"type={context.news_type.value}"
+                f"[PromptGen v2.0] Contexto: "
+                f"entity={context.entity_type.value}:{context.primary_entity}, "
+                f"sentiment={context.sentiment.value}, "
+                f"action={context.action.action}"
             )
 
-            # 2. Gerar composição visual
-            composition = self.elements_bank.compose_visual_elements(
-                category=context.category,
+            # 2. Gerar composição visual editorial
+            composition = self.elements_bank.compose_editorial_elements(
+                entity_type=context.entity_type,
+                entity_name=context.primary_entity,
+                entity_display=context.primary_entity_display,
                 sentiment=context.sentiment,
-                news_type=context.news_type
+                action=context.action.action,
+                has_numeric_data=context.has_numeric_data,
+                numeric_context=context.numeric_context,
+                keywords=context.keywords
             )
 
-            # 3. Construir prompt com variação
-            prompt = self._build_prompt(context, composition)
+            # 3. Construir prompt editorial
+            prompt = self._build_editorial_prompt(context, composition)
 
             # 4. Sanitizar prompt
             prompt = self._sanitize_prompt(prompt)
 
-            # 5. Verificar e garantir variação
-            prompt = self._ensure_variation(prompt, context)
+            # 5. Garantir variação
+            prompt = self._ensure_variation(prompt)
 
-            logger.debug(f"Prompt gerado ({len(prompt)} chars): {prompt[:200]}...")
+            logger.debug(f"[PromptGen v2.0] Prompt ({len(prompt)} chars): {prompt[:300]}...")
             return prompt
 
         except Exception as e:
-            logger.error(f"Erro ao gerar prompt inteligente: {e}")
-            # Fallback para prompt genérico seguro
+            logger.error(f"[PromptGen v2.0] Erro ao gerar prompt: {e}")
             return self._generate_fallback_prompt(category)
 
-    def _build_prompt(self, context: NewsContext, composition: VisualComposition) -> str:
-        """Constrói o prompt combinando contexto e composição visual"""
+    def _build_editorial_prompt(
+        self,
+        context: NewsContext,
+        composition: EditorialComposition
+    ) -> str:
+        """
+        Constrói o prompt no formato editorial fotográfico
 
-        # Selecionar template baseado no tipo de notícia
-        templates = self.TYPE_TEMPLATES.get(
-            context.news_type,
-            self.TYPE_TEMPLATES[NewsType.ANALYSIS]
-        )
-        template = random.choice(templates)
+        Estrutura:
+        [ESTILO_FOTOGRÁFICO], featuring [ELEMENTO_CONCRETO],
+        [BACKGROUND], [PALETA], [ILUMINAÇÃO], [DATA_OVERLAY],
+        [QUALIDADE], [ÁREA_TEXTO], [EVITAR]
+        """
 
-        # Preparar elementos secundários como string
-        secondary_str = ", ".join(composition.secondary_elements)
+        # Montar seções do prompt
+        sections = []
 
-        # Selecionar visual de sentimento
-        sentiment_visuals = self.SENTIMENT_VISUALS.get(
-            context.sentiment,
-            self.SENTIMENT_VISUALS[NewsSentiment.NEUTRAL]
-        )
-        sentiment_visual = random.choice(sentiment_visuals)
+        # 1. Estilo fotográfico base
+        sections.append(composition.photography_style)
 
-        # Construir prompt usando template
-        prompt = template.format(
-            style=self.BASE_STYLE,
-            central=composition.central_element,
-            secondary=secondary_str,
-            palette=f"color palette: {composition.color_palette}",
-            mood=f"{composition.mood} atmosphere",
-            composition=composition.composition_style,
-            lighting=composition.lighting,
-            background=f"background: {composition.background}",
-            quality=self.QUALITY_SUFFIX,
-            sentiment_visual=sentiment_visual
-        )
+        # 2. Elemento visual concreto principal
+        sections.append(f"featuring {composition.main_subject}")
 
-        # Adicionar contexto específico se houver crypto identificada
-        if context.primary_crypto:
-            crypto_identity = self.context_analyzer.get_crypto_visual_identity(
-                context.primary_crypto
-            )
-            prompt = prompt.replace(
-                composition.central_element,
-                f"{composition.central_element} with {crypto_identity['color']} accents"
-            )
+        # 3. Background
+        sections.append(f"background: {composition.background}")
+
+        # 4. Paleta de cores
+        sections.append(f"color palette: {composition.color_palette}")
+
+        # 5. Iluminação
+        sections.append(composition.lighting)
+
+        # 6. Overlay de dados (se aplicável)
+        if composition.data_overlay:
+            sections.append(composition.data_overlay)
+        else:
+            sections.append("clean product focus without data overlay")
+
+        # 7. Referência de estilo
+        sections.append(self.STYLE_REFERENCE)
+
+        # 8. Qualidade e especificações
+        sections.append(self.QUALITY_SUFFIX)
+
+        # 9. Área para texto
+        sections.append(composition.text_area)
+
+        # 10. Elementos a evitar
+        sections.append(self.AVOID_ELEMENTS)
+
+        # Juntar todas as seções
+        prompt = ", ".join(sections)
 
         return prompt
 
     def _sanitize_prompt(self, prompt: str) -> str:
-        """Remove palavras bloqueadas e sanitiza o prompt"""
+        """Remove palavras bloqueadas e normaliza o prompt"""
+        import re
+
         prompt_lower = prompt.lower()
 
+        # Remover palavras bloqueadas
         for word in self.BLOCKED_WORDS:
-            # Substituir palavras bloqueadas por alternativas seguras
-            prompt_lower = prompt_lower.replace(word, "")
+            # Usar regex para substituir palavra completa
+            prompt_lower = re.sub(rf'\b{word}\b', '', prompt_lower)
 
         # Remover espaços múltiplos
-        import re
         prompt_lower = re.sub(r'\s+', ' ', prompt_lower).strip()
 
-        # Manter capitalização do original onde possível
+        # Remover vírgulas duplicadas
+        prompt_lower = re.sub(r',\s*,', ',', prompt_lower)
+
         # Garantir que começa com maiúscula
         if prompt_lower:
             prompt_lower = prompt_lower[0].upper() + prompt_lower[1:]
 
         return prompt_lower
 
-    def _ensure_variation(self, prompt: str, context: NewsContext) -> str:
-        """Garante que o prompt é suficientemente diferente dos recentes"""
+    def _ensure_variation(self, prompt: str) -> str:
+        """Garante que o prompt é diferente dos recentes"""
 
         prompt_hash = self._hash_prompt(prompt)
 
         # Verificar se é muito similar aos recentes
         if prompt_hash in self._recent_prompts:
-            # Adicionar variação extra
+            # Adicionar variação sutil que mantém estilo editorial
             variation_elements = [
-                "with subtle lens flare",
-                "with bokeh background effect",
-                "with volumetric lighting",
-                "with atmospheric haze",
-                "with dramatic shadows",
-                "with reflective surfaces",
-                "with depth of field effect",
-                "with crystalline textures",
+                "with subtle depth of field effect",
+                "with professional studio backdrop",
+                "with clean minimalist composition",
+                "with balanced exposure",
+                "with soft professional shadows",
+                "with centered focal point",
+                "with rule of thirds composition",
             ]
             variation = random.choice(variation_elements)
-            prompt = prompt.replace(
-                self.QUALITY_SUFFIX,
-                f"{variation}, {self.QUALITY_SUFFIX}"
-            )
+            prompt = f"{prompt}, {variation}"
             prompt_hash = self._hash_prompt(prompt)
 
         # Adicionar ao cache
@@ -320,42 +266,81 @@ class SmartPromptGenerator:
         return prompt
 
     def _hash_prompt(self, prompt: str) -> str:
-        """Gera hash simplificado do prompt para comparação"""
-        # Usar apenas primeiros 100 chars para hash
-        return hashlib.md5(prompt[:100].encode()).hexdigest()[:8]
+        """Gera hash simplificado do prompt"""
+        return hashlib.md5(prompt[:150].encode()).hexdigest()[:8]
 
     def _generate_fallback_prompt(self, category: Optional[str] = None) -> str:
-        """Gera prompt fallback seguro em caso de erro"""
+        """Gera prompt fallback editorial seguro"""
 
         category_fallbacks = {
             'bitcoin': (
-                "Professional cryptocurrency news imagery, abstract golden digital asset "
-                "visualization with ascending trend patterns, warm amber and gold color palette, "
-                "dynamic composition with depth, cinematic lighting, professional news media quality, "
+                "Professional product photography of golden Bitcoin physical coin, "
+                "centered on clean white surface, "
+                "orange-gold color palette with professional lighting, "
+                "style reference: CoinDesk editorial standard, "
+                "professional editorial photography for cryptocurrency news, "
+                "high contrast for text readability, "
+                "clear negative space on left third for headline, "
+                "photo-realistic, NOT abstract illustration, "
+                "avoid: abstract tech backgrounds, blockchain visualizations, "
                 "no text, no watermarks, 16:9 aspect ratio"
             ),
             'ethereum': (
-                "Professional cryptocurrency news imagery, abstract purple crystalline network "
-                "visualization with connected nodes, violet and cyan color palette, "
-                "layered composition with depth, ethereal lighting, professional news media quality, "
+                "Professional product photography of purple-blue Ethereum diamond logo, "
+                "as 3D metallic object on gradient background, "
+                "purple and cyan color palette with professional lighting, "
+                "style reference: Cointelegraph editorial standard, "
+                "professional editorial photography for cryptocurrency news, "
+                "high contrast for text readability, "
+                "clear negative space for headline overlay, "
+                "photo-realistic, NOT abstract illustration, "
+                "avoid: network visualizations, particle effects, "
                 "no text, no watermarks, 16:9 aspect ratio"
             ),
             'defi': (
-                "Professional cryptocurrency news imagery, abstract decentralized finance "
-                "visualization with flowing liquidity patterns, teal and aquamarine color palette, "
-                "dynamic composition, clean lighting, professional news media quality, "
+                "Professional fintech interface photography, "
+                "clean DeFi protocol visualization on modern backdrop, "
+                "teal and professional blue color palette, "
+                "style reference: CoinDesk editorial standard, "
+                "professional editorial photography for cryptocurrency news, "
+                "high contrast for text readability, "
+                "clear space for headline text, "
+                "photo-realistic, NOT abstract illustration, "
+                "avoid: abstract blockchain networks, "
                 "no text, no watermarks, 16:9 aspect ratio"
             ),
             'regulacao': (
-                "Professional cryptocurrency news imagery, abstract institutional framework "
-                "visualization with balanced geometric elements, navy and gold color palette, "
-                "symmetrical composition, formal lighting, professional news media quality, "
+                "Government building or institutional architecture photography, "
+                "official regulatory setting with professional lighting, "
+                "navy and gold institutional color palette, "
+                "style reference: CoinDesk editorial standard, "
+                "professional editorial photography for cryptocurrency news, "
+                "high contrast for text readability, "
+                "clear negative space for headline, "
+                "photo-realistic, NOT abstract illustration, "
+                "avoid: tech backgrounds, digital effects, "
                 "no text, no watermarks, 16:9 aspect ratio"
             ),
         }
 
         cat_key = category.lower() if category else 'bitcoin'
-        return category_fallbacks.get(cat_key, category_fallbacks['bitcoin'])
+
+        # Fallback genérico se categoria não encontrada
+        if cat_key not in category_fallbacks:
+            return (
+                "Professional editorial photography for cryptocurrency news, "
+                "clean financial market visualization with professional aesthetic, "
+                "modern blue and white color palette, "
+                "style reference: CoinDesk editorial standard, "
+                "professional journalism photography quality, "
+                "high contrast ensuring excellent text readability, "
+                "clear negative space on left third for headline overlay, "
+                "photo-realistic, NOT abstract illustration, NOT tech art, "
+                "avoid: abstract tech backgrounds, blockchain particles, network visualizations, "
+                "no text, no watermarks, 16:9 aspect ratio, 8k resolution"
+            )
+
+        return category_fallbacks[cat_key]
 
     def generate_prompt_with_metadata(
         self,
@@ -375,15 +360,18 @@ class SmartPromptGenerator:
         return {
             'prompt': prompt,
             'metadata': {
-                'category': context.category,
+                'entity_type': context.entity_type.value,
+                'primary_entity': context.primary_entity,
+                'primary_entity_display': context.primary_entity_display,
                 'sentiment': context.sentiment.value,
                 'news_type': context.news_type.value,
-                'primary_crypto': context.primary_crypto,
-                'secondary_cryptos': context.secondary_cryptos,
-                'entities_count': len(context.entities),
+                'action': context.action.action,
+                'has_numeric_data': context.has_numeric_data,
+                'numeric_context': context.numeric_context,
                 'keywords': context.keywords,
                 'confidence_score': context.confidence_score,
                 'prompt_length': len(prompt),
+                'prompt_version': 'v2.0-editorial',
             }
         }
 
