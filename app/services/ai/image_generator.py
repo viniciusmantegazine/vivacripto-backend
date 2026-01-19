@@ -1,17 +1,18 @@
 """
-Image Generation Service v7.0 - Smart Context-Aware Image Generation
-Gera imagens únicas e relevantes baseadas em análise inteligente do contexto da notícia
+Image Generation Service v8.0 - Editorial Photography Style
+Gera imagens no estilo editorial fotográfico dos grandes portais de notícias cripto
 
 Changelog:
+- v8.0: Estilo editorial fotográfico (CoinDesk/Cointelegraph standard)
 - v7.0: Sistema inteligente de análise de contexto e geração de prompts dinâmicos
 - v6.0: Visualização de dados abstratos com sanitização
 - v5.0: Estilo de terminal financeiro
 
 Recursos:
-- Análise automática de categoria, sentimento, tipo e entidades
-- Banco de elementos visuais por classificação
-- Geração de prompts com variação para evitar repetição
-- Logging detalhado para debug
+- Análise de entidade principal (crypto, exchange, bank, government, etc.)
+- Elementos visuais CONCRETOS (logos, moedas, prédios) - não abstratos
+- Alta legibilidade para texto sobreposto
+- Paletas de cores específicas por criptomoeda
 """
 
 import asyncio
@@ -74,7 +75,7 @@ class ImageGenerator:
             api_secret=settings.CLOUDINARY_API_SECRET
         )
 
-        logger.info("ImageGenerator v7.0 inicializado com Smart Prompt Generator")
+        logger.info("ImageGenerator v8.0 inicializado com Editorial Prompt Generator")
 
     async def generate_and_upload_image(
         self,
@@ -83,16 +84,16 @@ class ImageGenerator:
         category_name: Optional[str] = None
     ) -> str:
         """
-        Gera imagem contextualizada usando análise inteligente (v7.0)
+        Gera imagem no estilo editorial fotográfico (v8.0)
 
         O sistema analisa a notícia para identificar:
-        - Categoria principal (Bitcoin, Ethereum, DeFi, etc.)
-        - Sentimento (bullish, bearish, neutro, alerta)
-        - Tipo de notícia (preço, regulação, tecnologia, etc.)
-        - Entidades mencionadas
+        - Entidade principal (Bitcoin, JPMorgan, SEC, etc.)
+        - Tipo de entidade (crypto, bank, government, exchange, etc.)
+        - Sentimento (positive, negative, neutral)
+        - Ação (lança, sobe, cai, alerta, etc.)
 
-        Com base nessa análise, gera um prompt único e relevante
-        que resulta em imagens profissionais e diferenciadas.
+        Com base nessa análise, gera um prompt EDITORIAL FOTOGRÁFICO
+        no padrão CoinDesk/Cointelegraph com elementos visuais concretos.
 
         Args:
             title: Título do artigo
@@ -103,9 +104,9 @@ class ImageGenerator:
             URL da imagem no Cloudinary ou string vazia em caso de erro
         """
         try:
-            logger.info(f"[ImageGen v7.0] Iniciando geração para: {title[:60]}...")
+            logger.info(f"[ImageGen v8.0] Iniciando geração para: {title[:60]}...")
 
-            # 1. Gerar prompt inteligente com metadados
+            # 1. Gerar prompt editorial com metadados
             prompt_result = self.prompt_generator.generate_prompt_with_metadata(
                 title=title,
                 content=content,
@@ -116,16 +117,16 @@ class ImageGenerator:
             metadata = prompt_result['metadata']
 
             logger.info(
-                f"[ImageGen v7.0] Contexto detectado: "
+                f"[ImageGen v8.0] Contexto detectado: "
+                f"entity={metadata['entity_type']}:{metadata['primary_entity']}, "
                 f"sentiment={metadata['sentiment']}, "
-                f"type={metadata['news_type']}, "
-                f"crypto={metadata['primary_crypto']}, "
+                f"action={metadata['action']}, "
                 f"confidence={metadata['confidence_score']:.2f}"
             )
-            logger.debug(f"[ImageGen v7.0] Prompt ({metadata['prompt_length']} chars): {prompt[:300]}...")
+            logger.debug(f"[ImageGen v8.0] Prompt ({metadata['prompt_length']} chars): {prompt[:300]}...")
 
             # 2. Gerar imagem com DALL-E 3
-            logger.info("[ImageGen v7.0] Chamando DALL-E 3...")
+            logger.info("[ImageGen v8.0] Chamando DALL-E 3...")
             response = await self.client.images.generate(
                 model=self.IMAGE_MODEL,
                 prompt=prompt,
@@ -135,16 +136,16 @@ class ImageGenerator:
             )
 
             image_url = response.data[0].url
-            logger.info(f"[ImageGen v7.0] Imagem gerada com sucesso: {image_url[:80]}...")
+            logger.info(f"[ImageGen v8.0] Imagem gerada com sucesso: {image_url[:80]}...")
 
             # 3. Upload para Cloudinary com otimização
             cloudinary_url = await self._upload_to_cloudinary(image_url)
 
-            logger.info(f"[ImageGen v7.0] Processo completo. URL final: {cloudinary_url[:80]}...")
+            logger.info(f"[ImageGen v8.0] Processo completo. URL final: {cloudinary_url[:80]}...")
             return cloudinary_url
 
         except Exception as e:
-            logger.error(f"[ImageGen v7.0] Erro na geração: {e}", exc_info=True)
+            logger.error(f"[ImageGen v8.0] Erro na geração: {e}", exc_info=True)
             return ""
 
     async def _upload_to_cloudinary(self, image_url: str) -> str:
@@ -169,7 +170,7 @@ class ImageGenerator:
         )
 
         cloudinary_url = upload_result['secure_url']
-        logger.debug(f"[ImageGen v7.0] Upload Cloudinary concluído: {cloudinary_url}")
+        logger.debug(f"[ImageGen v8.0] Upload Cloudinary concluído: {cloudinary_url}")
 
         return cloudinary_url
 
