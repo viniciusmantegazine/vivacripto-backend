@@ -1,5 +1,5 @@
 """
-News Context Analyzer v2.0 - Editorial Photography Style
+News Context Analyzer v3.0 - Contextual Editorial Photography Style
 Analisa notícias de criptomoedas para extrair contexto semântico para geração de imagens EDITORIAIS
 
 Este módulo identifica:
@@ -8,9 +8,18 @@ Este módulo identifica:
 - Ação/verbo da notícia (lança, alerta, sobe, cai)
 - Sentimento (positivo, negativo, neutro)
 - Presença de dados numéricos (para overlay de gráficos)
+- Magnitude/percentual extraído (NOVO v3.0)
+- Importância da notícia (breaking, major, standard, analysis) (NOVO v3.0)
+- Eventos específicos do mercado cripto (halving, ETF, fork, etc.) (NOVO v3.0)
 
 IMPORTANTE: Este analisador é otimizado para gerar prompts no estilo EDITORIAL FOTOGRÁFICO,
 não ilustrações abstratas. Os resultados direcionam a seleção de elementos visuais concretos.
+
+Changelog v3.0:
+- Adicionado extracted_percentage para magnitude numérica
+- Adicionado news_importance para hierarquia visual
+- Expandido keywords para incluir eventos específicos
+- Melhorado safe_replacements para palavras sensíveis
 """
 
 import re
@@ -75,7 +84,7 @@ class NewsAction:
 
 @dataclass
 class NewsContext:
-    """Contexto completo extraído da notícia para geração editorial"""
+    """Contexto completo extraído da notícia para geração editorial v3.0"""
     # Entidade principal
     entity_type: EntityType
     primary_entity: Optional[str]
@@ -90,10 +99,19 @@ class NewsContext:
     has_numeric_data: bool
     numeric_context: Optional[str]  # "percentage", "price", "volume", etc.
 
+    # NOVO v3.0: Percentual extraído para visualização
+    extracted_percentage: Optional[float] = None
+
+    # NOVO v3.0: Importância da notícia para hierarquia visual
+    news_importance: str = "standard"  # "breaking", "major", "standard", "analysis"
+
+    # NOVO v3.0: Entidade secundária principal (para composição dual-entity)
+    secondary_entity_display: Optional[str] = None
+
     # Entidades secundárias
     secondary_entities: list[EntityMention] = field(default_factory=list)
 
-    # Keywords para contexto adicional
+    # Keywords para contexto adicional (expandido para eventos)
     keywords: list[str] = field(default_factory=list)
 
     # Confiança da análise
@@ -102,11 +120,49 @@ class NewsContext:
 
 class NewsContextAnalyzer:
     """
-    Analisador de contexto de notícias v2.0 - Editorial Photography Style
+    Analisador de contexto de notícias v3.0 - Contextual Editorial Photography Style
 
     Otimizado para extrair informações que direcionam a geração de
     imagens no estilo EDITORIAL FOTOGRÁFICO profissional.
+
+    Novidades v3.0:
+    - Extração de percentuais numéricos para visualização
+    - Determinação de importância da notícia
+    - Substituições seguras para palavras sensíveis
+    - Keywords expandidos para eventos específicos
     """
+
+    # === SUBSTITUIÇÕES SEGURAS (NOVO v3.0) ===
+    # Mantém contexto sem usar palavras que podem ser bloqueadas por APIs de imagem
+
+    SAFE_REPLACEMENTS = {
+        'hack': 'security incident',
+        'hacker': 'security threat',
+        'hackeado': 'security breach',
+        'hackeada': 'security breach',
+        'crash': 'sharp decline',
+        'colapso': 'significant downturn',
+        'colapsa': 'significant downturn',
+        'ataque': 'security incident',
+        'roubo': 'unauthorized transfer',
+        'roubado': 'unauthorized transfer',
+        'roubada': 'unauthorized transfer',
+        'exploit': 'vulnerability exposure',
+        'explorado': 'vulnerability exposure',
+        'fraude': 'irregularity',
+        'golpe': 'scheme',
+        'scam': 'fraudulent scheme',
+        'rug pull': 'project abandonment',
+        'ponzi': 'unsustainable scheme',
+        'pirâmide': 'pyramid scheme',
+        'lavagem': 'illicit flow',
+        'terrorismo': 'illicit activity',
+        'morte': 'end',
+        'morre': 'ends',
+        'mata': 'eliminates',
+        'guerra': 'conflict',
+        'bomba': 'explosive news',
+    }
 
     # === ENTIDADES CONHECIDAS COM IDENTIDADE VISUAL ===
 
@@ -390,6 +446,56 @@ class NewsContextAnalyzer:
         'volume': r'\bvolume|volume de negociação',
     }
 
+    # === PADRÃO PARA EXTRAÇÃO DE PERCENTUAL (NOVO v3.0) ===
+    PERCENTAGE_EXTRACTION_PATTERN = r'(\d+[\.,]?\d*)\s*%'
+
+    # === PADRÕES DE IMPORTÂNCIA (NOVO v3.0) ===
+    IMPORTANCE_PATTERNS = {
+        'breaking': [
+            r'\b(urgente|breaking|última hora|agora|acontecendo)\b',
+            r'\b(dispara|despenca|colapsa|explode|crash)\b',
+            r'\b\d{2,}[\.,]?\d*\s*%',  # >= 10% é breaking
+        ],
+        'major': [
+            r'\b(recorde|histórico|primeiro|inédito|maior)\b',
+            r'\b(aprovado|aprovação|rejeição|proibição)\b',
+            r'\b(bilhão|bilhões|trillion)\b',
+            r'\b(etf|halving|fork|mainnet)\b',
+        ],
+        'analysis': [
+            r'\b(análise|analista|opinião|perspectiva|previsão)\b',
+            r'\b(especialista|expert|fundador|ceo diz|afirma)\b',
+            r'\b(pode|poderia|deve|deveria|projeta)\b',
+        ],
+    }
+
+    # === EVENTOS ESPECÍFICOS DO MERCADO CRIPTO (NOVO v3.0) ===
+    EVENT_KEYWORDS = [
+        (r'\b(halving|halvening)\b', 'halving'),
+        (r'\b(etf|spot etf|bitcoin etf|ethereum etf)\b', 'etf'),
+        (r'\b(airdrop)\b', 'airdrop'),
+        (r'\b(hard fork|soft fork|fork)\b', 'fork'),
+        (r'\b(ipo|listagem|listing)\b', 'listing'),
+        (r'\b(mainnet|lançamento de rede)\b', 'mainnet'),
+        (r'\b(merge|fusão)\b', 'merge'),
+        (r'\b(upgrade|atualização)\b', 'upgrade'),
+        (r'\b(burn|queima)\b', 'burn'),
+        (r'\b(unlock|desbloqueio|vesting)\b', 'unlock'),
+        (r'\b(snapshot)\b', 'snapshot'),
+        (r'\b(staking|stake)\b', 'staking'),
+        (r'\b(mining|mineração)\b', 'mining'),
+        (r'\b(nft|nfts)\b', 'NFT'),
+        (r'\b(defi|finanças descentralizadas)\b', 'DeFi'),
+        (r'\b(dao)\b', 'DAO'),
+        (r'\b(layer 2|l2|rollup)\b', 'layer2'),
+        (r'\b(wallet|carteira)\b', 'wallet'),
+        (r'\b(smart contract|contrato inteligente)\b', 'smart_contract'),
+        (r'\b(whale|baleia)\b', 'whale'),
+        (r'\b(cbdc|moeda digital)\b', 'cbdc'),
+        (r'\b(metaverso|metaverse)\b', 'metaverse'),
+        (r'\b(web3)\b', 'web3'),
+    ]
+
     # === PADRÕES DE TIPO DE NOTÍCIA ===
 
     TYPE_PATTERNS = {
@@ -467,6 +573,21 @@ class NewsContextAnalyzer:
             for news_type, patterns in self.TYPE_PATTERNS.items()
         }
 
+        # NOVO v3.0: Compilar padrão de extração de percentual
+        self._percentage_regex = re.compile(self.PERCENTAGE_EXTRACTION_PATTERN, re.IGNORECASE)
+
+        # NOVO v3.0: Compilar padrões de importância
+        self._importance_regex = {
+            importance: [re.compile(p, re.IGNORECASE) for p in patterns]
+            for importance, patterns in self.IMPORTANCE_PATTERNS.items()
+        }
+
+        # NOVO v3.0: Compilar padrões de eventos
+        self._event_regex = [
+            (re.compile(pattern, re.IGNORECASE), keyword)
+            for pattern, keyword in self.EVENT_KEYWORDS
+        ]
+
     def analyze(self, title: str, content: str, category: Optional[str] = None) -> NewsContext:
         """
         Analisa uma notícia e extrai seu contexto para geração editorial
@@ -500,13 +621,24 @@ class NewsContextAnalyzer:
         # 6. Extrair entidades secundárias
         secondary_entities = self._extract_secondary_entities(full_text, primary_entity)
 
-        # 7. Extrair keywords
+        # 7. Extrair keywords (expandido para eventos v3.0)
         keywords = self._extract_keywords(full_text)
 
         # 8. Calcular confiança
         confidence = self._calculate_confidence(
             entity_type, primary_entity, action, has_numeric
         )
+
+        # NOVO v3.0: 9. Extrair percentual numérico
+        extracted_percentage = self._extract_percentage(title_lower)
+
+        # NOVO v3.0: 10. Determinar importância da notícia
+        news_importance = self._determine_importance(title_lower, extracted_percentage)
+
+        # NOVO v3.0: 11. Obter entidade secundária principal para dual-entity
+        secondary_entity_display = None
+        if secondary_entities:
+            secondary_entity_display = secondary_entities[0].display_name
 
         context = NewsContext(
             entity_type=entity_type,
@@ -517,18 +649,24 @@ class NewsContextAnalyzer:
             action=action,
             has_numeric_data=has_numeric,
             numeric_context=numeric_context,
+            extracted_percentage=extracted_percentage,
+            news_importance=news_importance,
+            secondary_entity_display=secondary_entity_display,
             secondary_entities=secondary_entities,
             keywords=keywords,
             confidence_score=confidence
         )
 
         logger.info(
-            f"[ContextAnalyzer v2.0] Análise: "
+            f"[ContextAnalyzer v3.0] Análise: "
             f"entity={entity_type.value}:{primary_entity}, "
             f"action={action.action}, "
             f"sentiment={sentiment.value}, "
             f"type={news_type.value}, "
             f"has_data={has_numeric}, "
+            f"percentage={extracted_percentage}, "
+            f"importance={news_importance}, "
+            f"secondary={secondary_entity_display}, "
             f"confidence={confidence:.2f}"
         )
 
@@ -705,29 +843,103 @@ class NewsContextAnalyzer:
         return entities[:5]
 
     def _extract_keywords(self, text: str) -> list[str]:
-        """Extrai palavras-chave para contexto adicional"""
+        """Extrai palavras-chave para contexto adicional (expandido v3.0)"""
         keywords = []
 
-        keyword_patterns = [
-            (r'\b(etf|spot etf|bitcoin etf)\b', 'ETF'),
-            (r'\b(halving|halvening)\b', 'halving'),
-            (r'\b(staking|stake)\b', 'staking'),
-            (r'\b(mining|mineração)\b', 'mining'),
-            (r'\b(nft|nfts)\b', 'NFT'),
-            (r'\b(defi|finanças descentralizadas)\b', 'DeFi'),
-            (r'\b(dao)\b', 'DAO'),
-            (r'\b(layer 2|l2|rollup)\b', 'layer2'),
-            (r'\b(wallet|carteira)\b', 'wallet'),
-            (r'\b(airdrop)\b', 'airdrop'),
-            (r'\b(smart contract|contrato inteligente)\b', 'smart_contract'),
-            (r'\b(whale|baleia)\b', 'whale'),
-        ]
-
-        for pattern, keyword in keyword_patterns:
-            if re.search(pattern, text, re.IGNORECASE):
+        # Usar padrões de eventos compilados para melhor performance
+        for regex, keyword in self._event_regex:
+            if regex.search(text):
                 keywords.append(keyword)
 
-        return keywords[:5]
+        return keywords[:8]  # Expandido de 5 para 8
+
+    def _extract_percentage(self, title: str) -> Optional[float]:
+        """
+        Extrai o primeiro percentual numérico do título (NOVO v3.0)
+
+        Args:
+            title: Título da notícia em minúsculas
+
+        Returns:
+            Valor percentual como float ou None
+        """
+        match = self._percentage_regex.search(title)
+        if match:
+            try:
+                # Substituir vírgula por ponto para parsing
+                value_str = match.group(1).replace(',', '.')
+                percentage = float(value_str)
+
+                # Determinar se é positivo ou negativo baseado em palavras-chave
+                if any(word in title for word in ['cai', 'caiu', 'despenca', 'queda', 'perde', 'recua']):
+                    percentage = -abs(percentage)
+                elif any(word in title for word in ['sobe', 'subiu', 'alta', 'ganha', 'avança']):
+                    percentage = abs(percentage)
+
+                return percentage
+            except ValueError:
+                return None
+        return None
+
+    def _determine_importance(
+        self,
+        title: str,
+        percentage: Optional[float]
+    ) -> str:
+        """
+        Determina a importância da notícia para hierarquia visual (NOVO v3.0)
+
+        Args:
+            title: Título da notícia em minúsculas
+            percentage: Percentual extraído (se houver)
+
+        Returns:
+            Nível de importância: "breaking", "major", "standard", "analysis"
+        """
+        # Verificar breaking primeiro (maior urgência)
+        for regex in self._importance_regex.get('breaking', []):
+            if regex.search(title):
+                return 'breaking'
+
+        # Percentual alto = breaking
+        if percentage is not None and abs(percentage) >= 10:
+            return 'breaking'
+
+        # Verificar major
+        for regex in self._importance_regex.get('major', []):
+            if regex.search(title):
+                return 'major'
+
+        # Verificar analysis
+        for regex in self._importance_regex.get('analysis', []):
+            if regex.search(title):
+                return 'analysis'
+
+        # Default
+        return 'standard'
+
+    def apply_safe_replacements(self, text: str) -> str:
+        """
+        Aplica substituições seguras para palavras sensíveis (NOVO v3.0)
+
+        Útil para sanitizar texto antes de enviar para APIs de geração de imagem.
+
+        Args:
+            text: Texto original
+
+        Returns:
+            Texto com substituições seguras aplicadas
+        """
+        result = text.lower()
+        for unsafe_word, safe_replacement in self.SAFE_REPLACEMENTS.items():
+            # Substituir palavra completa usando regex
+            result = re.sub(
+                rf'\b{re.escape(unsafe_word)}\b',
+                safe_replacement,
+                result,
+                flags=re.IGNORECASE
+            )
+        return result
 
     def _calculate_confidence(
         self,

@@ -1,16 +1,27 @@
 """
-Visual Elements Bank v2.0 - Editorial Photography Style
-Banco de elementos visuais FOTOGRÁFICOS E CONCRETOS para geração de imagens editoriais
+Visual Elements Bank v3.0 - Contextual Editorial Photography Style
+Banco de elementos visuais FOTOGRÁFICOS E CONTEXTUAIS para geração de imagens editoriais
 
-IMPORTANTE: Este módulo NÃO contém elementos abstratos como redes blockchain,
-partículas digitais ou efeitos futuristas. Todos os elementos são CONCRETOS
-e seguem o padrão visual dos grandes portais de notícias cripto.
+IMPORTANTE: Este módulo gera elementos visuais que CONTAM A HISTÓRIA da notícia,
+não apenas mostram a entidade principal. Cada imagem deve comunicar a ação/evento
+em um único olhar.
 
 Padrão de referência: CoinDesk, Cointelegraph, Bitcoin Magazine
+
+Changelog v3.0:
+- Adicionado ACTION_VISUAL_ELEMENTS para representar ações visualmente
+- Adicionado DUAL_ENTITY_TEMPLATES para notícias relacionais
+- Adicionado BACKGROUNDS_BY_TYPE para backgrounds contextuais
+- Adicionado EVENT_VISUAL_ELEMENTS para eventos específicos
+- Adicionado DRAMA_LEVELS para magnitude de eventos
+- Adicionado JOURNALISTIC_SCENES para storytelling visual
+- Adicionado VISUAL_HIERARCHY para importância de notícias
+- Melhorado sistema de composição para incluir contexto narrativo
 """
 
-from dataclasses import dataclass
-from typing import Optional
+import random
+from dataclasses import dataclass, field
+from typing import Optional, List
 
 from app.services.ai.news_context_analyzer import (
     EntityType,
@@ -21,157 +32,478 @@ from app.services.ai.news_context_analyzer import (
 
 @dataclass
 class EditorialComposition:
-    """Composição visual editorial completa para um prompt"""
+    """Composição visual editorial completa para um prompt v3.0"""
     # Estilo fotográfico base
     photography_style: str
 
     # Elemento visual concreto principal
     main_subject: str
 
+    # Elemento de ação visual (NOVO)
+    action_element: Optional[str] = None
+
+    # Cena jornalística (NOVO)
+    journalistic_scene: Optional[str] = None
+
     # Background/cenário
-    background: str
+    background: str = ""
 
     # Paleta de cores
-    color_palette: str
+    color_palette: str = ""
 
     # Overlay de dados (se aplicável)
-    data_overlay: Optional[str]
+    data_overlay: Optional[str] = None
+
+    # Visualização de percentual (NOVO)
+    percentage_visual: Optional[str] = None
+
+    # Nível de dramaticidade (NOVO)
+    drama_level: str = ""
 
     # Estilo de iluminação
-    lighting: str
+    lighting: str = ""
 
     # Área para texto
-    text_area: str
+    text_area: str = ""
+
+    # Hierarquia visual (NOVO)
+    visual_hierarchy: str = ""
+
+    # Composição dual-entity (NOVO)
+    dual_entity_scene: Optional[str] = None
+
+    # Elemento de evento específico (NOVO)
+    event_element: Optional[str] = None
 
 
 class EditorialVisualElementsBank:
     """
-    Banco de elementos visuais v2.0 - Editorial Photography Style
+    Banco de elementos visuais v3.0 - Contextual Editorial Photography Style
 
-    Todos os elementos são CONCRETOS e FOTOGRÁFICOS, não abstratos.
-    Segue o padrão visual de CoinDesk, Cointelegraph e Bitcoin Magazine.
+    Foco em STORYTELLING VISUAL - cada imagem deve contar a história da notícia
+    em um único olhar, não apenas mostrar logos ou moedas genéricas.
     """
+
+    # === ELEMENTOS VISUAIS DE AÇÃO (NOVO) ===
+    # Representa visualmente o verbo/ação da notícia
+
+    ACTION_VISUAL_ELEMENTS = {
+        # Ações de queda/declínio
+        'cai': [
+            "with dramatic downward arrow indicator prominently displayed",
+            "positioned at edge of cliff with sense of falling",
+            "with cascading coins tumbling downward effect",
+            "sinking below surface level metaphor",
+            "with red downward trajectory visualization",
+        ],
+        'despenca': [
+            "in freefall motion blur effect",
+            "crashing through floor support level",
+            "with shattered glass falling effect",
+            "tumbling down steep decline visualization",
+        ],
+
+        # Ações de alta/crescimento
+        'sobe': [
+            "with bold upward arrow indicator prominently displayed",
+            "ascending on rising staircase of coins",
+            "with rocket launch trajectory behind",
+            "breaking through ceiling resistance level",
+            "with green upward trajectory visualization",
+        ],
+        'dispara': [
+            "with explosive rocket launch effect",
+            "breaking through multiple resistance barriers",
+            "soaring upward with momentum trails",
+            "piercing through clouds to new heights",
+        ],
+
+        # Ações de lançamento/anúncio
+        'lanca': [
+            "emerging from gift box grand unveiling",
+            "in spotlight reveal on professional stage",
+            "with launch countdown display backdrop",
+            "breaking through wrapping paper reveal",
+            "with fireworks celebration atmosphere",
+        ],
+
+        # Ações de alerta/aviso
+        'alerta': [
+            "with warning triangle sign prominently displayed",
+            "surrounded by caution tape barriers",
+            "with flashing alert beacon lights",
+            "behind protective shield barrier",
+        ],
+
+        # Ações de enfrentamento/conflito
+        'enfrenta': [
+            "facing opposing force across dramatic divide",
+            "in courtroom setting atmosphere",
+            "with versus battle stance composition",
+            "standing ground against incoming pressure",
+        ],
+
+        # Ações de aprovação/regulação positiva
+        'aprova': [
+            "with official approval stamp prominently displayed",
+            "receiving green checkmark validation",
+            "with celebratory gavel approval gesture",
+            "under official government seal of approval",
+        ],
+
+        # Ações de proibição/rejeição
+        'proibe': [
+            "behind red prohibition sign barrier",
+            "with crossed-out rejection symbol overlay",
+            "blocked by official barrier gate",
+            "with stop hand gesture indication",
+        ],
+
+        # Ações de parceria/integração
+        'parceria': [
+            "connected with partnership bridge element",
+            "in professional handshake composition",
+            "with interlocking puzzle pieces joining",
+            "united under collaborative framework",
+        ],
+
+        # Ações de adoção
+        'adota': [
+            "being embraced by larger entity structure",
+            "integrated into mainstream payment terminal",
+            "welcomed into institutional portfolio display",
+            "incorporated into corporate ecosystem",
+        ],
+
+        # Ações de hack/segurança
+        'hackeia': [
+            "with broken lock security breach indication",
+            "surrounded by shattered digital barrier",
+            "with visible crack in protective wall",
+            "under attack with warning indicators",
+        ],
+
+        # Ações de análise
+        'analisa': [
+            "under magnifying glass examination",
+            "with analytical chart overlay display",
+            "in research laboratory setting",
+            "with thoughtful contemplation atmosphere",
+        ],
+
+        # Ações de atualização/upgrade
+        'atualiza': [
+            "with upgrade arrow transformation effect",
+            "evolving into enhanced version visualization",
+            "with progress loading bar completion",
+            "transforming with improvement glow effect",
+        ],
+
+        # Default para ações não mapeadas
+        'informa': [
+            "in professional news presentation setting",
+            "with informational display backdrop",
+        ],
+    }
+
+    # === TEMPLATES DUAL-ENTITY (NOVO) ===
+    # Para notícias que envolvem duas entidades em interação
+
+    DUAL_ENTITY_TEMPLATES = {
+        'enfrenta': "{primary} logo facing {secondary} logo across dramatic divide, "
+                    "tension-filled confrontation atmosphere",
+        'parceria': "{primary} and {secondary} logos connected by partnership bridge, "
+                    "collaborative celebration atmosphere",
+        'adota': "{secondary} corporate setting embracing {primary} symbol, "
+                 "institutional adoption visualization",
+        'proibe': "{secondary} official barrier blocking {primary} symbol, "
+                  "regulatory prohibition atmosphere",
+        'processa': "{primary} in courtroom setting facing {secondary} legal action, "
+                    "judicial confrontation atmosphere",
+        'investe': "{secondary} institutional vault containing {primary} assets, "
+                   "investment allocation visualization",
+        'integra': "{secondary} platform incorporating {primary} functionality, "
+                   "technical integration visualization",
+        'compete': "{primary} and {secondary} in side-by-side competition stance, "
+                   "market rivalry atmosphere",
+        'supera': "{primary} positioned above {secondary} in hierarchy, "
+                  "market dominance visualization",
+    }
+
+    # === BACKGROUNDS POR TIPO DE NOTÍCIA (NOVO) ===
+    # Backgrounds contextuais baseados no tipo de notícia
+
+    BACKGROUNDS_BY_TYPE = {
+        NewsType.REGULATION: [
+            "government building columns in background setting",
+            "courthouse facade with institutional architecture",
+            "official government chamber or hearing room",
+            "regulatory agency headquarters backdrop",
+            "legislative building interior with formal atmosphere",
+        ],
+        NewsType.TECHNOLOGY: [
+            "modern data center server room environment",
+            "clean tech laboratory backdrop setting",
+            "developer workspace with code displays",
+            "futuristic but clean technology facility",
+            "software development environment hints",
+        ],
+        NewsType.ADOPTION: [
+            "mainstream retail store payment terminal",
+            "modern commercial shopping environment",
+            "consumer-friendly payment counter setting",
+            "mainstream business acceptance backdrop",
+            "everyday commerce integration scene",
+        ],
+        NewsType.SECURITY: [
+            "digital vault security chamber setting",
+            "cybersecurity operations center backdrop",
+            "secure facility with protection elements",
+            "fortress-like defensive environment",
+            "security monitoring station setting",
+        ],
+        NewsType.PRICE: [
+            "professional trading floor environment",
+            "financial market screens backdrop",
+            "stock exchange trading atmosphere",
+            "investment desk with market displays",
+            "professional trading terminal setting",
+        ],
+        NewsType.ANALYSIS: [
+            "research office analytical environment",
+            "think tank discussion room setting",
+            "financial analysis desk backdrop",
+            "expert commentary studio setting",
+            "professional research facility",
+        ],
+        NewsType.PARTNERSHIP: [
+            "corporate boardroom meeting setting",
+            "professional conference room backdrop",
+            "business partnership ceremony venue",
+            "collaborative workspace environment",
+            "executive meeting room atmosphere",
+        ],
+        NewsType.LAUNCH: [
+            "product launch event stage setting",
+            "unveiling ceremony backdrop",
+            "press conference announcement venue",
+            "grand opening celebration atmosphere",
+            "premiere event professional setting",
+        ],
+        NewsType.LEGAL: [
+            "courtroom interior formal setting",
+            "legal office professional backdrop",
+            "judicial chamber atmosphere",
+            "law firm conference room setting",
+            "legal proceedings formal environment",
+        ],
+        NewsType.MINING: [
+            "cryptocurrency mining facility interior",
+            "data center with mining hardware",
+            "industrial mining operation setting",
+            "professional mining farm backdrop",
+            "high-performance computing facility",
+        ],
+    }
+
+    # === ELEMENTOS DE EVENTOS ESPECÍFICOS (NOVO) ===
+    # Visualizações para eventos conhecidos do mercado cripto
+
+    EVENT_VISUAL_ELEMENTS = {
+        'halving': "Bitcoin symbol split in half with countdown timer element, "
+                   "historic halving event visualization",
+        'etf': "official ETF approval documentation with SEC seal, "
+               "institutional trading floor celebration",
+        'airdrop': "tokens falling like golden rain from above, "
+                   "distribution celebration atmosphere",
+        'fork': "blockchain path splitting into two distinct directions, "
+                "network divergence visualization",
+        'ipo': "stock market opening bell ceremony, "
+               "listing celebration atmosphere",
+        'mainnet': "network launch countdown with activation visualization, "
+                   "mainnet deployment celebration",
+        'merge': "two networks combining into unified structure, "
+                 "historic merger visualization",
+        'upgrade': "system transformation with progress visualization, "
+                   "network upgrade deployment",
+        'burn': "tokens entering ceremonial burning mechanism, "
+                "deflationary event visualization",
+        'unlock': "locked tokens being released from vault, "
+                  "vesting unlock event visualization",
+        'snapshot': "network freeze moment capture visualization, "
+                    "snapshot event documentation",
+        'listing': "exchange listing announcement celebration, "
+                   "new trading pair availability",
+    }
+
+    # === NÍVEIS DE DRAMATICIDADE (NOVO) ===
+    # Ajusta intensidade visual baseada na magnitude do evento
+
+    DRAMA_LEVELS = {
+        'extreme': {
+            'description': "highly dramatic composition with maximum visual impact",
+            'lighting': "intense dramatic lighting with strong contrasts",
+            'motion': "explosive motion effects and energy",
+            'threshold': 30,  # >= 30% change
+        },
+        'high': {
+            'description': "dynamic impactful composition with clear visual tension",
+            'lighting': "dramatic lighting with pronounced shadows",
+            'motion': "visible movement and momentum indication",
+            'threshold': 15,  # >= 15% change
+        },
+        'moderate': {
+            'description': "professionally dynamic composition with subtle energy",
+            'lighting': "balanced lighting with directional emphasis",
+            'motion': "subtle movement suggestion",
+            'threshold': 5,  # >= 5% change
+        },
+        'subtle': {
+            'description': "clean professional composition with understated elegance",
+            'lighting': "even professional lighting",
+            'motion': "static professional presentation",
+            'threshold': 0,  # < 5% change
+        },
+    }
+
+    # === CENAS JORNALÍSTICAS (NOVO) ===
+    # Templates de cenas que contam histórias em um olhar
+
+    JOURNALISTIC_SCENES = {
+        'price_surge': "trading floor celebration with {crypto} charts showing "
+                       "dramatic gains on multiple screens, victorious atmosphere",
+        'price_crash': "trading floor tension with {crypto} charts showing "
+                       "steep decline on screens, serious concerned atmosphere",
+        'regulation_positive': "{entity} receiving official approval in "
+                               "governmental setting, celebratory formal atmosphere",
+        'regulation_negative': "{entity} facing regulatory barrier in "
+                               "official governmental hearing, tense atmosphere",
+        'adoption_corporate': "{company} headquarters displaying {crypto} "
+                              "acceptance signage, mainstream integration moment",
+        'adoption_retail': "modern store payment terminal processing {crypto} "
+                           "transaction, everyday commerce integration",
+        'security_breach': "{entity} digital fortress with visible breach, "
+                           "emergency response atmosphere",
+        'partnership_announcement': "{entity1} and {entity2} executives in "
+                                    "formal handshake, partnership ceremony",
+        'technology_launch': "{entity} unveiling new technology on professional "
+                             "stage, product launch atmosphere",
+        'legal_action': "{entity} in formal courtroom setting, "
+                        "legal proceedings atmosphere",
+        'market_analysis': "financial analyst examining {crypto} data on "
+                           "multiple screens, research environment",
+        'institutional_investment': "{entity} vault containing {crypto} "
+                                    "assets, institutional allocation",
+        'mining_operation': "{crypto} mining facility with industrial "
+                            "equipment, operational environment",
+        'network_event': "{crypto} network visualization showing {event} "
+                         "in progress, technical milestone",
+    }
+
+    # === HIERARQUIA VISUAL (NOVO) ===
+    # Ajusta estilo baseado na importância da notícia
+
+    VISUAL_HIERARCHY = {
+        'breaking': {
+            'style': "urgent breaking news composition with maximum impact",
+            'emphasis': "bold dramatic emphasis with immediate attention grab",
+            'urgency': "high contrast urgent visual treatment",
+        },
+        'major': {
+            'style': "significant news professional impact composition",
+            'emphasis': "clear professional emphasis with strong focal point",
+            'urgency': "important news visual treatment",
+        },
+        'standard': {
+            'style': "balanced professional editorial composition",
+            'emphasis': "professional standard emphasis",
+            'urgency': "standard news visual treatment",
+        },
+        'analysis': {
+            'style': "thoughtful analytical contemplative composition",
+            'emphasis': "subtle intellectual emphasis",
+            'urgency': "measured analytical visual treatment",
+        },
+    }
 
     # === ESTILOS FOTOGRÁFICOS BASE POR TIPO DE ENTIDADE ===
 
     PHOTOGRAPHY_STYLES = {
-        # Criptomoedas
         EntityType.CRYPTO: "Professional product photography of cryptocurrency",
         EntityType.STABLECOIN: "Clean product photography of stablecoin",
-
-        # Instituições
         EntityType.EXCHANGE: "Modern fintech corporate photography",
         EntityType.BANK: "Institutional corporate photography with professional lighting",
         EntityType.GOVERNMENT: "Government building or institutional architecture photography",
-
-        # Empresas e pessoas
         EntityType.COMPANY: "Corporate technology product photography",
         EntityType.PERSON: "Professional corporate portrait photography",
-
-        # DeFi e NFT
         EntityType.DEFI: "Modern fintech interface photography with clean design",
         EntityType.NFT: "Digital art gallery photography with modern framing",
-
-        # Tema genérico
         EntityType.THEME: "Professional financial news editorial photography",
     }
 
     # === ELEMENTOS VISUAIS CONCRETOS POR ENTIDADE ===
 
-    # Criptomoedas - Elementos visuais concretos (NÃO abstratos)
     CRYPTO_SUBJECTS = {
-        # Bitcoin
         'bitcoin': "golden Bitcoin physical coin with orange-gold metallic finish, "
                    "centered on clean professional surface",
         'btc': "golden Bitcoin physical coin with orange-gold metallic finish, "
                "centered on clean professional surface",
-
-        # Ethereum
         'ethereum': "purple-blue Ethereum diamond logo as 3D metallic object, "
                     "professional product shot on gradient background",
         'eth': "purple-blue Ethereum diamond logo as 3D metallic object, "
                "professional product shot on gradient background",
-
-        # Solana
         'solana': "purple-teal Solana logo as modern 3D rendered object, "
                   "clean product photography style",
         'sol': "purple-teal Solana logo as modern 3D rendered object, "
                "clean product photography style",
-
-        # XRP
         'xrp': "blue XRP logo as professional 3D metallic symbol, "
                "institutional product photography",
         'ripple': "blue XRP logo as professional 3D metallic symbol, "
                   "institutional product photography",
-
-        # Cardano
         'cardano': "blue Cardano ADA logo as geometric 3D object, "
                    "clean professional product shot",
         'ada': "blue Cardano ADA logo as geometric 3D object, "
                "clean professional product shot",
-
-        # BNB
         'bnb': "golden yellow BNB logo as 3D metallic coin, "
                "professional exchange branding photography",
-
-        # Dogecoin
         'dogecoin': "golden Dogecoin with Shiba Inu emblem, "
                     "playful but professional product photography",
         'doge': "golden Dogecoin with Shiba Inu emblem, "
                 "playful but professional product photography",
-
-        # Polygon
         'polygon': "purple Polygon MATIC logo as modern 3D geometric shape, "
                    "clean tech product photography",
         'matic': "purple Polygon MATIC logo as modern 3D geometric shape, "
                  "clean tech product photography",
-
-        # Avalanche
         'avalanche': "red Avalanche triangle logo as bold 3D object, "
                      "dynamic product photography",
         'avax': "red Avalanche triangle logo as bold 3D object, "
                 "dynamic product photography",
-
-        # Chainlink
         'chainlink': "blue Chainlink hexagon logo as connected 3D element, "
                      "professional tech product shot",
         'link': "blue Chainlink hexagon logo as connected 3D element, "
                 "professional tech product shot",
-
-        # Litecoin
         'litecoin': "silver Litecoin physical coin with metallic finish, "
                     "professional numismatic photography",
         'ltc': "silver Litecoin physical coin with metallic finish, "
                "professional numismatic photography",
-
-        # Polkadot
         'polkadot': "pink-white Polkadot logo as interconnected 3D spheres, "
                     "modern tech product photography",
         'dot': "pink-white Polkadot logo as interconnected 3D spheres, "
                "modern tech product photography",
-
-        # Cosmos
         'cosmos': "purple Cosmos ATOM logo as orbital 3D structure, "
                   "space-themed product photography",
         'atom': "purple Cosmos ATOM logo as orbital 3D structure, "
                 "space-themed product photography",
-
-        # Toncoin
         'toncoin': "blue Toncoin logo as modern 3D diamond shape, "
                    "clean messenger-style product shot",
         'ton': "blue Toncoin logo as modern 3D diamond shape, "
                "clean messenger-style product shot",
-
-        # Arbitrum
         'arbitrum': "blue-orange Arbitrum logo as modern 3D symbol, "
                     "layer 2 tech product photography",
-
-        # Optimism
         'optimism': "red Optimism logo as bold 3D circular element, "
                     "optimistic tech product photography",
     }
 
-    # Stablecoins
     STABLECOIN_SUBJECTS = {
         'usdt': "green Tether USDT logo on stable professional surface, "
                 "representing stability and trust",
@@ -185,7 +517,6 @@ class EditorialVisualElementsBank:
                 "professional stablecoin photography",
     }
 
-    # Exchanges
     EXCHANGE_SUBJECTS = {
         'binance': "Binance logo prominently displayed on modern trading interface backdrop, "
                    "professional fintech photography",
@@ -203,7 +534,6 @@ class EditorialVisualElementsBank:
                            "Latin American exchange photography",
     }
 
-    # Bancos e Instituições Financeiras
     BANK_SUBJECTS = {
         'jpmorgan': "JPMorgan Chase corporate logo on institutional banking backdrop, "
                     "Wall Street corporate photography",
@@ -233,7 +563,6 @@ class EditorialVisualElementsBank:
               "tech-forward brokerage photography",
     }
 
-    # Governos e Reguladores
     GOVERNMENT_SUBJECTS = {
         'sec': "SEC official seal or government building facade, "
                "US regulatory institutional photography",
@@ -263,7 +592,6 @@ class EditorialVisualElementsBank:
               "Brazilian financial market photography",
     }
 
-    # Empresas de Tecnologia
     COMPANY_SUBJECTS = {
         'tesla': "Tesla logo on electric vehicle or corporate backdrop, "
                  "innovative tech company photography",
@@ -289,7 +617,6 @@ class EditorialVisualElementsBank:
                   "fintech developer photography",
     }
 
-    # Pessoas - Descrições genéricas por papel
     PERSON_SUBJECTS = {
         'ceo': "professional business executive in corporate setting, "
                "CEO portrait photography with confident pose",
@@ -303,7 +630,6 @@ class EditorialVisualElementsBank:
                       "executive portrait photography",
     }
 
-    # Temas genéricos
     THEME_SUBJECTS = {
         'defi': "interconnected DeFi protocol logos arranged cleanly, "
                 "decentralized finance infographic style",
@@ -327,7 +653,7 @@ class EditorialVisualElementsBank:
                   "market analysis photography",
     }
 
-    # === BACKGROUNDS POR SENTIMENTO ===
+    # === BACKGROUNDS POR SENTIMENTO (mantido para fallback) ===
 
     BACKGROUNDS = {
         NewsSentiment.POSITIVE: [
@@ -353,7 +679,6 @@ class EditorialVisualElementsBank:
     # === PALETAS DE CORES EDITORIAIS ===
 
     COLOR_PALETTES = {
-        # Por sentimento
         NewsSentiment.POSITIVE: [
             "bright greens (#00D47E), golds (#FFD700), clean whites",
             "optimistic emerald (#50C878), warm amber (#FFBF00), pristine white",
@@ -369,8 +694,6 @@ class EditorialVisualElementsBank:
             "corporate navy (#1C3F6E), silver (#C0C0C0), balanced tones",
             "analytical blue (#4682B4), neutral gray (#708090), professional whites",
         ],
-
-        # Por tipo de entidade
         EntityType.CRYPTO: [
             "crypto-specific colors matching the coin identity",
         ],
@@ -388,7 +711,6 @@ class EditorialVisualElementsBank:
         ],
     }
 
-    # Cores específicas de criptomoedas
     CRYPTO_COLORS = {
         'bitcoin': "orange-gold (#F7931A), warm amber (#FFD700), clean whites",
         'btc': "orange-gold (#F7931A), warm amber (#FFD700), clean whites",
@@ -430,6 +752,29 @@ class EditorialVisualElementsBank:
                         "professional neutral data visualization",
     }
 
+    # === VISUALIZAÇÃO DE PERCENTUAIS (NOVO) ===
+
+    PERCENTAGE_VISUALS = {
+        'extreme_positive': "massive +{value}% indicator prominently displayed in bold green, "
+                            "explosive gain visualization",
+        'high_positive': "bold +{value}% indicator clearly visible in green, "
+                         "significant gain visualization",
+        'moderate_positive': "+{value}% indicator visible in soft green, "
+                             "moderate gain indication",
+        'slight_positive': "subtle +{value}% indicator in light green, "
+                           "minor positive movement",
+        'extreme_negative': "massive -{value}% indicator prominently displayed in bold red, "
+                            "dramatic loss visualization",
+        'high_negative': "bold -{value}% indicator clearly visible in red, "
+                         "significant loss visualization",
+        'moderate_negative': "-{value}% indicator visible in soft red, "
+                             "moderate decline indication",
+        'slight_negative': "subtle -{value}% indicator in light red, "
+                           "minor negative movement",
+        'neutral': "0% stable indicator in neutral gray, "
+                   "stability visualization",
+    }
+
     # === ESTILOS DE ILUMINAÇÃO EDITORIAL ===
 
     LIGHTING_STYLES = {
@@ -453,8 +798,6 @@ class EditorialVisualElementsBank:
         ],
     }
 
-    # === ÁREA PARA TEXTO (COMPOSIÇÃO) ===
-
     TEXT_AREAS = [
         "clear negative space on left third for headline text overlay",
         "dedicated text area on bottom third with high contrast background",
@@ -463,6 +806,117 @@ class EditorialVisualElementsBank:
     ]
 
     # === MÉTODOS DE COMPOSIÇÃO ===
+
+    def get_action_element(self, action: str) -> Optional[str]:
+        """Retorna elemento visual de ação apropriado (NOVO)"""
+        action_lower = action.lower()
+        if action_lower in self.ACTION_VISUAL_ELEMENTS:
+            return random.choice(self.ACTION_VISUAL_ELEMENTS[action_lower])
+        return None
+
+    def get_dual_entity_scene(
+        self,
+        primary: str,
+        secondary: str,
+        action: str
+    ) -> Optional[str]:
+        """Retorna cena com duas entidades em interação (NOVO)"""
+        action_lower = action.lower()
+        if action_lower in self.DUAL_ENTITY_TEMPLATES:
+            template = self.DUAL_ENTITY_TEMPLATES[action_lower]
+            return template.format(primary=primary, secondary=secondary)
+        return None
+
+    def get_background_by_type(
+        self,
+        news_type: NewsType,
+        sentiment: NewsSentiment
+    ) -> str:
+        """Retorna background contextual baseado no tipo de notícia (NOVO)"""
+        if news_type in self.BACKGROUNDS_BY_TYPE:
+            return random.choice(self.BACKGROUNDS_BY_TYPE[news_type])
+        # Fallback para background por sentimento
+        return random.choice(self.BACKGROUNDS.get(
+            sentiment,
+            self.BACKGROUNDS[NewsSentiment.NEUTRAL]
+        ))
+
+    def get_event_element(self, keywords: List[str]) -> Optional[str]:
+        """Retorna elemento visual para eventos específicos (NOVO)"""
+        for keyword in keywords:
+            keyword_lower = keyword.lower()
+            if keyword_lower in self.EVENT_VISUAL_ELEMENTS:
+                return self.EVENT_VISUAL_ELEMENTS[keyword_lower]
+        return None
+
+    def get_drama_level(
+        self,
+        percentage: Optional[float],
+        action: str
+    ) -> dict:
+        """Retorna nível de dramaticidade baseado na magnitude (NOVO)"""
+        # Ações que implicam alta dramaticidade
+        high_drama_actions = ['dispara', 'despenca', 'colapsa', 'explode', 'hackeia']
+
+        if action.lower() in high_drama_actions:
+            return self.DRAMA_LEVELS['extreme']
+
+        if percentage is not None:
+            abs_pct = abs(percentage)
+            for level_name, level_data in self.DRAMA_LEVELS.items():
+                if abs_pct >= level_data['threshold']:
+                    return level_data
+
+        return self.DRAMA_LEVELS['subtle']
+
+    def get_percentage_visual(
+        self,
+        percentage: float,
+        sentiment: NewsSentiment
+    ) -> Optional[str]:
+        """Retorna visualização concreta de percentual (NOVO)"""
+        if percentage is None:
+            return None
+
+        abs_pct = abs(percentage)
+        is_positive = percentage >= 0
+
+        if abs_pct >= 30:
+            key = 'extreme_positive' if is_positive else 'extreme_negative'
+        elif abs_pct >= 10:
+            key = 'high_positive' if is_positive else 'high_negative'
+        elif abs_pct >= 3:
+            key = 'moderate_positive' if is_positive else 'moderate_negative'
+        elif abs_pct > 0:
+            key = 'slight_positive' if is_positive else 'slight_negative'
+        else:
+            key = 'neutral'
+
+        template = self.PERCENTAGE_VISUALS.get(key)
+        if template:
+            return template.format(value=abs(int(percentage)))
+        return None
+
+    def get_journalistic_scene(
+        self,
+        scene_type: str,
+        **kwargs
+    ) -> Optional[str]:
+        """Retorna template de cena jornalística (NOVO)"""
+        if scene_type in self.JOURNALISTIC_SCENES:
+            template = self.JOURNALISTIC_SCENES[scene_type]
+            try:
+                return template.format(**kwargs)
+            except KeyError:
+                return template
+        return None
+
+    def get_visual_hierarchy(self, importance: str) -> dict:
+        """Retorna estilo de hierarquia visual (NOVO)"""
+        return self.VISUAL_HIERARCHY.get(
+            importance,
+            self.VISUAL_HIERARCHY['standard']
+        )
 
     def get_photography_style(self, entity_type: EntityType) -> str:
         """Retorna o estilo fotográfico base para o tipo de entidade"""
@@ -478,37 +932,28 @@ class EditorialVisualElementsBank:
         entity_display: str
     ) -> str:
         """Retorna o elemento visual concreto principal"""
-
-        # Buscar pelo nome da entidade
         if entity_name:
             entity_key = entity_name.lower()
 
-            # Verificar em cada dicionário de assuntos
             if entity_type == EntityType.CRYPTO:
                 if entity_key in self.CRYPTO_SUBJECTS:
                     return self.CRYPTO_SUBJECTS[entity_key]
-
             elif entity_type == EntityType.STABLECOIN:
                 if entity_key in self.STABLECOIN_SUBJECTS:
                     return self.STABLECOIN_SUBJECTS[entity_key]
-
             elif entity_type == EntityType.EXCHANGE:
                 if entity_key in self.EXCHANGE_SUBJECTS:
                     return self.EXCHANGE_SUBJECTS[entity_key]
-
             elif entity_type == EntityType.BANK:
                 if entity_key in self.BANK_SUBJECTS:
                     return self.BANK_SUBJECTS[entity_key]
-
             elif entity_type == EntityType.GOVERNMENT:
                 if entity_key in self.GOVERNMENT_SUBJECTS:
                     return self.GOVERNMENT_SUBJECTS[entity_key]
-
             elif entity_type == EntityType.COMPANY:
                 if entity_key in self.COMPANY_SUBJECTS:
                     return self.COMPANY_SUBJECTS[entity_key]
 
-        # Fallback: gerar descrição genérica baseada no tipo
         fallback_templates = {
             EntityType.CRYPTO: f"{entity_display} cryptocurrency logo as professional 3D product, "
                                f"clean editorial photography",
@@ -532,7 +977,7 @@ class EditorialVisualElementsBank:
         """Retorna descrição de subject para pessoas baseado no papel"""
         if role and role in self.PERSON_SUBJECTS:
             return self.PERSON_SUBJECTS[role]
-        return self.PERSON_SUBJECTS['ceo']  # Default
+        return self.PERSON_SUBJECTS['ceo']
 
     def get_theme_subject(self, keywords: list[str]) -> str:
         """Retorna subject temático baseado em keywords"""
@@ -540,13 +985,10 @@ class EditorialVisualElementsBank:
             keyword_lower = keyword.lower()
             if keyword_lower in self.THEME_SUBJECTS:
                 return self.THEME_SUBJECTS[keyword_lower]
-
-        # Default para mercado genérico
         return self.THEME_SUBJECTS['market']
 
     def get_background(self, sentiment: NewsSentiment) -> str:
-        """Retorna background apropriado para o sentimento"""
-        import random
+        """Retorna background apropriado para o sentimento (fallback)"""
         backgrounds = self.BACKGROUNDS.get(
             sentiment,
             self.BACKGROUNDS[NewsSentiment.NEUTRAL]
@@ -560,21 +1002,16 @@ class EditorialVisualElementsBank:
         entity_name: Optional[str]
     ) -> str:
         """Retorna paleta de cores apropriada"""
-        import random
-
-        # Para criptos, usar cores específicas
         if entity_type in [EntityType.CRYPTO, EntityType.STABLECOIN] and entity_name:
             entity_key = entity_name.lower()
             if entity_key in self.CRYPTO_COLORS:
                 return self.CRYPTO_COLORS[entity_key]
 
-        # Para outros tipos de entidade, tentar paleta específica
         if entity_type in self.COLOR_PALETTES:
             type_palettes = self.COLOR_PALETTES[entity_type]
             if type_palettes and random.random() < 0.6:
                 return random.choice(type_palettes)
 
-        # Usar paleta baseada em sentimento
         sentiment_palettes = self.COLOR_PALETTES.get(
             sentiment,
             self.COLOR_PALETTES[NewsSentiment.NEUTRAL]
@@ -592,7 +1029,6 @@ class EditorialVisualElementsBank:
         if not has_data:
             return None
 
-        # Determinar tipo de overlay baseado na ação e contexto
         if action in ['sobe', 'aprova', 'lanca'] and sentiment == NewsSentiment.POSITIVE:
             return self.DATA_OVERLAYS['price_up']
         elif action in ['cai', 'alerta', 'hackeia'] and sentiment == NewsSentiment.NEGATIVE:
@@ -608,7 +1044,6 @@ class EditorialVisualElementsBank:
 
     def get_lighting(self, sentiment: NewsSentiment) -> str:
         """Retorna estilo de iluminação baseado no sentimento"""
-        import random
         lighting_options = self.LIGHTING_STYLES.get(
             sentiment,
             self.LIGHTING_STYLES[NewsSentiment.NEUTRAL]
@@ -617,7 +1052,6 @@ class EditorialVisualElementsBank:
 
     def get_text_area(self) -> str:
         """Retorna especificação de área para texto"""
-        import random
         return random.choice(self.TEXT_AREAS)
 
     def compose_editorial_elements(
@@ -629,23 +1063,17 @@ class EditorialVisualElementsBank:
         action: str,
         has_numeric_data: bool,
         numeric_context: Optional[str],
-        keywords: list[str]
+        keywords: list[str],
+        # Novos parâmetros opcionais
+        news_type: Optional[NewsType] = None,
+        secondary_entity: Optional[str] = None,
+        percentage: Optional[float] = None,
+        importance: str = 'standard',
     ) -> EditorialComposition:
         """
-        Compõe todos os elementos visuais em uma composição editorial
+        Compõe todos os elementos visuais em uma composição editorial v3.0
 
-        Args:
-            entity_type: Tipo da entidade principal
-            entity_name: Nome/chave da entidade
-            entity_display: Nome para exibição
-            sentiment: Sentimento da notícia
-            action: Ação principal identificada
-            has_numeric_data: Se há dados numéricos
-            numeric_context: Tipo de dado numérico
-            keywords: Palavras-chave adicionais
-
-        Returns:
-            EditorialComposition com todos os elementos selecionados
+        Agora inclui contexto narrativo completo para storytelling visual.
         """
         # Determinar subject principal
         if entity_type == EntityType.THEME:
@@ -653,16 +1081,72 @@ class EditorialVisualElementsBank:
         else:
             main_subject = self.get_main_subject(entity_type, entity_name, entity_display)
 
+        # NOVO: Elemento de ação visual
+        action_element = self.get_action_element(action)
+
+        # NOVO: Composição dual-entity se houver entidade secundária
+        dual_entity_scene = None
+        if secondary_entity:
+            dual_entity_scene = self.get_dual_entity_scene(
+                entity_display, secondary_entity, action
+            )
+
+        # NOVO: Background contextual por tipo de notícia
+        if news_type:
+            background = self.get_background_by_type(news_type, sentiment)
+        else:
+            background = self.get_background(sentiment)
+
+        # NOVO: Elemento de evento específico
+        event_element = self.get_event_element(keywords)
+
+        # NOVO: Nível de dramaticidade
+        drama_data = self.get_drama_level(percentage, action)
+
+        # NOVO: Visualização de percentual
+        percentage_visual = None
+        if percentage is not None:
+            percentage_visual = self.get_percentage_visual(percentage, sentiment)
+
+        # NOVO: Hierarquia visual
+        hierarchy_data = self.get_visual_hierarchy(importance)
+
+        # NOVO: Determinar cena jornalística apropriada
+        journalistic_scene = None
+        if news_type == NewsType.PRICE and sentiment == NewsSentiment.POSITIVE:
+            journalistic_scene = self.get_journalistic_scene(
+                'price_surge', crypto=entity_display
+            )
+        elif news_type == NewsType.PRICE and sentiment == NewsSentiment.NEGATIVE:
+            journalistic_scene = self.get_journalistic_scene(
+                'price_crash', crypto=entity_display
+            )
+        elif news_type == NewsType.REGULATION and sentiment == NewsSentiment.POSITIVE:
+            journalistic_scene = self.get_journalistic_scene(
+                'regulation_positive', entity=entity_display
+            )
+        elif news_type == NewsType.REGULATION and sentiment == NewsSentiment.NEGATIVE:
+            journalistic_scene = self.get_journalistic_scene(
+                'regulation_negative', entity=entity_display
+            )
+
         return EditorialComposition(
             photography_style=self.get_photography_style(entity_type),
             main_subject=main_subject,
-            background=self.get_background(sentiment),
+            action_element=action_element,
+            journalistic_scene=journalistic_scene,
+            background=background,
             color_palette=self.get_color_palette(sentiment, entity_type, entity_name),
             data_overlay=self.get_data_overlay(
                 has_numeric_data, sentiment, action, numeric_context
             ),
+            percentage_visual=percentage_visual,
+            drama_level=drama_data['description'],
             lighting=self.get_lighting(sentiment),
-            text_area=self.get_text_area()
+            text_area=self.get_text_area(),
+            visual_hierarchy=hierarchy_data['style'],
+            dual_entity_scene=dual_entity_scene,
+            event_element=event_element,
         )
 
 
