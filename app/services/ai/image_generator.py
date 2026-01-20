@@ -208,18 +208,16 @@ class ImageGenerator:
         Returns:
             Bytes da imagem gerada ou None em caso de erro
         """
-        # Construir config baseado na disponibilidade de ImageConfig
+        # Construir config - usar apenas aspect_ratio (image_size não é suportado em todas versões)
         if GEMINI_IMAGE_CONFIG_AVAILABLE:
             config = types.GenerateContentConfig(
                 response_modalities=['IMAGE'],
                 image_config=types.ImageConfig(
-                    aspect_ratio=self.GEMINI_ASPECT_RATIO,
-                    image_size=self.GEMINI_IMAGE_SIZE
+                    aspect_ratio=self.GEMINI_ASPECT_RATIO
                 )
             )
         else:
             # Fallback: usar apenas response_modalities sem image_config
-            # Algumas versões do SDK não têm ImageConfig
             config = types.GenerateContentConfig(
                 response_modalities=['IMAGE'],
             )
