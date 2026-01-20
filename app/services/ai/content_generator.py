@@ -1,7 +1,7 @@
 """
-AI Content Generator Service v3.0
-Gera conteúdo de notícias usando OpenAI GPT-4 com estrutura otimizada,
-guardrails de segurança e prevenção de alucinações
+AI Content Generator Service v4.0
+Gera conteúdo de notícias usando Google Gemini (primário) com OpenAI como fallback,
+estrutura otimizada, guardrails de segurança e prevenção de alucinações
 """
 import re
 from typing import Dict, Optional
@@ -11,6 +11,14 @@ from openai import AsyncOpenAI
 from slugify import slugify
 
 from app.core.config import settings
+
+# Google Gemini imports
+try:
+    from google import genai
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+    logger.warning("Google GenAI SDK não instalado. Usando apenas OpenAI.")
 
 
 # Configurações de tom por categoria
@@ -54,7 +62,11 @@ CATEGORY_CONFIG = {
 
 
 class ContentGenerator:
-    """Gerador de conteúdo com IA v3.0 - Editor-Chefe com guardrails anti-alucinação"""
+    """Gerador de conteúdo com IA v4.0 - Gemini + OpenAI fallback com guardrails anti-alucinação"""
+
+    # Modelos
+    GEMINI_MODEL = "gemini-2.5-flash"
+    OPENAI_MODEL = "gpt-4o-mini"
 
     # System Prompt v3.0 - Estruturado com tags XML para melhor parsing
     SYSTEM_PROMPT = """<persona>
@@ -139,8 +151,22 @@ NUNCA use estas construções robóticas ou clichês:
 </formato_de_saida>"""
 
     def __init__(self):
-        self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-        self.model = "gpt-4o-mini"
+        # OpenAI client (fallback)
+        self.openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+
+        # Gemini client (primário)
+        self.gemini_client = None
+        self.use_gemini = False
+
+        if GEMINI_AVAILABLE and settings.GEMINI_API_KEY:
+            try:
+                self.gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
+                self.use_gemini = True
+                logger.info("ContentGenerator v4.0: Gemini configurado como primário")
+            except Exception as e:
+                logger.warning(f"Falha ao inicializar Gemini: {e}. Usando OpenAI como primário.")
+        else:
+            logger.info("ContentGenerator v4.0: Usando OpenAI (Gemini não disponível)")
     
     async def generate_article(self, source_news: Dict, category: str = "default") -> Optional[Dict]:
         """
@@ -306,38 +332,58 @@ Escreva APENAS o artigo final em Markdown, começando diretamente pelo H2.
 Nenhum texto adicional, prefixo ou metadado.
 </output>"""
 
-        try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": self.SYSTEM_PROMPT},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.4,  # Reduzido de 0.7 para maior precisão factual em conteúdo jornalístico
-                max_tokens=900,  # Aumentado para comportar artigos de até 500 palavras
-            )
-            
-            content = response.choices[0].message.content.strip()
-            
-            # Debug: Mostrar conteúdo bruto da IA
-            logger.debug(f"Conteúdo bruto da IA (primeiros 300 chars): {content[:300]}")
-            
-            # Sanitização adicional (failsafe)
-            content = self._sanitize_content(content)
-            
-            # Debug: Mostrar conteúdo após sanitização
-            logger.debug(f"Conteúdo após sanitização (primeiros 300 chars): {content[:300]}")
-            
-            # Verificar quebras de linha
-            double_breaks = content.count('\n\n')
-            word_count = len(content.split())
-            logger.info(f"Artigo gerado - Quebras duplas: {double_breaks}, Palavras: {word_count}")
-            
-            return content
-        
-        except Exception as e:
-            logger.error(f"Erro ao gerar conteúdo: {e}")
-            return None
+        # Combinar system prompt com user prompt para Gemini (não tem system message separado)
+        full_prompt = f"{self.SYSTEM_PROMPT}\n\n{user_prompt}"
+
+        content = None
+
+        # Tentar Gemini primeiro
+        if self.use_gemini and self.gemini_client:
+            try:
+                logger.info(f"[Gemini] Gerando conteúdo com {self.GEMINI_MODEL}...")
+                response = await self.gemini_client.aio.models.generate_content(
+                    model=self.GEMINI_MODEL,
+                    contents=full_prompt,
+                )
+                content = response.text.strip()
+                logger.info("[Gemini] Conteúdo gerado com sucesso")
+            except Exception as e:
+                logger.warning(f"[Gemini] Falha na geração: {e}. Tentando OpenAI como fallback...")
+
+        # Fallback para OpenAI se Gemini falhou ou não está disponível
+        if content is None:
+            try:
+                logger.info(f"[OpenAI] Gerando conteúdo com {self.OPENAI_MODEL}...")
+                response = await self.openai_client.chat.completions.create(
+                    model=self.OPENAI_MODEL,
+                    messages=[
+                        {"role": "system", "content": self.SYSTEM_PROMPT},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    temperature=0.4,
+                    max_tokens=900,
+                )
+                content = response.choices[0].message.content.strip()
+                logger.info("[OpenAI] Conteúdo gerado com sucesso (fallback)")
+            except Exception as e:
+                logger.error(f"[OpenAI] Erro ao gerar conteúdo: {e}")
+                return None
+
+        # Debug: Mostrar conteúdo bruto da IA
+        logger.debug(f"Conteúdo bruto da IA (primeiros 300 chars): {content[:300]}")
+
+        # Sanitização adicional (failsafe)
+        content = self._sanitize_content(content)
+
+        # Debug: Mostrar conteúdo após sanitização
+        logger.debug(f"Conteúdo após sanitização (primeiros 300 chars): {content[:300]}")
+
+        # Verificar quebras de linha
+        double_breaks = content.count('\n\n')
+        word_count = len(content.split())
+        logger.info(f"Artigo gerado - Quebras duplas: {double_breaks}, Palavras: {word_count}")
+
+        return content
     
     def _sanitize_content(self, content: str) -> str:
         """
@@ -470,26 +516,43 @@ Crie um título SEO otimizado para este artigo sobre criptomoedas.
 Retorne APENAS o título, sem aspas, prefixos ou explicações.
 </output>"""
 
-        try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "Você é um especialista em SEO para portais de notícias cripto. Crie títulos precisos, informativos e otimizados para buscadores."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.5,
-                max_tokens=60,
-            )
+        system_instruction = "Você é um especialista em SEO para portais de notícias cripto. Crie títulos precisos, informativos e otimizados para buscadores."
+        full_prompt = f"{system_instruction}\n\n{prompt}"
 
-            title = response.choices[0].message.content.strip()
-            # Remover aspas e prefixos comuns
-            title = title.strip('"\'')
-            title = re.sub(r'^(Título|Titulo|Title):\s*', '', title, flags=re.IGNORECASE).strip()
-            return title
+        title = None
 
-        except Exception as e:
-            logger.error(f"Erro ao gerar título SEO: {e}")
-            return None
+        # Tentar Gemini primeiro
+        if self.use_gemini and self.gemini_client:
+            try:
+                response = await self.gemini_client.aio.models.generate_content(
+                    model=self.GEMINI_MODEL,
+                    contents=full_prompt,
+                )
+                title = response.text.strip()
+            except Exception as e:
+                logger.warning(f"[Gemini] Falha ao gerar título SEO: {e}")
+
+        # Fallback para OpenAI
+        if title is None:
+            try:
+                response = await self.openai_client.chat.completions.create(
+                    model=self.OPENAI_MODEL,
+                    messages=[
+                        {"role": "system", "content": system_instruction},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.5,
+                    max_tokens=60,
+                )
+                title = response.choices[0].message.content.strip()
+            except Exception as e:
+                logger.error(f"[OpenAI] Erro ao gerar título SEO: {e}")
+                return None
+
+        # Remover aspas e prefixos comuns
+        title = title.strip('"\'')
+        title = re.sub(r'^(Título|Titulo|Title):\s*', '', title, flags=re.IGNORECASE).strip()
+        return title
     
     async def _generate_excerpt(self, content: str) -> Optional[str]:
         """Gera excerpt do artigo"""
@@ -548,28 +611,45 @@ Crie uma meta description SEO para este artigo sobre criptomoedas.
 Retorne APENAS a meta description, sem aspas ou prefixos.
 </output>"""
 
-        try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "Você é um especialista em SEO para portais de notícias cripto. Crie meta descriptions que aumentam CTR nos resultados de busca."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.3,  # Mais conservador para meta descriptions
-                max_tokens=80,
-            )
+        system_instruction = "Você é um especialista em SEO para portais de notícias cripto. Crie meta descriptions que aumentam CTR nos resultados de busca."
+        full_prompt = f"{system_instruction}\n\n{prompt}"
 
-            meta_desc = response.choices[0].message.content.strip()
-            # Remover aspas e prefixos comuns
-            meta_desc = meta_desc.strip('"\'')
-            meta_desc = re.sub(r'^(Meta description|Descrição|Description):\s*', '', meta_desc, flags=re.IGNORECASE).strip()
+        meta_desc = None
 
-            # Garantir que não exceda 160 caracteres
-            if len(meta_desc) > 160:
-                meta_desc = meta_desc[:157] + "..."
+        # Tentar Gemini primeiro
+        if self.use_gemini and self.gemini_client:
+            try:
+                response = await self.gemini_client.aio.models.generate_content(
+                    model=self.GEMINI_MODEL,
+                    contents=full_prompt,
+                )
+                meta_desc = response.text.strip()
+            except Exception as e:
+                logger.warning(f"[Gemini] Falha ao gerar meta description: {e}")
 
-            return meta_desc
+        # Fallback para OpenAI
+        if meta_desc is None:
+            try:
+                response = await self.openai_client.chat.completions.create(
+                    model=self.OPENAI_MODEL,
+                    messages=[
+                        {"role": "system", "content": system_instruction},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.3,
+                    max_tokens=80,
+                )
+                meta_desc = response.choices[0].message.content.strip()
+            except Exception as e:
+                logger.error(f"[OpenAI] Erro ao gerar meta description: {e}")
+                return None
 
-        except Exception as e:
-            logger.error(f"Erro ao gerar meta description: {e}")
-            return None
+        # Remover aspas e prefixos comuns
+        meta_desc = meta_desc.strip('"\'')
+        meta_desc = re.sub(r'^(Meta description|Descrição|Description):\s*', '', meta_desc, flags=re.IGNORECASE).strip()
+
+        # Garantir que não exceda 160 caracteres
+        if len(meta_desc) > 160:
+            meta_desc = meta_desc[:157] + "..."
+
+        return meta_desc

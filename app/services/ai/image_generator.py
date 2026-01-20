@@ -1,8 +1,9 @@
 """
-Image Generation Service v8.0 - Editorial Photography Style
-Gera imagens no estilo editorial fotográfico dos grandes portais de notícias cripto
+Image Generation Service v9.0 - Gemini + DALL-E Fallback
+Gera imagens usando Google Gemini (primário) com DALL-E como fallback
 
 Changelog:
+- v9.0: Migração para Gemini como primário, DALL-E como fallback
 - v8.0: Estilo editorial fotográfico (CoinDesk/Cointelegraph standard)
 - v7.0: Sistema inteligente de análise de contexto e geração de prompts dinâmicos
 - v6.0: Visualização de dados abstratos com sanitização
@@ -16,6 +17,7 @@ Recursos:
 """
 
 import asyncio
+import io
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
@@ -30,22 +32,36 @@ from app.services.ai.smart_prompt_generator import (
     smart_prompt_generator
 )
 
+# Google Gemini imports
+try:
+    from google import genai
+    from google.genai import types
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+    logger.warning("Google GenAI SDK não instalado. Usando apenas DALL-E.")
+
 # ThreadPool para operações síncronas do Cloudinary
 _cloudinary_executor = ThreadPoolExecutor(max_workers=3)
 
 
 class ImageGenerator:
     """
-    Gerador de imagens v7.0 - Context-Aware Smart Generation
+    Gerador de imagens v9.0 - Gemini + DALL-E Fallback
 
-    Utiliza análise inteligente de contexto para gerar imagens únicas
-    e relevantes para cada notícia de criptomoedas.
+    Utiliza Google Gemini como primário e DALL-E como fallback para
+    gerar imagens únicas e relevantes para cada notícia de criptomoedas.
     """
 
-    # Configurações de geração
-    IMAGE_MODEL = "dall-e-3"
-    IMAGE_SIZE = "1792x1024"  # Widescreen 16:9 para header de artigo
-    IMAGE_QUALITY = "hd"
+    # Configurações de geração - Gemini
+    GEMINI_IMAGE_MODEL = "gemini-3-pro-image-preview"
+    GEMINI_ASPECT_RATIO = "16:9"
+    GEMINI_IMAGE_SIZE = "2K"
+
+    # Configurações de geração - DALL-E (fallback)
+    DALLE_MODEL = "dall-e-3"
+    DALLE_SIZE = "1792x1024"  # Widescreen 16:9 para header de artigo
+    DALLE_QUALITY = "hd"
 
     # Transformações do Cloudinary para otimização
     CLOUDINARY_TRANSFORMATIONS = [
@@ -60,13 +76,28 @@ class ImageGenerator:
 
     def __init__(self, prompt_generator: Optional[SmartPromptGenerator] = None):
         """
-        Inicializa o gerador de imagens com cliente assíncrono
+        Inicializa o gerador de imagens com clientes Gemini e OpenAI
 
         Args:
             prompt_generator: Gerador de prompts inteligente (usa singleton se None)
         """
-        self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        # OpenAI/DALL-E client (fallback)
+        self.openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         self.prompt_generator = prompt_generator or smart_prompt_generator
+
+        # Gemini client (primário)
+        self.gemini_client = None
+        self.use_gemini = False
+
+        if GEMINI_AVAILABLE and settings.GEMINI_API_KEY:
+            try:
+                self.gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
+                self.use_gemini = True
+                logger.info("ImageGenerator v9.0: Gemini configurado como primário")
+            except Exception as e:
+                logger.warning(f"Falha ao inicializar Gemini para imagens: {e}. Usando DALL-E como primário.")
+        else:
+            logger.info("ImageGenerator v9.0: Usando DALL-E (Gemini não disponível)")
 
         # Configurar Cloudinary
         cloudinary.config(
@@ -75,7 +106,7 @@ class ImageGenerator:
             api_secret=settings.CLOUDINARY_API_SECRET
         )
 
-        logger.info("ImageGenerator v8.0 inicializado com Editorial Prompt Generator")
+        logger.info("ImageGenerator v9.0 inicializado com Editorial Prompt Generator")
 
     async def generate_and_upload_image(
         self,
@@ -84,7 +115,7 @@ class ImageGenerator:
         category_name: Optional[str] = None
     ) -> str:
         """
-        Gera imagem no estilo editorial fotográfico (v8.0)
+        Gera imagem usando Gemini (primário) ou DALL-E (fallback)
 
         O sistema analisa a notícia para identificar:
         - Entidade principal (Bitcoin, JPMorgan, SEC, etc.)
@@ -104,7 +135,7 @@ class ImageGenerator:
             URL da imagem no Cloudinary ou string vazia em caso de erro
         """
         try:
-            logger.info(f"[ImageGen v8.0] Iniciando geração para: {title[:60]}...")
+            logger.info(f"[ImageGen v9.0] Iniciando geração para: {title[:60]}...")
 
             # 1. Gerar prompt editorial com metadados
             prompt_result = self.prompt_generator.generate_prompt_with_metadata(
@@ -117,43 +148,137 @@ class ImageGenerator:
             metadata = prompt_result['metadata']
 
             logger.info(
-                f"[ImageGen v8.0] Contexto detectado: "
+                f"[ImageGen v9.0] Contexto detectado: "
                 f"entity={metadata['entity_type']}:{metadata['primary_entity']}, "
                 f"sentiment={metadata['sentiment']}, "
                 f"action={metadata['action']}, "
                 f"confidence={metadata['confidence_score']:.2f}"
             )
-            logger.debug(f"[ImageGen v8.0] Prompt ({metadata['prompt_length']} chars): {prompt[:300]}...")
+            logger.debug(f"[ImageGen v9.0] Prompt ({metadata['prompt_length']} chars): {prompt[:300]}...")
 
-            # 2. Gerar imagem com DALL-E 3
-            logger.info("[ImageGen v8.0] Chamando DALL-E 3...")
-            response = await self.client.images.generate(
-                model=self.IMAGE_MODEL,
-                prompt=prompt,
-                size=self.IMAGE_SIZE,
-                quality=self.IMAGE_QUALITY,
-                n=1
-            )
+            # 2. Tentar gerar imagem com Gemini primeiro
+            image_data = None
 
-            image_url = response.data[0].url
-            logger.info(f"[ImageGen v8.0] Imagem gerada com sucesso: {image_url[:80]}...")
+            if self.use_gemini and self.gemini_client:
+                try:
+                    logger.info(f"[ImageGen v9.0] Chamando Gemini ({self.GEMINI_IMAGE_MODEL})...")
+                    image_data = await self._generate_with_gemini(prompt)
+                    if image_data:
+                        logger.info("[ImageGen v9.0] Imagem gerada com sucesso via Gemini")
+                except Exception as e:
+                    logger.warning(f"[ImageGen v9.0] Falha no Gemini: {e}. Tentando DALL-E...")
 
-            # 3. Upload para Cloudinary com otimização
-            cloudinary_url = await self._upload_to_cloudinary(image_url)
+            # 3. Fallback para DALL-E se Gemini falhou
+            if image_data is None:
+                try:
+                    logger.info(f"[ImageGen v9.0] Chamando DALL-E ({self.DALLE_MODEL})...")
+                    image_url = await self._generate_with_dalle(prompt)
+                    if image_url:
+                        logger.info(f"[ImageGen v9.0] Imagem gerada via DALL-E: {image_url[:80]}...")
+                        # Upload URL diretamente para Cloudinary
+                        cloudinary_url = await self._upload_to_cloudinary(image_url)
+                        logger.info(f"[ImageGen v9.0] Processo completo. URL final: {cloudinary_url[:80]}...")
+                        return cloudinary_url
+                except Exception as e:
+                    logger.error(f"[ImageGen v9.0] Falha no DALL-E: {e}")
+                    return ""
 
-            logger.info(f"[ImageGen v8.0] Processo completo. URL final: {cloudinary_url[:80]}...")
-            return cloudinary_url
+            # 4. Upload bytes do Gemini para Cloudinary
+            if image_data:
+                cloudinary_url = await self._upload_bytes_to_cloudinary(image_data)
+                logger.info(f"[ImageGen v9.0] Processo completo. URL final: {cloudinary_url[:80]}...")
+                return cloudinary_url
+
+            return ""
 
         except Exception as e:
-            logger.error(f"[ImageGen v8.0] Erro na geração: {e}", exc_info=True)
+            logger.error(f"[ImageGen v9.0] Erro na geração: {e}", exc_info=True)
             return ""
+
+    async def _generate_with_gemini(self, prompt: str) -> Optional[bytes]:
+        """
+        Gera imagem usando Google Gemini
+
+        Args:
+            prompt: Prompt para geração da imagem
+
+        Returns:
+            Bytes da imagem gerada ou None em caso de erro
+        """
+        config = types.GenerateContentConfig(
+            response_modalities=['IMAGE'],
+            image_config=types.ImageConfig(
+                aspect_ratio=self.GEMINI_ASPECT_RATIO,
+                image_size=self.GEMINI_IMAGE_SIZE
+            )
+        )
+
+        response = await self.gemini_client.aio.models.generate_content(
+            model=self.GEMINI_IMAGE_MODEL,
+            contents=prompt,
+            config=config,
+        )
+
+        # Extrair imagem da resposta
+        for part in response.candidates[0].content.parts:
+            if part.inline_data is not None:
+                # Retornar bytes da imagem
+                return part.inline_data.data
+
+        return None
+
+    async def _generate_with_dalle(self, prompt: str) -> Optional[str]:
+        """
+        Gera imagem usando DALL-E
+
+        Args:
+            prompt: Prompt para geração da imagem
+
+        Returns:
+            URL da imagem gerada ou None em caso de erro
+        """
+        response = await self.openai_client.images.generate(
+            model=self.DALLE_MODEL,
+            prompt=prompt,
+            size=self.DALLE_SIZE,
+            quality=self.DALLE_QUALITY,
+            n=1
+        )
+
+        return response.data[0].url
+
+    async def _upload_bytes_to_cloudinary(self, image_bytes: bytes) -> str:
+        """
+        Faz upload de bytes de imagem para o Cloudinary
+
+        Args:
+            image_bytes: Bytes da imagem gerada
+
+        Returns:
+            URL segura da imagem no Cloudinary
+        """
+        loop = asyncio.get_event_loop()
+
+        upload_result = await loop.run_in_executor(
+            _cloudinary_executor,
+            lambda: cloudinary.uploader.upload(
+                io.BytesIO(image_bytes),
+                folder="vivacripto/articles",
+                transformation=self.CLOUDINARY_TRANSFORMATIONS
+            )
+        )
+
+        cloudinary_url = upload_result['secure_url']
+        logger.debug(f"[ImageGen v9.0] Upload Cloudinary (bytes) concluído: {cloudinary_url}")
+
+        return cloudinary_url
 
     async def _upload_to_cloudinary(self, image_url: str) -> str:
         """
         Faz upload da imagem para o Cloudinary com transformações
 
         Args:
-            image_url: URL da imagem gerada pelo DALL-E
+            image_url: URL da imagem gerada
 
         Returns:
             URL segura da imagem no Cloudinary
@@ -170,7 +295,7 @@ class ImageGenerator:
         )
 
         cloudinary_url = upload_result['secure_url']
-        logger.debug(f"[ImageGen v8.0] Upload Cloudinary concluído: {cloudinary_url}")
+        logger.debug(f"[ImageGen v9.0] Upload Cloudinary concluído: {cloudinary_url}")
 
         return cloudinary_url
 
