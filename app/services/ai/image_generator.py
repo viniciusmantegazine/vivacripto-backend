@@ -23,6 +23,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 from openai import AsyncOpenAI
+from PIL import Image
 import cloudinary
 import cloudinary.uploader
 
@@ -291,29 +292,43 @@ class ImageGenerator:
         """
         loop = asyncio.get_event_loop()
 
-        # Determinar formato e resource_type baseado no mime_type
-        format_map = {
-            "image/png": "png",
-            "image/jpeg": "jpg",
-            "image/jpg": "jpg",
-            "image/webp": "webp",
-            "image/gif": "gif",
-        }
-        image_format = format_map.get(mime_type, "png")
+        logger.debug(f"[ImageGen v9.0] Preparando upload: {len(image_bytes)} bytes, mime={mime_type}")
+        logger.debug(f"[ImageGen v9.0] Primeiros 20 bytes (hex): {image_bytes[:20].hex() if len(image_bytes) >= 20 else image_bytes.hex()}")
 
-        logger.debug(f"[ImageGen v9.0] Upload Cloudinary: {len(image_bytes)} bytes, mime={mime_type}, format={image_format}")
+        # Validar e converter imagem usando Pillow para garantir formato correto
+        try:
+            img = Image.open(io.BytesIO(image_bytes))
+            logger.debug(f"[ImageGen v9.0] Pillow detectou: format={img.format}, mode={img.mode}, size={img.size}")
 
-        # Cloudinary aceita data URI para upload de bytes
-        # Formato: data:[<mediatype>][;base64],<data>
-        base64_data = base64.b64encode(image_bytes).decode('utf-8')
-        data_uri = f"data:{mime_type};base64,{base64_data}"
+            # Converter para RGB se necessário (RGBA pode causar problemas)
+            if img.mode in ('RGBA', 'LA', 'P'):
+                img = img.convert('RGB')
+                logger.debug(f"[ImageGen v9.0] Convertido para RGB")
+
+            # Salvar como PNG em buffer
+            output_buffer = io.BytesIO()
+            img.save(output_buffer, format='PNG', optimize=True)
+            output_buffer.seek(0)
+            validated_bytes = output_buffer.getvalue()
+
+            logger.debug(f"[ImageGen v9.0] Imagem validada: {len(validated_bytes)} bytes (PNG)")
+
+        except Exception as e:
+            logger.error(f"[ImageGen v9.0] Pillow não conseguiu abrir imagem: {e}")
+            raise ValueError(f"Invalid image data from Gemini: {e}")
+
+        # Criar data URI com os bytes validados
+        base64_data = base64.b64encode(validated_bytes).decode('utf-8')
+        data_uri = f"data:image/png;base64,{base64_data}"
+
+        logger.debug(f"[ImageGen v9.0] Data URI criado: {len(data_uri)} chars")
 
         upload_result = await loop.run_in_executor(
             _cloudinary_executor,
             lambda: cloudinary.uploader.upload(
                 data_uri,
                 folder="vivacripto/articles",
-                format=image_format,
+                format="png",
                 transformation=self.CLOUDINARY_TRANSFORMATIONS
             )
         )
