@@ -1,13 +1,12 @@
 """
-Image Generation Service v9.0 - Gemini + DALL-E Fallback
+Image Generation Service v9.1 - Gemini + DALL-E Fallback
 Gera imagens usando Google Gemini (primário) com DALL-E como fallback
 
 Changelog:
+- v9.1: Melhorias de robustez, logging detalhado, fallback aprimorado
 - v9.0: Migração para Gemini como primário, DALL-E como fallback
 - v8.0: Estilo editorial fotográfico (CoinDesk/Cointelegraph standard)
 - v7.0: Sistema inteligente de análise de contexto e geração de prompts dinâmicos
-- v6.0: Visualização de dados abstratos com sanitização
-- v5.0: Estilo de terminal financeiro
 
 Recursos:
 - Análise de entidade principal (crypto, exchange, bank, government, etc.)
@@ -16,6 +15,7 @@ Recursos:
 - Paletas de cores específicas por criptomoeda
 """
 
+import atexit
 import asyncio
 import base64
 import io
@@ -49,10 +49,13 @@ except ImportError:
 # ThreadPool para operações síncronas do Cloudinary
 _cloudinary_executor = ThreadPoolExecutor(max_workers=3)
 
+# Registrar shutdown do executor para evitar resource leaks
+atexit.register(_cloudinary_executor.shutdown, wait=False)
+
 
 class ImageGenerator:
     """
-    Gerador de imagens v9.0 - Gemini + DALL-E Fallback
+    Gerador de imagens v9.1 - Gemini + DALL-E Fallback
 
     Utiliza Google Gemini como primário e DALL-E como fallback para
     gerar imagens únicas e relevantes para cada notícia de criptomoedas.
@@ -61,7 +64,6 @@ class ImageGenerator:
     # Configurações de geração - Gemini
     GEMINI_IMAGE_MODEL = "gemini-3-pro-image-preview"
     GEMINI_ASPECT_RATIO = "16:9"
-    GEMINI_IMAGE_SIZE = "2K"
 
     # Configurações de geração - DALL-E (fallback)
     DALLE_MODEL = "dall-e-3"
@@ -98,11 +100,11 @@ class ImageGenerator:
             try:
                 self.gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
                 self.use_gemini = True
-                logger.info("ImageGenerator v9.0: Gemini configurado como primário")
+                logger.info("ImageGenerator v9.1: Gemini configurado como primário")
             except Exception as e:
                 logger.warning(f"Falha ao inicializar Gemini para imagens: {e}. Usando DALL-E como primário.")
         else:
-            logger.info("ImageGenerator v9.0: Usando DALL-E (Gemini não disponível)")
+            logger.info("ImageGenerator v9.1: Usando DALL-E (Gemini não disponível)")
 
         # Configurar Cloudinary
         cloudinary.config(
@@ -111,7 +113,7 @@ class ImageGenerator:
             api_secret=settings.CLOUDINARY_API_SECRET
         )
 
-        logger.info("ImageGenerator v9.0 inicializado com Editorial Prompt Generator")
+        logger.info("ImageGenerator v9.1 inicializado com Editorial Prompt Generator")
 
     async def generate_and_upload_image(
         self,
@@ -140,7 +142,7 @@ class ImageGenerator:
             URL da imagem no Cloudinary ou string vazia em caso de erro
         """
         try:
-            logger.info(f"[ImageGen v9.0] Iniciando geração para: {title[:60]}...")
+            logger.info(f"[ImageGen v9.1] Iniciando geração para: {title[:60]}...")
 
             # 1. Gerar prompt editorial com metadados
             prompt_result = self.prompt_generator.generate_prompt_with_metadata(
@@ -153,52 +155,60 @@ class ImageGenerator:
             metadata = prompt_result['metadata']
 
             logger.info(
-                f"[ImageGen v9.0] Contexto detectado: "
+                f"[ImageGen v9.1] Contexto detectado: "
                 f"entity={metadata['entity_type']}:{metadata['primary_entity']}, "
                 f"sentiment={metadata['sentiment']}, "
                 f"action={metadata['action']}, "
                 f"confidence={metadata['confidence_score']:.2f}"
             )
-            logger.debug(f"[ImageGen v9.0] Prompt ({metadata['prompt_length']} chars): {prompt[:300]}...")
+            logger.debug(f"[ImageGen v9.1] Prompt ({metadata['prompt_length']} chars): {prompt[:300]}...")
 
             # 2. Tentar gerar imagem com Gemini primeiro
             gemini_result = None
+            use_dalle_fallback = False
 
             if self.use_gemini and self.gemini_client:
                 try:
-                    logger.info(f"[ImageGen v9.0] Chamando Gemini ({self.GEMINI_IMAGE_MODEL})...")
+                    logger.info(f"[ImageGen v9.1] Chamando Gemini ({self.GEMINI_IMAGE_MODEL})...")
                     gemini_result = await self._generate_with_gemini(prompt)
                     if gemini_result:
-                        logger.info("[ImageGen v9.0] Imagem gerada com sucesso via Gemini")
+                        logger.info("[ImageGen v9.1] Imagem gerada com sucesso via Gemini")
+                        # Tentar fazer upload para Cloudinary
+                        try:
+                            image_bytes, mime_type = gemini_result
+                            cloudinary_url = await self._upload_bytes_to_cloudinary(image_bytes, mime_type)
+                            logger.info(f"[ImageGen v9.1] Processo completo. URL final: {cloudinary_url[:80]}...")
+                            return cloudinary_url
+                        except Exception as upload_error:
+                            logger.warning(f"[ImageGen v9.1] Falha no upload Cloudinary: {upload_error}. Tentando DALL-E...")
+                            use_dalle_fallback = True
+                    else:
+                        use_dalle_fallback = True
                 except Exception as e:
-                    logger.warning(f"[ImageGen v9.0] Falha no Gemini: {e}. Tentando DALL-E...")
+                    logger.warning(f"[ImageGen v9.1] Falha no Gemini: {e}. Tentando DALL-E...")
+                    use_dalle_fallback = True
+            else:
+                use_dalle_fallback = True
 
-            # 3. Fallback para DALL-E se Gemini falhou
-            if gemini_result is None:
+            # 3. Fallback para DALL-E se Gemini falhou ou upload falhou
+            if use_dalle_fallback or gemini_result is None:
                 try:
-                    logger.info(f"[ImageGen v9.0] Chamando DALL-E ({self.DALLE_MODEL})...")
+                    logger.info(f"[ImageGen v9.1] Chamando DALL-E ({self.DALLE_MODEL})...")
                     image_url = await self._generate_with_dalle(prompt)
                     if image_url:
-                        logger.info(f"[ImageGen v9.0] Imagem gerada via DALL-E: {image_url[:80]}...")
+                        logger.info(f"[ImageGen v9.1] Imagem gerada via DALL-E: {image_url[:80]}...")
                         # Upload URL diretamente para Cloudinary
                         cloudinary_url = await self._upload_to_cloudinary(image_url)
-                        logger.info(f"[ImageGen v9.0] Processo completo. URL final: {cloudinary_url[:80]}...")
+                        logger.info(f"[ImageGen v9.1] Processo completo. URL final: {cloudinary_url[:80]}...")
                         return cloudinary_url
                 except Exception as e:
-                    logger.error(f"[ImageGen v9.0] Falha no DALL-E: {e}")
+                    logger.error(f"[ImageGen v9.1] Falha no DALL-E: {e}")
                     return ""
-
-            # 4. Upload bytes do Gemini para Cloudinary
-            if gemini_result:
-                image_bytes, mime_type = gemini_result
-                cloudinary_url = await self._upload_bytes_to_cloudinary(image_bytes, mime_type)
-                logger.info(f"[ImageGen v9.0] Processo completo. URL final: {cloudinary_url[:80]}...")
-                return cloudinary_url
 
             return ""
 
         except Exception as e:
-            logger.error(f"[ImageGen v9.0] Erro na geração: {e}", exc_info=True)
+            logger.error(f"[ImageGen v9.1] Erro na geração: {e}", exc_info=True)
             return ""
 
     async def _generate_with_gemini(self, prompt: str) -> Optional[tuple[bytes, str]]:
@@ -211,7 +221,7 @@ class ImageGenerator:
         Returns:
             Tuple (bytes da imagem, mime_type) ou None em caso de erro
         """
-        # Construir config - usar apenas aspect_ratio (image_size não é suportado em todas versões)
+        # Construir config - usar apenas aspect_ratio
         if GEMINI_IMAGE_CONFIG_AVAILABLE:
             config = types.GenerateContentConfig(
                 response_modalities=['IMAGE'],
@@ -224,7 +234,7 @@ class ImageGenerator:
             config = types.GenerateContentConfig(
                 response_modalities=['IMAGE'],
             )
-            logger.debug("[ImageGen v9.0] ImageConfig não disponível, usando config básico")
+            logger.debug("[ImageGen v9.1] ImageConfig não disponível, usando config básico")
 
         response = await self.gemini_client.aio.models.generate_content(
             model=self.GEMINI_IMAGE_MODEL,
@@ -232,30 +242,122 @@ class ImageGenerator:
             config=config,
         )
 
+        # Verificar se há candidatos na resposta
+        if not response.candidates:
+            logger.warning("[ImageGen v9.1] Gemini não retornou candidatos")
+            return None
+
+        if not response.candidates[0].content or not response.candidates[0].content.parts:
+            logger.warning("[ImageGen v9.1] Gemini retornou resposta sem partes de conteúdo")
+            return None
+
         # Extrair imagem da resposta
         for part in response.candidates[0].content.parts:
             if part.inline_data is not None:
                 inline_data = part.inline_data
-                mime_type = getattr(inline_data, 'mime_type', 'image/png')
+
+                # Obter mime_type com verificação robusta
+                mime_type = getattr(inline_data, 'mime_type', None)
+                if not mime_type:
+                    logger.warning("[ImageGen v9.1] Gemini não informou mime_type, usando image/png")
+                    mime_type = 'image/png'
+
                 raw_data = inline_data.data
 
-                logger.debug(f"[ImageGen v9.0] Gemini inline_data: mime_type={mime_type}, data_type={type(raw_data).__name__}, data_len={len(raw_data) if raw_data else 0}")
+                # Verificar se raw_data existe
+                if not raw_data:
+                    logger.error("[ImageGen v9.1] Gemini retornou inline_data.data vazio")
+                    return None
+
+                # Log detalhado do tipo e tamanho dos dados
+                data_type = type(raw_data).__name__
+                data_len = len(raw_data) if hasattr(raw_data, '__len__') else 'unknown'
+                logger.info(f"[ImageGen v9.1] Gemini inline_data: mime_type={mime_type}, data_type={data_type}, data_len={data_len}")
 
                 # O SDK do Gemini pode retornar dados como string base64 ou bytes
-                # Verificar e converter conforme necessário
                 if isinstance(raw_data, str):
                     # Dados retornados como string base64 - decodificar
-                    logger.debug("[ImageGen v9.0] Decodificando dados base64 do Gemini")
-                    image_bytes = base64.b64decode(raw_data)
+                    logger.debug("[ImageGen v9.1] Decodificando dados base64 do Gemini")
+                    try:
+                        image_bytes = base64.b64decode(raw_data)
+                    except Exception as decode_error:
+                        logger.error(f"[ImageGen v9.1] Erro ao decodificar base64: {decode_error}")
+                        return None
                 elif isinstance(raw_data, bytes):
                     # Já são bytes - usar diretamente
                     image_bytes = raw_data
                 else:
-                    logger.warning(f"[ImageGen v9.0] Tipo de dado inesperado do Gemini: {type(raw_data)}")
+                    # Tentar converter para bytes
+                    logger.warning(f"[ImageGen v9.1] Tipo de dado inesperado: {data_type}, tentando converter")
+                    try:
+                        if hasattr(raw_data, 'read'):
+                            image_bytes = raw_data.read()
+                        elif hasattr(raw_data, '__bytes__'):
+                            image_bytes = bytes(raw_data)
+                        else:
+                            logger.error(f"[ImageGen v9.1] Não foi possível converter {data_type} para bytes")
+                            return None
+                    except Exception as conv_error:
+                        logger.error(f"[ImageGen v9.1] Erro na conversão: {conv_error}")
+                        return None
+
+                # Verificar se temos bytes válidos
+                if not image_bytes or len(image_bytes) < 100:
+                    logger.error(f"[ImageGen v9.1] Bytes inválidos: {len(image_bytes) if image_bytes else 0} bytes")
                     return None
 
-                logger.debug(f"[ImageGen v9.0] Imagem processada: {len(image_bytes)} bytes")
+                # Log dos primeiros bytes para diagnóstico (magic bytes)
+                hex_preview = image_bytes[:16].hex()
+                logger.debug(f"[ImageGen v9.1] Magic bytes (hex): {hex_preview}")
+
+                # Identificar formato real pelos magic bytes
+                detected_format = self._detect_image_format(image_bytes)
+                if detected_format:
+                    logger.info(f"[ImageGen v9.1] Formato detectado pelos magic bytes: {detected_format}")
+                    # Atualizar mime_type se detectado diferente
+                    format_to_mime = {
+                        'PNG': 'image/png',
+                        'JPEG': 'image/jpeg',
+                        'WEBP': 'image/webp',
+                        'GIF': 'image/gif',
+                    }
+                    if detected_format in format_to_mime:
+                        mime_type = format_to_mime[detected_format]
+
+                logger.info(f"[ImageGen v9.1] Imagem processada: {len(image_bytes)} bytes, mime={mime_type}")
                 return (image_bytes, mime_type)
+
+        logger.warning("[ImageGen v9.1] Nenhuma imagem encontrada na resposta do Gemini")
+        return None
+
+    def _detect_image_format(self, data: bytes) -> Optional[str]:
+        """
+        Detecta o formato da imagem pelos magic bytes
+
+        Args:
+            data: Bytes da imagem
+
+        Returns:
+            Nome do formato ou None se não reconhecido
+        """
+        if len(data) < 8:
+            return None
+
+        # PNG: 89 50 4E 47 0D 0A 1A 0A
+        if data[:8] == b'\x89PNG\r\n\x1a\n':
+            return 'PNG'
+
+        # JPEG: FF D8 FF
+        if data[:3] == b'\xff\xd8\xff':
+            return 'JPEG'
+
+        # WebP: 52 49 46 46 ... 57 45 42 50 (RIFF...WEBP)
+        if data[:4] == b'RIFF' and data[8:12] == b'WEBP':
+            return 'WEBP'
+
+        # GIF: 47 49 46 38
+        if data[:4] == b'GIF8':
+            return 'GIF'
 
         return None
 
@@ -289,21 +391,31 @@ class ImageGenerator:
 
         Returns:
             URL segura da imagem no Cloudinary
-        """
-        loop = asyncio.get_event_loop()
 
-        logger.debug(f"[ImageGen v9.0] Preparando upload: {len(image_bytes)} bytes, mime={mime_type}")
-        logger.debug(f"[ImageGen v9.0] Primeiros 20 bytes (hex): {image_bytes[:20].hex() if len(image_bytes) >= 20 else image_bytes.hex()}")
+        Raises:
+            ValueError: Se a imagem não puder ser processada
+        """
+        loop = asyncio.get_running_loop()
+
+        logger.debug(f"[ImageGen v9.1] Preparando upload: {len(image_bytes)} bytes, mime={mime_type}")
 
         # Validar e converter imagem usando Pillow para garantir formato correto
         try:
             img = Image.open(io.BytesIO(image_bytes))
-            logger.debug(f"[ImageGen v9.0] Pillow detectou: format={img.format}, mode={img.mode}, size={img.size}")
+            logger.info(f"[ImageGen v9.1] Pillow detectou: format={img.format}, mode={img.mode}, size={img.size}")
 
             # Converter para RGB se necessário (RGBA pode causar problemas)
             if img.mode in ('RGBA', 'LA', 'P'):
+                # Criar background branco para transparência
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                img = background
+                logger.debug("[ImageGen v9.1] Convertido para RGB com fundo branco")
+            elif img.mode != 'RGB':
                 img = img.convert('RGB')
-                logger.debug(f"[ImageGen v9.0] Convertido para RGB")
+                logger.debug(f"[ImageGen v9.1] Convertido de {img.mode} para RGB")
 
             # Salvar como PNG em buffer
             output_buffer = io.BytesIO()
@@ -311,17 +423,17 @@ class ImageGenerator:
             output_buffer.seek(0)
             validated_bytes = output_buffer.getvalue()
 
-            logger.debug(f"[ImageGen v9.0] Imagem validada: {len(validated_bytes)} bytes (PNG)")
+            logger.info(f"[ImageGen v9.1] Imagem validada: {len(validated_bytes)} bytes (PNG)")
 
         except Exception as e:
-            logger.error(f"[ImageGen v9.0] Pillow não conseguiu abrir imagem: {e}")
+            logger.error(f"[ImageGen v9.1] Pillow não conseguiu processar imagem: {e}")
             raise ValueError(f"Invalid image data from Gemini: {e}")
 
         # Criar data URI com os bytes validados
         base64_data = base64.b64encode(validated_bytes).decode('utf-8')
         data_uri = f"data:image/png;base64,{base64_data}"
 
-        logger.debug(f"[ImageGen v9.0] Data URI criado: {len(data_uri)} chars")
+        logger.debug(f"[ImageGen v9.1] Data URI criado: {len(data_uri)} chars")
 
         upload_result = await loop.run_in_executor(
             _cloudinary_executor,
@@ -334,7 +446,7 @@ class ImageGenerator:
         )
 
         cloudinary_url = upload_result['secure_url']
-        logger.debug(f"[ImageGen v9.0] Upload Cloudinary (bytes) concluído: {cloudinary_url}")
+        logger.info(f"[ImageGen v9.1] Upload Cloudinary (bytes) concluído: {cloudinary_url}")
 
         return cloudinary_url
 
@@ -348,7 +460,7 @@ class ImageGenerator:
         Returns:
             URL segura da imagem no Cloudinary
         """
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         upload_result = await loop.run_in_executor(
             _cloudinary_executor,
@@ -360,7 +472,7 @@ class ImageGenerator:
         )
 
         cloudinary_url = upload_result['secure_url']
-        logger.debug(f"[ImageGen v9.0] Upload Cloudinary concluído: {cloudinary_url}")
+        logger.info(f"[ImageGen v9.1] Upload Cloudinary concluído: {cloudinary_url}")
 
         return cloudinary_url
 
@@ -391,5 +503,23 @@ class ImageGenerator:
         )
 
 
-# Singleton para compatibilidade com código existente
+# Lazy initialization para evitar problemas com variáveis de ambiente
+_image_generator: Optional[ImageGenerator] = None
+
+
+def get_image_generator() -> ImageGenerator:
+    """
+    Retorna instância do ImageGenerator (lazy initialization)
+
+    Returns:
+        Instância singleton do ImageGenerator
+    """
+    global _image_generator
+    if _image_generator is None:
+        _image_generator = ImageGenerator()
+    return _image_generator
+
+
+# Manter compatibilidade com código existente que usa o singleton diretamente
+# Nota: Em novos códigos, preferir usar get_image_generator()
 image_generator = ImageGenerator()

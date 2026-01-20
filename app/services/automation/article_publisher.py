@@ -51,8 +51,8 @@ class ArticlePublisher:
             # Classificar categoria automaticamente
             category = await self._get_or_create_category(article, db)
 
-            # Gerar imagem
-            image_url = await self._generate_image(article)
+            # Gerar imagem (passando categoria para contexto visual)
+            image_url = await self._generate_image(article, category.slug)
 
             # Preparar dados do post com validação de campos meta
             post_data = self._prepare_post_data(article, content_html, image_url, category.id)
@@ -150,12 +150,15 @@ class ArticlePublisher:
 
         return category
 
-    async def _generate_image(self, article: Dict) -> Optional[str]:
+    async def _generate_image(
+        self, article: Dict, category_slug: Optional[str] = None
+    ) -> Optional[str]:
         """
         Gera e faz upload da imagem de destaque.
 
         Args:
             article: Dados do artigo
+            category_slug: Slug da categoria para contexto visual
 
         Returns:
             URL da imagem ou None se falhar
@@ -164,6 +167,7 @@ class ArticlePublisher:
             return await self.image_generator.generate_and_upload_image(
                 article["title"],
                 article["content_markdown"],
+                category_name=category_slug,
             )
         except Exception as e:
             logger.warning(f"Erro ao gerar imagem: {e}")
