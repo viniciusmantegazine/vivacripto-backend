@@ -37,8 +37,11 @@ try:
     from google import genai
     from google.genai import types
     GEMINI_AVAILABLE = True
+    # Verificar se ImageConfig está disponível (pode variar entre versões)
+    GEMINI_IMAGE_CONFIG_AVAILABLE = hasattr(types, 'ImageConfig')
 except ImportError:
     GEMINI_AVAILABLE = False
+    GEMINI_IMAGE_CONFIG_AVAILABLE = False
     logger.warning("Google GenAI SDK não instalado. Usando apenas DALL-E.")
 
 # ThreadPool para operações síncronas do Cloudinary
@@ -205,13 +208,22 @@ class ImageGenerator:
         Returns:
             Bytes da imagem gerada ou None em caso de erro
         """
-        config = types.GenerateContentConfig(
-            response_modalities=['IMAGE'],
-            image_config=types.ImageConfig(
-                aspect_ratio=self.GEMINI_ASPECT_RATIO,
-                image_size=self.GEMINI_IMAGE_SIZE
+        # Construir config baseado na disponibilidade de ImageConfig
+        if GEMINI_IMAGE_CONFIG_AVAILABLE:
+            config = types.GenerateContentConfig(
+                response_modalities=['IMAGE'],
+                image_config=types.ImageConfig(
+                    aspect_ratio=self.GEMINI_ASPECT_RATIO,
+                    image_size=self.GEMINI_IMAGE_SIZE
+                )
             )
-        )
+        else:
+            # Fallback: usar apenas response_modalities sem image_config
+            # Algumas versões do SDK não têm ImageConfig
+            config = types.GenerateContentConfig(
+                response_modalities=['IMAGE'],
+            )
+            logger.debug("[ImageGen v9.0] ImageConfig não disponível, usando config básico")
 
         response = await self.gemini_client.aio.models.generate_content(
             model=self.GEMINI_IMAGE_MODEL,
