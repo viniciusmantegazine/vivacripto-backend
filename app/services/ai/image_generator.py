@@ -308,7 +308,26 @@ class ImageGenerator:
 
                 # Log dos primeiros bytes para diagnóstico (magic bytes)
                 hex_preview = image_bytes[:16].hex()
-                logger.debug(f"[ImageGen v9.1] Magic bytes (hex): {hex_preview}")
+                logger.info(f"[ImageGen v9.1] Magic bytes (hex): {hex_preview}")
+
+                # Verificar se parece ser base64 encoded (bytes começam com caracteres ASCII imprimíveis)
+                # Base64 geralmente começa com letras/números, não com bytes binários
+                first_bytes = image_bytes[:100]
+                try:
+                    first_chars = first_bytes.decode('ascii')
+                    # Se conseguiu decodificar como ASCII e parece base64, tentar decodificar
+                    if all(c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=' for c in first_chars.replace('\n', '').replace('\r', '')):
+                        logger.warning("[ImageGen v9.1] Dados parecem ser base64 double-encoded, decodificando...")
+                        try:
+                            image_bytes = base64.b64decode(image_bytes)
+                            logger.info(f"[ImageGen v9.1] Após decodificação base64: {len(image_bytes)} bytes")
+                            hex_preview = image_bytes[:16].hex()
+                            logger.info(f"[ImageGen v9.1] Magic bytes após decode (hex): {hex_preview}")
+                        except Exception as e:
+                            logger.warning(f"[ImageGen v9.1] Falha ao decodificar como base64: {e}")
+                except (UnicodeDecodeError, AttributeError):
+                    # Bytes binários normais, não é base64
+                    pass
 
                 # Identificar formato real pelos magic bytes
                 detected_format = self._detect_image_format(image_bytes)
@@ -323,6 +342,8 @@ class ImageGenerator:
                     }
                     if detected_format in format_to_mime:
                         mime_type = format_to_mime[detected_format]
+                else:
+                    logger.warning(f"[ImageGen v9.1] Formato não reconhecido pelos magic bytes. Primeiros 50 bytes: {image_bytes[:50]}")
 
                 logger.info(f"[ImageGen v9.1] Imagem processada: {len(image_bytes)} bytes, mime={mime_type}")
                 return (image_bytes, mime_type)
@@ -400,6 +421,7 @@ class ImageGenerator:
         logger.debug(f"[ImageGen v9.1] Preparando upload: {len(image_bytes)} bytes, mime={mime_type}")
 
         # Validar e converter imagem usando Pillow para garantir formato correto
+        validated_bytes = None
         try:
             img = Image.open(io.BytesIO(image_bytes))
             logger.info(f"[ImageGen v9.1] Pillow detectou: format={img.format}, mode={img.mode}, size={img.size}")
@@ -426,21 +448,31 @@ class ImageGenerator:
             logger.info(f"[ImageGen v9.1] Imagem validada: {len(validated_bytes)} bytes (PNG)")
 
         except Exception as e:
-            logger.error(f"[ImageGen v9.1] Pillow não conseguiu processar imagem: {e}")
-            raise ValueError(f"Invalid image data from Gemini: {e}")
+            logger.warning(f"[ImageGen v9.1] Pillow não conseguiu processar imagem: {e}")
+            # Fallback: tentar upload direto sem validação Pillow
+            logger.info("[ImageGen v9.1] Tentando upload direto sem validação Pillow...")
+            validated_bytes = image_bytes
 
-        # Criar data URI com os bytes validados
+        if not validated_bytes:
+            raise ValueError("No valid image bytes to upload")
+
+        # Determinar formato para o upload
+        # Se Pillow processou, é PNG; se não, usar o mime_type original
+        upload_mime = "image/png" if validated_bytes != image_bytes else mime_type
+        upload_format = "png" if upload_mime == "image/png" else mime_type.split('/')[-1]
+
+        # Criar data URI com os bytes
         base64_data = base64.b64encode(validated_bytes).decode('utf-8')
-        data_uri = f"data:image/png;base64,{base64_data}"
+        data_uri = f"data:{upload_mime};base64,{base64_data}"
 
-        logger.debug(f"[ImageGen v9.1] Data URI criado: {len(data_uri)} chars")
+        logger.info(f"[ImageGen v9.1] Data URI criado: {len(data_uri)} chars, format={upload_format}")
 
         upload_result = await loop.run_in_executor(
             _cloudinary_executor,
             lambda: cloudinary.uploader.upload(
                 data_uri,
                 folder="vivacripto/articles",
-                format="png",
+                format=upload_format,
                 transformation=self.CLOUDINARY_TRANSFORMATIONS
             )
         )
