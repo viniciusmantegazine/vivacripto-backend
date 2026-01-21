@@ -1,12 +1,24 @@
 """
-Visual Elements Bank v3.0 - Contextual Editorial Photography Style
+Visual Elements Bank v3.1 - Contextual Editorial Photography Style
 Banco de elementos visuais FOTOGRÁFICOS E CONTEXTUAIS para geração de imagens editoriais
 
 IMPORTANTE: Este módulo gera elementos visuais que CONTAM A HISTÓRIA da notícia,
 não apenas mostram a entidade principal. Cada imagem deve comunicar a ação/evento
 em um único olhar.
 
+## REGRA CRÍTICA DE CORRESPONDÊNCIA TÍTULO-IMAGEM (v3.1)
+
+Quando o título usa termos GENÉRICOS como "Altcoins", "Criptomoedas", "Mercado cripto":
+- THEME_SUBJECTS SEMPRE retorna subjects com MÚLTIPLAS criptos
+- NUNCA retorna uma cripto específica sozinha (ex: Cardano, Litecoin)
+- Subjects genéricos enfatizam "MULTIPLE", "diverse", "variety"
+
 Padrão de referência: CoinDesk, Cointelegraph, Bitcoin Magazine
+
+Changelog v3.1:
+- Subjects genéricos expandidos para enfatizar MÚLTIPLAS criptos
+- get_theme_subject agora aceita entity_name para contextos genéricos
+- Adicionados mais subjects genéricos (diverse altcoins ecosystem, etc)
 
 Changelog v3.0:
 - Adicionado ACTION_VISUAL_ELEMENTS para representar ações visualmente
@@ -675,32 +687,71 @@ class EditorialVisualElementsBank:
                    "crypto airdrop conceptual photography",
         'market': "clean financial charts on professional monitor, "
                   "market analysis photography",
-        # === SUBJECTS PARA ALTCOINS GENÉRICAS (sem moeda específica) ===
-        'altcoin': "diverse collection of cryptocurrency coins arranged professionally, "
-                   "multiple token symbols without specific brand focus, "
-                   "generic crypto portfolio visualization",
-        'altcoins': "diverse collection of cryptocurrency coins arranged professionally, "
-                    "multiple token symbols without specific brand focus, "
-                    "generic crypto portfolio visualization",
-        'tokens': "abstract token representations as professional 3D coins, "
-                  "diverse crypto assets without specific branding, "
-                  "portfolio diversity visualization",
-        'criptomoedas': "professional arrangement of diverse crypto coins, "
-                        "multiple cryptocurrency symbols in balanced composition, "
-                        "market diversity photography",
-        'criptomoeda': "professional arrangement of diverse crypto coins, "
-                       "multiple cryptocurrency symbols in balanced composition, "
-                       "market diversity photography",
-        'crypto': "clean cryptocurrency market visualization, "
-                  "professional financial dashboard with multiple assets, "
-                  "diverse portfolio representation",
-        'cryptos': "clean cryptocurrency market visualization, "
-                   "professional financial dashboard with multiple assets, "
-                   "diverse portfolio representation",
-        # Subject genérico para mercado
-        'mercado_cripto': "professional trading floor with cryptocurrency displays, "
-                          "diverse digital assets on financial screens, "
-                          "market overview visualization",
+
+        # === SUBJECTS PARA ALTCOINS/CRIPTOMOEDAS GENÉRICAS (v3.1 MELHORADO) ===
+        # CRÍTICO: Estes subjects SEMPRE mostram MÚLTIPLAS criptos, NUNCA uma específica sozinha
+        # Usado quando título diz "Altcoins", "Criptomoedas", "Mercado cripto" etc.
+
+        'altcoin': (
+            "MULTIPLE diverse cryptocurrency coins displayed together (showing BTC, ETH, SOL, ADA, "
+            "AVAX, DOT symbols), professional arrangement of various crypto assets, "
+            "NOT single coin focus, variety of tokens representing the altcoin ecosystem, "
+            "clean portfolio diversity visualization"
+        ),
+        'altcoins': (
+            "MULTIPLE diverse cryptocurrency coins displayed together (showing BTC, ETH, SOL, ADA, "
+            "AVAX, DOT, LINK symbols), professional arrangement of various crypto assets, "
+            "NOT single coin focus, variety of tokens representing the altcoin ecosystem, "
+            "diverse crypto market visualization, portfolio of different cryptocurrencies"
+        ),
+        'diverse altcoins': (
+            "professional trading display showing MULTIPLE cryptocurrency symbols simultaneously "
+            "(BTC, ETH, SOL, ADA, AVAX, DOT, LINK, MATIC), diverse altcoin ecosystem representation, "
+            "NOT focused on single specific altcoin, variety and diversity of crypto assets, "
+            "multi-coin portfolio visualization, generic crypto market overview"
+        ),
+        'diverse altcoins ecosystem': (
+            "professional trading screens showing MULTIPLE diverse cryptocurrency symbols together "
+            "(BTC, ETH, SOL, ADA, AVAX, DOT, LINK, MATIC, ATOM), rich variety of crypto assets, "
+            "NOT single altcoin focus like Cardano or Litecoin alone, "
+            "diverse multi-coin ecosystem visualization, professional market overview with variety"
+        ),
+        'tokens': (
+            "MULTIPLE different token representations as professional 3D coins, "
+            "diverse crypto assets without focus on single brand, "
+            "variety of token symbols displayed together, portfolio diversity visualization"
+        ),
+        'criptomoedas': (
+            "professional arrangement of MULTIPLE diverse crypto coins together, "
+            "various cryptocurrency symbols (BTC, ETH, SOL, ADA, AVAX) in balanced composition, "
+            "NOT single coin, market diversity photography showing crypto variety"
+        ),
+        'criptomoeda': (
+            "professional arrangement of MULTIPLE diverse crypto coins together, "
+            "various cryptocurrency symbols in balanced composition, "
+            "market diversity photography showing crypto ecosystem variety"
+        ),
+        'crypto': (
+            "clean cryptocurrency market visualization showing MULTIPLE assets, "
+            "professional financial dashboard with diverse coins displayed, "
+            "NOT single crypto focus, variety of cryptocurrency symbols"
+        ),
+        'cryptos': (
+            "clean cryptocurrency market visualization showing MULTIPLE diverse assets, "
+            "professional financial dashboard with various coins (BTC, ETH, SOL, etc), "
+            "diverse portfolio representation, NOT single coin focus"
+        ),
+        'cryptocurrency market': (
+            "professional trading floor displaying MULTIPLE cryptocurrency symbols simultaneously, "
+            "diverse digital assets on financial screens (BTC, ETH, SOL, ADA, AVAX visible), "
+            "NOT single coin focus, market overview showing variety of cryptocurrencies"
+        ),
+        # Subject genérico para mercado cripto
+        'mercado_cripto': (
+            "professional trading floor with MULTIPLE cryptocurrency displays, "
+            "diverse digital assets on financial screens (BTC, ETH, SOL, ADA, AVAX, DOT), "
+            "NOT single coin focus, market overview visualization showing variety"
+        ),
     }
 
     # === BACKGROUNDS POR SENTIMENTO (mantido para fallback) ===
@@ -1101,13 +1152,26 @@ class EditorialVisualElementsBank:
             return self.PERSON_SUBJECTS[role]
         return self.PERSON_SUBJECTS['ceo']
 
-    def get_theme_subject(self, keywords: list[str]) -> str:
-        """Retorna subject temático baseado em keywords"""
+    def get_theme_subject(self, keywords: list[str], entity_name: Optional[str] = None) -> str:
+        """
+        Retorna subject temático baseado em keywords ou entity_name
+
+        NOVO v3.1: Prioriza entity_name para contextos genéricos como 'altcoins'
+        """
+        # NOVO v3.1: Primeiro verificar se entity_name é um subject genérico
+        if entity_name:
+            entity_lower = entity_name.lower()
+            if entity_lower in self.THEME_SUBJECTS:
+                return self.THEME_SUBJECTS[entity_lower]
+
+        # Depois verificar keywords
         for keyword in keywords:
             keyword_lower = keyword.lower()
             if keyword_lower in self.THEME_SUBJECTS:
                 return self.THEME_SUBJECTS[keyword_lower]
-        return self.THEME_SUBJECTS['market']
+
+        # Fallback para market genérico
+        return self.THEME_SUBJECTS['cryptocurrency market']
 
     def get_background(self, sentiment: NewsSentiment) -> str:
         """Retorna background apropriado para o sentimento (fallback)"""
@@ -1202,8 +1266,9 @@ class EditorialVisualElementsBank:
         Agora inclui contexto narrativo completo para storytelling visual.
         """
         # Determinar subject principal
+        # NOVO v3.1: Passar entity_name para get_theme_subject para suportar contextos genéricos
         if entity_type == EntityType.THEME:
-            main_subject = self.get_theme_subject(keywords)
+            main_subject = self.get_theme_subject(keywords, entity_name)
         else:
             main_subject = self.get_main_subject(entity_type, entity_name, entity_display)
 

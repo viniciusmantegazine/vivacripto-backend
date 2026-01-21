@@ -525,21 +525,45 @@ class NewsContextAnalyzer:
         (r'\b(web3)\b', 'web3'),
     ]
 
-    # === PADRÕES DE CONTEXTO GENÉRICO (NOVO v3.1) ===
+    # === PADRÕES DE CONTEXTO GENÉRICO (NOVO v3.1, expandido v3.2) ===
     # Detecta quando a notícia fala de altcoins/criptomoedas de forma genérica
     # sem mencionar uma moeda específica
+    #
+    # REGRA CRÍTICA: Se o título usa termos genéricos como "Altcoins", "Criptomoedas",
+    # "Mercado cripto", etc., a imagem NUNCA deve mostrar uma cripto específica
+    # (como Cardano, Litecoin, Polkadot sozinha). Deve mostrar MÚLTIPLAS criptos
+    # ou conceito abstrato de mercado.
 
     GENERIC_CONTEXT_PATTERNS = [
+        # Altcoins (termo genérico para "outras criptos além de Bitcoin")
         r'\b(altcoins?)\b',
-        r'\b(tokens?)\s+(de\s+)?(criptomoedas?|cripto)',
+        r'\b(altcoin[s]?:)',  # Padrão "Altcoins:" no início de títulos
+
+        # Criptomoedas genérico
         r'\b(criptomoedas?)\b',
-        r'\b(mercado\s+(cripto|de\s+criptomoedas?))\b',
+        r'\b(cryptocurrenc(?:y|ies))\b',
+        r'\b(cripto[s]?)\b(?!\s*(moeda|currency|coin))',  # "cripto" sozinho, não "criptomoeda"
+
+        # Mercado/setor genérico
+        r'\b(mercado\s+(cripto|de\s+criptomoedas?|de\s+cripto))\b',
         r'\b(setor\s+(cripto|de\s+criptomoedas?))\b',
+        r'\b(crypto\s+market)\b',
+        r'\b(cryptocurrency\s+market)\b',
+        r'\b(mercado\s+de\s+ativos\s+digitais)\b',
+
+        # Ativos/moedas digitais genérico
         r'\b(ativos\s+digitais)\b',
         r'\b(moedas\s+digitais)\b',
-        r'\b(crypto\s+market)\b',
         r'\b(digital\s+assets)\b',
-        r'\b(cryptocurrency\s+market)\b',
+        r'\b(tokens?)\s+(de\s+)?(criptomoedas?|cripto)',
+
+        # Padrões adicionais de contexto genérico
+        r'\b(ecossistema\s+cripto)\b',
+        r'\b(universo\s+cripto)\b',
+        r'\b(mundo\s+(das\s+)?criptomoedas?)\b',
+        r'\b(crypto\s+ecosystem)\b',
+        r'\b(criptoeconomia)\b',
+        r'\b(crypto\s+economy)\b',
     ]
 
     # === PADRÕES DE TIPO DE NOTÍCIA ===
@@ -738,25 +762,55 @@ class NewsContextAnalyzer:
         Prioridade: título > conteúdo
         Ordem de busca: Crypto > Exchange > Bank > Government > Company > Person
 
+        REGRA CRÍTICA v3.2:
+        - Se o título menciona uma cripto ESPECÍFICA (Bitcoin, Ethereum, etc.) → usar ESSA cripto
+        - Se o título usa termos GENÉRICOS (Altcoins, Criptomoedas, Mercado) → is_generic=True
+        - NUNCA usar cripto específica quando o título é genérico
+
         Returns:
             Tuple de (EntityType, entity_name, display_name, is_generic_context)
         """
 
         def search_entities(text: str, entities: dict) -> Optional[tuple[str, dict]]:
+            """
+            Busca entidades usando word boundaries para evitar matches parciais.
+            Ex: "virada" não deve dar match em "ada" (Cardano)
+            """
             for key, config in entities.items():
-                if key in text:
+                # Usar regex com word boundary para evitar matches parciais
+                pattern = rf'\b{re.escape(key)}\b'
+                if re.search(pattern, text, re.IGNORECASE):
                     return key, config
                 # Verificar aliases se existirem
                 if 'aliases' in config:
                     for alias in config['aliases']:
-                        if alias in text:
+                        alias_pattern = rf'\b{re.escape(alias)}\b'
+                        if re.search(alias_pattern, text, re.IGNORECASE):
                             return key, config
             return None
 
-        # Buscar no título primeiro (maior relevância)
+        # NOVO v3.2: PRIMEIRO verificar se é contexto genérico NO TÍTULO
+        # Isso tem precedência sobre busca de entidades no conteúdo
+        is_generic_title = False
+        for regex in self._generic_context_regex:
+            if regex.search(title):
+                is_generic_title = True
+                break
+
+        # Buscar cripto específica APENAS no título
+        # Se encontrar cripto específica NO TÍTULO, usar ela (mesmo se título também tiver termo genérico)
         for entities_dict in [
             self.CRYPTO_ENTITIES,
             self.STABLECOIN_ENTITIES,
+        ]:
+            result = search_entities(title, entities_dict)
+            if result:
+                key, config = result
+                # Cripto específica encontrada NO TÍTULO = não é contexto genérico
+                return config['type'], key, config['display'], False
+
+        # Buscar outras entidades no título (exchange, bank, gov, company, person)
+        for entities_dict in [
             self.EXCHANGE_ENTITIES,
             self.BANK_ENTITIES,
             self.GOVERNMENT_ENTITIES,
@@ -766,10 +820,17 @@ class NewsContextAnalyzer:
             result = search_entities(title, entities_dict)
             if result:
                 key, config = result
-                # Entidade específica encontrada = não é contexto genérico
-                return config['type'], key, config['display'], False
+                # Entidade não-cripto encontrada no título
+                # Se título é genérico (ex: "Altcoins: Binance..."), ainda é genérico
+                return config['type'], key, config['display'], is_generic_title
 
-        # Se não encontrou no título, buscar no conteúdo
+        # Se título é genérico e não encontrou entidade específica no título
+        if is_generic_title:
+            # CRÍTICO: NÃO buscar cripto no conteúdo quando título é genérico
+            # Isso evita que "Altcoins: mercado 24/7" vire imagem de Cardano
+            return EntityType.THEME, 'altcoins', 'diverse altcoins ecosystem', True
+
+        # Se não encontrou no título e não é genérico, buscar no conteúdo
         for entities_dict in [
             self.CRYPTO_ENTITIES,
             self.EXCHANGE_ENTITIES,
@@ -779,12 +840,6 @@ class NewsContextAnalyzer:
             if result:
                 key, config = result
                 return config['type'], key, config['display'], False
-
-        # NOVO v3.1: Verificar se é contexto genérico de altcoins/criptomoedas
-        for regex in self._generic_context_regex:
-            if regex.search(title):
-                # Encontrou padrão genérico no título - usar subject de altcoins
-                return EntityType.THEME, 'altcoins', 'diverse altcoins', True
 
         # Fallback para tema genérico
         return EntityType.THEME, None, 'cryptocurrency market', True

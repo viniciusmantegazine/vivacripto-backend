@@ -1,5 +1,5 @@
 """
-Smart Prompt Generator v3.0 - Contextual Editorial Photography Style
+Smart Prompt Generator v3.1 - Contextual Editorial Photography Style
 Gerador de prompts para imagens de notícias de criptomoedas com STORYTELLING VISUAL
 
 IMPORTANTE: Este módulo gera prompts que CONTAM A HISTÓRIA da notícia em um único olhar.
@@ -7,7 +7,21 @@ Cada imagem deve comunicar imediatamente o contexto, ação e sentimento da not�
 
 Padrão de referência: CoinDesk, Cointelegraph, Bitcoin Magazine
 
-Características dos prompts gerados v3.0:
+## REGRA CRÍTICA DE CORRESPONDÊNCIA TÍTULO-IMAGEM (v3.1)
+
+A imagem gerada DEVE corresponder EXATAMENTE ao que está no título da notícia:
+
+1. Se título menciona cripto ESPECÍFICA (Bitcoin, Ethereum, Cardano) → usar APENAS essa cripto
+2. Se título usa termo GENÉRICO (Altcoins, Criptomoedas, Mercado) → NUNCA usar cripto específica
+   - Deve mostrar MÚLTIPLAS criptos ou conceito abstrato de mercado
+3. Se título foca em conceito/empresa/tecnologia sem cripto → NÃO usar logos de criptos
+
+### Exemplos:
+- "Altcoins: 2026 marca virada para mercados 24/7" → MÚLTIPLAS criptos, NÃO Cardano sozinha
+- "Bitcoin supera US$ 100.000" → APENAS Bitcoin
+- "Criptomoedas ganham espaço na regulação" → MÚLTIPLAS criptos, conceito genérico
+
+Características dos prompts gerados v3.1:
 - Elementos visuais CONCRETOS com AÇÃO visual (não apenas logos estáticos)
 - Composições DUAL-ENTITY para notícias relacionais
 - Backgrounds CONTEXTUAIS por tipo de notícia
@@ -16,6 +30,12 @@ Características dos prompts gerados v3.0:
 - Cenas JORNALÍSTICAS que contam histórias
 - HIERARQUIA VISUAL por importância da notícia
 - Prompts OTIMIZADOS e condensados
+- INSTRUÇÃO CRÍTICA de correspondência título-imagem (NOVO v3.1)
+
+Changelog v3.1:
+- Adicionada instrução crítica de correspondência título-imagem
+- Melhorada sanitização de contextos genéricos
+- Expandidos padrões de detecção genérica
 
 Changelog v3.0:
 - Integração com novos elementos de ação visual
@@ -64,7 +84,7 @@ class SmartPromptGenerator:
     - Composições jornalísticas profissionais
     """
 
-    # === CONFIGURAÇÃO DO ESTILO EDITORIAL v3.0 ===
+    # === CONFIGURAÇÃO DO ESTILO EDITORIAL v3.1 ===
 
     # Prefixo de proibição (no início para maior peso)
     AVOID_PREFIX = (
@@ -80,6 +100,23 @@ class SmartPromptGenerator:
         "professional editorial news photography, photo-realistic, "
         "high contrast for text readability, sharp focus, "
         "no text, no watermarks, 16:9 aspect ratio"
+    )
+
+    # NOVO v3.1: Instrução crítica para contextos genéricos
+    # Adicionada ao final do prompt quando is_generic_context=True
+    GENERIC_CONTEXT_INSTRUCTION = (
+        "CRITICAL: This is about ALTCOINS/CRYPTOCURRENCIES in general, NOT a specific coin. "
+        "MUST show MULTIPLE diverse cryptocurrency symbols (BTC, ETH, SOL, ADA, AVAX, DOT) together. "
+        "DO NOT show only one specific altcoin like Cardano, Litecoin, or Polkadot alone. "
+        "Show variety and diversity of the crypto ecosystem, NOT single coin focus."
+    )
+
+    # NOVO v3.1: Instrução crítica para cripto específica
+    # Adicionada ao final do prompt quando é uma cripto específica mencionada
+    SPECIFIC_CRYPTO_INSTRUCTION_TEMPLATE = (
+        "CRITICAL: This news is specifically about {crypto_name}. "
+        "Show ONLY {crypto_name}, do NOT include other cryptocurrencies. "
+        "The image must clearly feature {crypto_name} visual identity."
     )
 
     # Palavras bloqueadas (segurança) - agora usa safe replacements
@@ -121,7 +158,7 @@ class SmartPromptGenerator:
         self._recent_prompts: list[str] = []
         self._max_cache_size = 50
 
-        logger.info("SmartPromptGenerator v3.0 (Contextual Storytelling) inicializado")
+        logger.info("SmartPromptGenerator v3.1 (Contextual Storytelling + Title Matching) inicializado")
 
     def generate_prompt(
         self,
@@ -144,12 +181,13 @@ class SmartPromptGenerator:
             # 1. Analisar contexto da notícia (v3.0 com percentage e importance)
             context = self.context_analyzer.analyze(title, content, category)
             logger.info(
-                f"[PromptGen v3.0] Contexto: "
+                f"[PromptGen v3.1] Contexto: "
                 f"entity={context.entity_type.value}:{context.primary_entity}, "
                 f"sentiment={context.sentiment.value}, "
                 f"action={context.action.action}, "
                 f"percentage={context.extracted_percentage}, "
-                f"importance={context.news_importance}"
+                f"importance={context.news_importance}, "
+                f"is_generic={context.is_generic_context}"
             )
 
             # 2. Gerar composição visual editorial com novos parâmetros v3.0
@@ -187,11 +225,11 @@ class SmartPromptGenerator:
             # 8. Garantir variação
             prompt = self._ensure_variation(prompt)
 
-            logger.debug(f"[PromptGen v3.0] Prompt ({len(prompt)} chars): {prompt[:300]}...")
+            logger.debug(f"[PromptGen v3.1] Prompt ({len(prompt)} chars): {prompt[:300]}...")
             return prompt
 
         except Exception as e:
-            logger.error(f"[PromptGen v3.0] Erro ao gerar prompt: {e}")
+            logger.error(f"[PromptGen v3.1] Erro ao gerar prompt: {e}")
             return self._generate_fallback_prompt(category)
 
     def _build_editorial_prompt_v3(
@@ -200,19 +238,33 @@ class SmartPromptGenerator:
         composition: EditorialComposition
     ) -> str:
         """
-        Constrói o prompt v3.0 com storytelling visual
+        Constrói o prompt v3.1 com storytelling visual e instrução crítica de correspondência
 
         Estrutura otimizada:
-        [AVOID_PREFIX] [SCENE/DUAL_ENTITY] [MAIN_SUBJECT] [ACTION_ELEMENT]
+        [AVOID_PREFIX] [CRITICAL_INSTRUCTION] [SCENE/DUAL_ENTITY] [MAIN_SUBJECT] [ACTION_ELEMENT]
         [PERCENTAGE_VISUAL] [EVENT_ELEMENT] [BACKGROUND] [DRAMA_LEVEL]
         [LIGHTING] [COLOR_PALETTE] [HIERARCHY] [TEXT_AREA] [QUALITY]
+
+        NOVO v3.1: Adiciona instrução crítica baseada em is_generic_context
         """
         sections = []
 
         # 1. AVOID_PREFIX no início (maior peso)
         sections.append(self.AVOID_PREFIX)
 
-        # 2. Cena jornalística OU composição dual-entity (se disponível)
+        # 2. NOVO v3.1: INSTRUÇÃO CRÍTICA DE CORRESPONDÊNCIA TÍTULO-IMAGEM
+        # Adicionada logo após AVOID_PREFIX para máximo peso
+        if context.is_generic_context:
+            # Contexto genérico: NUNCA mostrar cripto específica sozinha
+            sections.append(self.GENERIC_CONTEXT_INSTRUCTION)
+        elif context.entity_type == EntityType.CRYPTO and context.primary_entity:
+            # Cripto específica mencionada: mostrar APENAS essa cripto
+            crypto_instruction = self.SPECIFIC_CRYPTO_INSTRUCTION_TEMPLATE.format(
+                crypto_name=context.primary_entity_display
+            )
+            sections.append(crypto_instruction)
+
+        # 3. Cena jornalística OU composição dual-entity (se disponível)
         if composition.dual_entity_scene:
             sections.append(composition.dual_entity_scene)
         elif composition.journalistic_scene:
@@ -222,39 +274,39 @@ class SmartPromptGenerator:
             sections.append(composition.photography_style)
             sections.append(f"featuring {composition.main_subject}")
 
-        # 3. Elemento de ação visual (NOVO - conta a história)
+        # 4. Elemento de ação visual (conta a história)
         if composition.action_element:
             sections.append(composition.action_element)
 
-        # 4. Visualização de percentual (NOVO - dados concretos)
+        # 5. Visualização de percentual (dados concretos)
         if composition.percentage_visual:
             sections.append(composition.percentage_visual)
 
-        # 5. Elemento de evento específico (NOVO - halving, ETF, etc)
+        # 6. Elemento de evento específico (halving, ETF, etc)
         if composition.event_element:
             sections.append(composition.event_element)
 
-        # 6. Background contextual (agora por tipo de notícia)
+        # 7. Background contextual (agora por tipo de notícia)
         sections.append(f"setting: {composition.background}")
 
-        # 7. Nível de dramaticidade (NOVO)
+        # 8. Nível de dramaticidade
         if composition.drama_level:
             sections.append(composition.drama_level)
 
-        # 8. Iluminação
+        # 9. Iluminação
         sections.append(composition.lighting)
 
-        # 9. Paleta de cores
+        # 10. Paleta de cores
         sections.append(f"colors: {composition.color_palette}")
 
-        # 10. Hierarquia visual (NOVO)
+        # 11. Hierarquia visual
         if composition.visual_hierarchy:
             sections.append(composition.visual_hierarchy)
 
-        # 11. Área para texto
+        # 12. Área para texto
         sections.append(composition.text_area)
 
-        # 12. Referência de estilo e qualidade (condensados)
+        # 13. Referência de estilo e qualidade (condensados)
         sections.append(self.STYLE_REFERENCE)
         sections.append(self.QUALITY_SUFFIX)
 
@@ -491,7 +543,8 @@ class SmartPromptGenerator:
                 'keywords': context.keywords,
                 'confidence_score': context.confidence_score,
                 'prompt_length': len(prompt),
-                'prompt_version': 'v3.0-contextual-storytelling',
+                'prompt_version': 'v3.1-contextual-storytelling-title-matching',
+                'is_generic_context': context.is_generic_context,
             }
         }
 
