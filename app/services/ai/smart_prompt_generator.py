@@ -1,11 +1,25 @@
 """
-Smart Prompt Generator v3.1 - Contextual Editorial Photography Style
+Smart Prompt Generator v3.2 - Contextual Editorial Photography Style + Quality Protection
 Gerador de prompts para imagens de notícias de criptomoedas com STORYTELLING VISUAL
 
 IMPORTANTE: Este módulo gera prompts que CONTAM A HISTÓRIA da notícia em um único olhar.
 Cada imagem deve comunicar imediatamente o contexto, ação e sentimento da notícia.
 
-Padrão de referência: CoinDesk, Cointelegraph, Bitcoin Magazine
+Padrão de referência: Estilo editorial profissional ORIGINAL (não stock photos)
+
+## PROTEÇÃO ANTI-WATERMARK E QUALIDADE (v3.2)
+
+TODOS os prompts gerados agora incluem proteções contra:
+- ❌ Watermarks de bancos de imagens (Getty, Shutterstock, iStock, Unsplash, Pexels)
+- ❌ Logos de outros sites de notícias (CoinDesk, CoinTelegraph, CoinRepo, Bitcoin Magazine)
+- ❌ Símbolos de copyright ou créditos visíveis
+- ❌ Elementos cortados ou incompletos nas bordas
+- ❌ Texto parcialmente visível (ex: "LOBAL" ao invés de "GLOBAL")
+
+PROTEÇÕES IMPLEMENTADAS:
+- PROTECTION_PREFIX: Vai no INÍCIO do prompt para máximo peso
+- QUALITY_PROTECTION_SUFFIX: Vai no FINAL do prompt como reforço
+- ANTI_WATERMARK_REINFORCEMENTS: Frases de reforço usadas estrategicamente
 
 ## REGRA CRÍTICA DE CORRESPONDÊNCIA TÍTULO-IMAGEM (v3.1)
 
@@ -21,7 +35,7 @@ A imagem gerada DEVE corresponder EXATAMENTE ao que está no título da notícia
 - "Bitcoin supera US$ 100.000" → APENAS Bitcoin
 - "Criptomoedas ganham espaço na regulação" → MÚLTIPLAS criptos, conceito genérico
 
-Características dos prompts gerados v3.1:
+Características dos prompts gerados v3.2:
 - Elementos visuais CONCRETOS com AÇÃO visual (não apenas logos estáticos)
 - Composições DUAL-ENTITY para notícias relacionais
 - Backgrounds CONTEXTUAIS por tipo de notícia
@@ -30,7 +44,20 @@ Características dos prompts gerados v3.1:
 - Cenas JORNALÍSTICAS que contam histórias
 - HIERARQUIA VISUAL por importância da notícia
 - Prompts OTIMIZADOS e condensados
-- INSTRUÇÃO CRÍTICA de correspondência título-imagem (NOVO v3.1)
+- INSTRUÇÃO CRÍTICA de correspondência título-imagem
+- PROTEÇÃO ANTI-WATERMARK em todos os prompts (NOVO v3.2)
+- PROTEÇÃO contra elementos cortados/incompletos (NOVO v3.2)
+
+Changelog v3.2:
+- Adicionado PROTECTION_PREFIX para proteção anti-watermark no início do prompt
+- Adicionado QUALITY_PROTECTION_SUFFIX para proteção no final do prompt
+- Adicionados ANTI_WATERMARK_REINFORCEMENTS para reforço estratégico
+- Atualizado AVOID_PREFIX para incluir proibições de watermarks
+- Atualizado QUALITY_SUFFIX para incluir proteção contra elementos cortados
+- Atualizado STYLE_REFERENCE para enfatizar "original" (não stock photo)
+- Adicionada função validar_imagem_gerada() para checklist pós-geração
+- Adicionada função gerar_prompt_protegido() como wrapper de proteção
+- Atualizados todos os prompts de fallback com proteções completas
 
 Changelog v3.1:
 - Adicionada instrução crítica de correspondência título-imagem
@@ -72,7 +99,7 @@ from app.services.ai.visual_elements_bank import (
 
 class SmartPromptGenerator:
     """
-    Gerador de prompts v3.0 - Contextual Editorial Photography Style
+    Gerador de prompts v3.2 - Contextual Editorial Photography Style + Quality Protection
 
     Gera prompts otimizados para Gemini/DALL-E com STORYTELLING VISUAL.
     Cada imagem conta a história da notícia em um único olhar.
@@ -82,24 +109,63 @@ class SmartPromptGenerator:
     - Contexto narrativo claro
     - Dramaticidade proporcional à magnitude
     - Composições jornalísticas profissionais
+    - PROTEÇÃO contra watermarks, logos indesejados e elementos cortados (v3.2)
     """
 
-    # === CONFIGURAÇÃO DO ESTILO EDITORIAL v3.1 ===
+    # === CONFIGURAÇÃO DO ESTILO EDITORIAL v3.2 ===
 
-    # Prefixo de proibição (no início para maior peso)
+    # === PROTEÇÃO ANTI-WATERMARK E QUALIDADE (NOVO v3.2) ===
+
+    # Prefixo de proteção anti-watermark (vai no INÍCIO do prompt para máximo peso)
+    PROTECTION_PREFIX = (
+        "Generate ORIGINAL editorial photography, NOT stock photo reproduction. "
+        "Create clean professional journalistic image WITHOUT watermarks or third-party branding. "
+        "NO Getty Images, NO Shutterstock, NO iStock, NO Unsplash marks. "
+        "NO CoinDesk logo, NO CoinTelegraph branding, NO CoinRepo watermark. "
+    )
+
+    # Sufixo de proteção de qualidade (vai no FINAL do prompt)
+    QUALITY_PROTECTION_SUFFIX = (
+        "CRITICAL QUALITY REQUIREMENTS: "
+        "absolutely NO watermarks in corners or edges, "
+        "NO stock photo service logos (Getty, Shutterstock, iStock, Unsplash, Pexels), "
+        "NO news publication branding visible (CoinDesk, CoinTelegraph, CoinRepo, Bitcoin Magazine), "
+        "NO copyright symbols or credits text, NO third-party logos, "
+        "NO cropped or cut-off elements, NO incomplete text (if text appears it must be fully readable), "
+        "complete composition with proper margins, all elements fully visible within frame, "
+        "original editorial aesthetic NOT stock photo reproduction, "
+        "publication-ready without licensing concerns"
+    )
+
+    # Reforços anti-watermark para usar estrategicamente
+    ANTI_WATERMARK_REINFORCEMENTS = [
+        "without any watermarks",
+        "no stock photo marks visible",
+        "clean professional image without external branding",
+        "original editorial photography",
+        "publication-ready quality",
+        "no third-party branding marks",
+        "journalism standard quality",
+        "no copyright marks visible",
+        "complete composition without crops",
+    ]
+
+    # Prefixo de proibição (mantido + expandido)
     AVOID_PREFIX = (
         "NO abstract networks, NO digital particles, NO sci-fi effects, "
-        "NO blockchain visualizations, NO neon cyberpunk, NO matrix code. "
+        "NO blockchain visualizations, NO neon cyberpunk, NO matrix code, "
+        "NO watermarks, NO stock photo logos, NO third-party branding. "
     )
 
     # Referência de estilo condensada
-    STYLE_REFERENCE = "CoinDesk/Cointelegraph editorial standard"
+    STYLE_REFERENCE = "original editorial standard (NOT stock photo reproduction)"
 
-    # Qualidade e formato (condensado)
+    # Qualidade e formato (expandido v3.2)
     QUALITY_SUFFIX = (
         "professional editorial news photography, photo-realistic, "
         "high contrast for text readability, sharp focus, "
-        "no text, no watermarks, 16:9 aspect ratio"
+        "no text overlays, no watermarks, no logos in corners, "
+        "complete framing with nothing cropped, 16:9 aspect ratio"
     )
 
     # NOVO v3.1: Instrução crítica para contextos genéricos
@@ -158,7 +224,7 @@ class SmartPromptGenerator:
         self._recent_prompts: list[str] = []
         self._max_cache_size = 50
 
-        logger.info("SmartPromptGenerator v3.1 (Contextual Storytelling + Title Matching) inicializado")
+        logger.info("SmartPromptGenerator v3.2 (Contextual Storytelling + Title Matching + Quality Protection) inicializado")
 
     def generate_prompt(
         self,
@@ -238,18 +304,23 @@ class SmartPromptGenerator:
         composition: EditorialComposition
     ) -> str:
         """
-        Constrói o prompt v3.1 com storytelling visual e instrução crítica de correspondência
+        Constrói o prompt v3.2 com storytelling visual, instrução crítica de correspondência
+        e PROTEÇÃO ANTI-WATERMARK/ELEMENTOS CORTADOS
 
-        Estrutura otimizada:
-        [AVOID_PREFIX] [CRITICAL_INSTRUCTION] [SCENE/DUAL_ENTITY] [MAIN_SUBJECT] [ACTION_ELEMENT]
-        [PERCENTAGE_VISUAL] [EVENT_ELEMENT] [BACKGROUND] [DRAMA_LEVEL]
-        [LIGHTING] [COLOR_PALETTE] [HIERARCHY] [TEXT_AREA] [QUALITY]
+        Estrutura otimizada v3.2:
+        [PROTECTION_PREFIX] [AVOID_PREFIX] [CRITICAL_INSTRUCTION] [SCENE/DUAL_ENTITY]
+        [MAIN_SUBJECT] [ACTION_ELEMENT] [PERCENTAGE_VISUAL] [EVENT_ELEMENT]
+        [BACKGROUND] [DRAMA_LEVEL] [LIGHTING] [COLOR_PALETTE] [HIERARCHY]
+        [TEXT_AREA] [QUALITY] [QUALITY_PROTECTION_SUFFIX]
 
-        NOVO v3.1: Adiciona instrução crítica baseada em is_generic_context
+        NOVO v3.2: Adiciona proteções anti-watermark no início e fim do prompt
         """
         sections = []
 
-        # 1. AVOID_PREFIX no início (maior peso)
+        # 0. PROTECTION_PREFIX no início (MÁXIMO peso - proteção anti-watermark)
+        sections.append(self.PROTECTION_PREFIX)
+
+        # 1. AVOID_PREFIX (proibições de estilo)
         sections.append(self.AVOID_PREFIX)
 
         # 2. NOVO v3.1: INSTRUÇÃO CRÍTICA DE CORRESPONDÊNCIA TÍTULO-IMAGEM
@@ -309,6 +380,9 @@ class SmartPromptGenerator:
         # 13. Referência de estilo e qualidade (condensados)
         sections.append(self.STYLE_REFERENCE)
         sections.append(self.QUALITY_SUFFIX)
+
+        # 14. NOVO v3.2: PROTEÇÃO DE QUALIDADE no final (reforço crítico)
+        sections.append(self.QUALITY_PROTECTION_SUFFIX)
 
         # Juntar seções removendo vazios
         prompt = ", ".join(s for s in sections if s)
@@ -458,39 +532,71 @@ class SmartPromptGenerator:
         return result
 
     def _generate_fallback_prompt(self, category: Optional[str] = None) -> str:
-        """Gera prompt fallback editorial seguro"""
+        """
+        Gera prompt fallback editorial seguro COM PROTEÇÕES ANTI-WATERMARK v3.2
+
+        Todos os fallbacks agora incluem:
+        - Prefixo de proteção anti-watermark
+        - Instruções contra logos de terceiros
+        - Requisitos de composição completa
+        """
+        # Proteção comum para todos os fallbacks
+        protection_base = (
+            "Generate ORIGINAL editorial photography WITHOUT watermarks or third-party branding. "
+            "NO Getty Images, NO Shutterstock, NO iStock marks. "
+            "NO CoinDesk logo, NO CoinTelegraph branding, NO CoinRepo watermark. "
+            "NO abstract networks, NO digital particles. "
+        )
+
+        # Proteção final comum
+        protection_suffix = (
+            "CRITICAL: NO watermarks in corners, NO stock photo logos, "
+            "NO third-party branding, NO cropped elements, "
+            "complete composition with all elements fully visible, "
+            "original editorial quality NOT stock photo reproduction, "
+            "publication-ready without licensing concerns"
+        )
+
         category_fallbacks = {
             'bitcoin': (
-                "NO abstract networks. Professional product photography of golden "
-                "Bitcoin physical coin, centered on clean white surface, "
-                "orange-gold color palette, professional studio lighting, "
-                "CoinDesk editorial standard, high contrast for text readability, "
+                f"{protection_base}"
+                "Professional product photography of golden Bitcoin physical coin, "
+                "centered on clean white surface, orange-gold color palette, "
+                "professional studio lighting, original editorial standard, "
+                "high contrast for text readability, "
                 "clear negative space on left third for headline, photo-realistic, "
-                "no text, no watermarks, 16:9 aspect ratio"
+                "complete framing with nothing cropped, 16:9 aspect ratio, "
+                f"{protection_suffix}"
             ),
             'ethereum': (
-                "NO abstract networks. Professional product photography of purple-blue "
-                "Ethereum diamond logo as 3D metallic object on gradient background, "
-                "purple and cyan color palette, professional lighting, "
-                "Cointelegraph editorial standard, high contrast for text readability, "
+                f"{protection_base}"
+                "Professional product photography of purple-blue Ethereum diamond logo "
+                "as 3D metallic object on gradient background, purple and cyan color palette, "
+                "professional lighting, original editorial standard, "
+                "high contrast for text readability, "
                 "clear negative space for headline overlay, photo-realistic, "
-                "no text, no watermarks, 16:9 aspect ratio"
+                "complete framing with nothing cropped, 16:9 aspect ratio, "
+                f"{protection_suffix}"
             ),
             'defi': (
-                "NO abstract networks. Professional fintech interface photography, "
+                f"{protection_base}"
+                "Professional fintech interface photography, "
                 "clean DeFi protocol visualization on modern backdrop, "
                 "teal and professional blue color palette, "
-                "CoinDesk editorial standard, high contrast for text readability, "
+                "original editorial standard, high contrast for text readability, "
                 "clear space for headline text, photo-realistic, "
-                "no text, no watermarks, 16:9 aspect ratio"
+                "complete framing with nothing cropped, 16:9 aspect ratio, "
+                f"{protection_suffix}"
             ),
             'regulacao': (
-                "NO abstract networks. Government building or institutional architecture "
-                "photography, official regulatory setting with professional lighting, "
+                f"{protection_base}"
+                "Government building or institutional architecture photography, "
+                "official regulatory setting with professional lighting, "
                 "navy and gold institutional color palette, "
-                "CoinDesk editorial standard, high contrast for text readability, "
+                "original editorial standard, high contrast for text readability, "
                 "clear negative space for headline, photo-realistic, "
-                "no text, no watermarks, 16:9 aspect ratio"
+                "complete framing with nothing cropped, 16:9 aspect ratio, "
+                f"{protection_suffix}"
             ),
         }
 
@@ -498,14 +604,15 @@ class SmartPromptGenerator:
 
         if cat_key not in category_fallbacks:
             return (
-                "NO abstract networks, NO digital particles. "
+                f"{protection_base}"
                 "Professional editorial photography for cryptocurrency news, "
                 "clean financial market visualization with professional aesthetic, "
                 "modern blue and white color palette, "
-                "CoinDesk editorial standard, professional journalism photography, "
+                "original editorial standard, professional journalism photography, "
                 "high contrast for text readability, "
                 "clear negative space on left third for headline overlay, "
-                "photo-realistic, no text, no watermarks, 16:9 aspect ratio"
+                "photo-realistic, complete framing with nothing cropped, 16:9 aspect ratio, "
+                f"{protection_suffix}"
             )
 
         return category_fallbacks[cat_key]
@@ -543,10 +650,102 @@ class SmartPromptGenerator:
                 'keywords': context.keywords,
                 'confidence_score': context.confidence_score,
                 'prompt_length': len(prompt),
-                'prompt_version': 'v3.1-contextual-storytelling-title-matching',
+                'prompt_version': 'v3.2-contextual-storytelling-quality-protection',
                 'is_generic_context': context.is_generic_context,
             }
         }
+
+
+    def validar_imagem_gerada(self, titulo_noticia: str) -> dict:
+        """
+        Retorna checklist de validação para revisão de imagem gerada.
+
+        Esta função fornece um checklist manual para verificar se a imagem
+        gerada atende aos padrões de qualidade e não contém watermarks
+        ou elementos problemáticos.
+
+        Args:
+            titulo_noticia: Título da notícia para referência
+
+        Returns:
+            Dict com warnings e checklist manual de verificação
+        """
+        # Lista de termos que indicam watermark/logo problemático
+        termos_proibidos = [
+            "getty", "shutterstock", "istock", "unsplash", "pexels",
+            "coindesk", "cointelegraph", "coinrepo", "bitcoin magazine",
+            "watermark", "copyright", "©", "®", "™"
+        ]
+
+        checklist = {
+            "verificar_cantos": {
+                "descricao": "Verificar se há logos/watermarks nos 4 cantos da imagem",
+                "locais": ["canto superior esquerdo", "canto superior direito",
+                          "canto inferior esquerdo", "canto inferior direito"],
+                "prioridade": "CRÍTICA"
+            },
+            "verificar_texto_completo": {
+                "descricao": "Se há texto visível, confirmar que está completo",
+                "exemplos_problema": ["LOBAL ao invés de GLOBAL", "ITCOIN ao invés de BITCOIN"],
+                "prioridade": "ALTA"
+            },
+            "verificar_branding": {
+                "descricao": "Confirmar ausência de logos de outros sites/serviços",
+                "sites_proibidos": ["CoinDesk", "CoinTelegraph", "CoinRepo", "Getty", "Shutterstock"],
+                "prioridade": "CRÍTICA"
+            },
+            "verificar_crop": {
+                "descricao": "Confirmar que nada importante está cortado nas bordas",
+                "verificar": ["moedas/logos não cortados", "texto completo", "pessoas com cabeça visível"],
+                "prioridade": "ALTA"
+            },
+            "verificar_qualidade": {
+                "descricao": "Confirmar qualidade profissional editorial",
+                "criterios": ["foco nítido", "iluminação adequada", "composição equilibrada"],
+                "prioridade": "MÉDIA"
+            },
+            "verificar_correspondencia_titulo": {
+                "descricao": f"Verificar se imagem corresponde ao título: '{titulo_noticia}'",
+                "verificar": ["cripto correta exibida", "sentimento apropriado", "contexto relevante"],
+                "prioridade": "ALTA"
+            }
+        }
+
+        return {
+            "titulo_referencia": titulo_noticia,
+            "termos_proibidos": termos_proibidos,
+            "checklist_manual": checklist,
+            "instrucao": "Revise a imagem verificando cada item do checklist antes de publicar"
+        }
+
+    def gerar_prompt_protegido(self, prompt_base: str) -> str:
+        """
+        Wrapper que adiciona proteções a um prompt base existente.
+
+        Útil para adicionar proteções anti-watermark a prompts já existentes
+        ou gerados por outros métodos.
+
+        Args:
+            prompt_base: Prompt original sem proteções
+
+        Returns:
+            Prompt com proteções anti-watermark adicionadas
+        """
+        import random
+
+        # Selecionar 2-3 reforços aleatórios
+        reforcos = random.sample(self.ANTI_WATERMARK_REINFORCEMENTS, min(3, len(self.ANTI_WATERMARK_REINFORCEMENTS)))
+        reforcos_str = ", ".join(reforcos)
+
+        # Montar prompt protegido
+        prompt_protegido = (
+            f"{self.PROTECTION_PREFIX}"
+            f"{prompt_base}, "
+            f"{reforcos_str}, "
+            f"{self.QUALITY_PROTECTION_SUFFIX}"
+        )
+
+        return prompt_protegido.strip()
 
 
 # Singleton para uso global

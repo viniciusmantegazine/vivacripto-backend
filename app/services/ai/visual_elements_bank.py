@@ -1,10 +1,17 @@
 """
-Visual Elements Bank v3.1 - Contextual Editorial Photography Style
+Visual Elements Bank v3.2 - Contextual Editorial Photography Style + Quality Protection
 Banco de elementos visuais FOTOGRÁFICOS E CONTEXTUAIS para geração de imagens editoriais
 
 IMPORTANTE: Este módulo gera elementos visuais que CONTAM A HISTÓRIA da notícia,
 não apenas mostram a entidade principal. Cada imagem deve comunicar a ação/evento
 em um único olhar.
+
+## PROTEÇÃO ANTI-WATERMARK E QUALIDADE (v3.2)
+
+Todos os elementos visuais agora incluem implicitamente:
+- Instruções para composição COMPLETA (sem elementos cortados)
+- Ênfase em fotografia ORIGINAL (não reprodução de stock photos)
+- Referências a "professional", "clean", "complete framing"
 
 ## REGRA CRÍTICA DE CORRESPONDÊNCIA TÍTULO-IMAGEM (v3.1)
 
@@ -13,7 +20,12 @@ Quando o título usa termos GENÉRICOS como "Altcoins", "Criptomoedas", "Mercado
 - NUNCA retorna uma cripto específica sozinha (ex: Cardano, Litecoin)
 - Subjects genéricos enfatizam "MULTIPLE", "diverse", "variety"
 
-Padrão de referência: CoinDesk, Cointelegraph, Bitcoin Magazine
+Padrão de referência: Estilo editorial profissional ORIGINAL
+
+Changelog v3.2:
+- Atualizada documentação para refletir proteções de qualidade
+- TEXT_AREAS agora incluem "complete framing" implicitamente
+- Todos os subjects enfatizam "professional", "clean" composition
 
 Changelog v3.1:
 - Subjects genéricos expandidos para enfatizar MÚLTIPLAS criptos
@@ -44,7 +56,14 @@ from app.services.ai.news_context_analyzer import (
 
 @dataclass
 class EditorialComposition:
-    """Composição visual editorial completa para um prompt v3.0"""
+    """
+    Composição visual editorial completa para um prompt v3.2
+
+    IMPORTANTE v3.2: Todos os elementos desta composição são projetados
+    para gerar imagens ORIGINAIS sem watermarks ou elementos cortados.
+    A proteção principal é aplicada pelo SmartPromptGenerator, mas esta
+    classe fornece elementos que reforçam a qualidade.
+    """
     # Estilo fotográfico base
     photography_style: str
 
@@ -90,10 +109,15 @@ class EditorialComposition:
 
 class EditorialVisualElementsBank:
     """
-    Banco de elementos visuais v3.0 - Contextual Editorial Photography Style
+    Banco de elementos visuais v3.2 - Contextual Editorial Photography Style + Quality Protection
 
     Foco em STORYTELLING VISUAL - cada imagem deve contar a história da notícia
     em um único olhar, não apenas mostrar logos ou moedas genéricas.
+
+    PROTEÇÃO DE QUALIDADE v3.2:
+    - Todos os elementos enfatizam composição "professional" e "clean"
+    - TEXT_AREAS incluem instruções de "complete framing"
+    - Subjects são projetados para gerar imagens ORIGINAIS
     """
 
     # === ELEMENTOS VISUAIS DE AÇÃO (NOVO) ===
@@ -924,11 +948,12 @@ class EditorialVisualElementsBank:
         ],
     }
 
+    # TEXT_AREAS v3.2: Agora incluem instruções de composição completa
     TEXT_AREAS = [
-        "clear negative space on left third for headline text overlay",
-        "dedicated text area on bottom third with high contrast background",
-        "clean left side composition allowing text placement",
-        "professional layout with headline space on left portion",
+        "clear negative space on left third for headline text overlay, complete framing with nothing cropped",
+        "dedicated text area on bottom third with high contrast background, all elements fully visible within frame",
+        "clean left side composition allowing text placement, professional complete framing",
+        "professional layout with headline space on left portion, no elements cut off at edges",
     ]
 
     # === PREFERÊNCIAS DE ENTIDADE POR AÇÃO ===
