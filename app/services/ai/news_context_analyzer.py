@@ -117,6 +117,10 @@ class NewsContext:
     # Confiança da análise
     confidence_score: float = 0.0
 
+    # NOVO v3.1: Indica se o contexto é genérico (não menciona moeda específica)
+    # Usado para evitar incluir moedas específicas em prompts de notícias genéricas
+    is_generic_context: bool = False
+
 
 class NewsContextAnalyzer:
     """
@@ -136,32 +140,57 @@ class NewsContextAnalyzer:
     # Mantém contexto sem usar palavras que podem ser bloqueadas por APIs de imagem
 
     SAFE_REPLACEMENTS = {
+        # Segurança e ataques
         'hack': 'security incident',
         'hacker': 'security threat',
         'hackeado': 'security breach',
         'hackeada': 'security breach',
-        'crash': 'sharp decline',
-        'colapso': 'significant downturn',
-        'colapsa': 'significant downturn',
         'ataque': 'security incident',
+        'exploit': 'vulnerability exposure',
+        'explorado': 'vulnerability exposure',
+        'explorada': 'vulnerability exposure',
+        'invadido': 'compromised',
+        'invadida': 'compromised',
+        # Roubo e fraude
         'roubo': 'unauthorized transfer',
         'roubado': 'unauthorized transfer',
         'roubada': 'unauthorized transfer',
-        'exploit': 'vulnerability exposure',
-        'explorado': 'vulnerability exposure',
         'fraude': 'irregularity',
         'golpe': 'scheme',
         'scam': 'fraudulent scheme',
         'rug pull': 'project abandonment',
+        'rug': 'project abandonment',
+        'exit scam': 'project abandonment',
         'ponzi': 'unsustainable scheme',
         'pirâmide': 'pyramid scheme',
+        # Mercado - quedas
+        'crash': 'sharp decline',
+        'colapso': 'significant downturn',
+        'colapsa': 'significant downturn',
+        'dump': 'large sell-off',
+        'dumping': 'selling pressure',
+        'whale dump': 'large holder selling',
+        'flash crash': 'rapid price decline',
+        'derretimento': 'significant decline',
+        'derrete': 'declines sharply',
+        # Finanças - problemas
+        'liquidation': 'position closure',
+        'liquidação': 'position closure',
+        'liquidações': 'position closures',
+        'bankrupt': 'financial difficulty',
+        'falência': 'financial difficulty',
+        'insolvência': 'financial difficulty',
+        'insolvente': 'facing financial difficulty',
+        # Atividades ilícitas
         'lavagem': 'illicit flow',
         'terrorismo': 'illicit activity',
+        # Violência e morte
         'morte': 'end',
         'morre': 'ends',
         'mata': 'eliminates',
         'guerra': 'conflict',
         'bomba': 'explosive news',
+        'explosão': 'rapid movement',
     }
 
     # === ENTIDADES CONHECIDAS COM IDENTIDADE VISUAL ===
@@ -496,6 +525,23 @@ class NewsContextAnalyzer:
         (r'\b(web3)\b', 'web3'),
     ]
 
+    # === PADRÕES DE CONTEXTO GENÉRICO (NOVO v3.1) ===
+    # Detecta quando a notícia fala de altcoins/criptomoedas de forma genérica
+    # sem mencionar uma moeda específica
+
+    GENERIC_CONTEXT_PATTERNS = [
+        r'\b(altcoins?)\b',
+        r'\b(tokens?)\s+(de\s+)?(criptomoedas?|cripto)',
+        r'\b(criptomoedas?)\b',
+        r'\b(mercado\s+(cripto|de\s+criptomoedas?))\b',
+        r'\b(setor\s+(cripto|de\s+criptomoedas?))\b',
+        r'\b(ativos\s+digitais)\b',
+        r'\b(moedas\s+digitais)\b',
+        r'\b(crypto\s+market)\b',
+        r'\b(digital\s+assets)\b',
+        r'\b(cryptocurrency\s+market)\b',
+    ]
+
     # === PADRÕES DE TIPO DE NOTÍCIA ===
 
     TYPE_PATTERNS = {
@@ -588,6 +634,12 @@ class NewsContextAnalyzer:
             for pattern, keyword in self.EVENT_KEYWORDS
         ]
 
+        # NOVO v3.1: Compilar padrões de contexto genérico
+        self._generic_context_regex = [
+            re.compile(pattern, re.IGNORECASE)
+            for pattern in self.GENERIC_CONTEXT_PATTERNS
+        ]
+
     def analyze(self, title: str, content: str, category: Optional[str] = None) -> NewsContext:
         """
         Analisa uma notícia e extrai seu contexto para geração editorial
@@ -604,7 +656,8 @@ class NewsContextAnalyzer:
         title_lower = title.lower()
 
         # 1. Identificar entidade principal (prioridade no título)
-        entity_type, primary_entity, primary_display = self._identify_primary_entity(title_lower, full_text)
+        # NOVO v3.1: Agora também retorna is_generic_context
+        entity_type, primary_entity, primary_display, is_generic = self._identify_primary_entity(title_lower, full_text)
 
         # 2. Identificar ação principal
         action = self._identify_action(title_lower)
@@ -654,11 +707,12 @@ class NewsContextAnalyzer:
             secondary_entity_display=secondary_entity_display,
             secondary_entities=secondary_entities,
             keywords=keywords,
-            confidence_score=confidence
+            confidence_score=confidence,
+            is_generic_context=is_generic,  # NOVO v3.1
         )
 
         logger.info(
-            f"[ContextAnalyzer v3.0] Análise: "
+            f"[ContextAnalyzer v3.1] Análise: "
             f"entity={entity_type.value}:{primary_entity}, "
             f"action={action.action}, "
             f"sentiment={sentiment.value}, "
@@ -667,6 +721,7 @@ class NewsContextAnalyzer:
             f"percentage={extracted_percentage}, "
             f"importance={news_importance}, "
             f"secondary={secondary_entity_display}, "
+            f"is_generic={is_generic}, "
             f"confidence={confidence:.2f}"
         )
 
@@ -676,11 +731,15 @@ class NewsContextAnalyzer:
         self,
         title: str,
         full_text: str
-    ) -> tuple[EntityType, Optional[str], str]:
+    ) -> tuple[EntityType, Optional[str], str, bool]:
         """
         Identifica a entidade principal da notícia
+
         Prioridade: título > conteúdo
         Ordem de busca: Crypto > Exchange > Bank > Government > Company > Person
+
+        Returns:
+            Tuple de (EntityType, entity_name, display_name, is_generic_context)
         """
 
         def search_entities(text: str, entities: dict) -> Optional[tuple[str, dict]]:
@@ -707,7 +766,8 @@ class NewsContextAnalyzer:
             result = search_entities(title, entities_dict)
             if result:
                 key, config = result
-                return config['type'], key, config['display']
+                # Entidade específica encontrada = não é contexto genérico
+                return config['type'], key, config['display'], False
 
         # Se não encontrou no título, buscar no conteúdo
         for entities_dict in [
@@ -718,10 +778,16 @@ class NewsContextAnalyzer:
             result = search_entities(full_text, entities_dict)
             if result:
                 key, config = result
-                return config['type'], key, config['display']
+                return config['type'], key, config['display'], False
+
+        # NOVO v3.1: Verificar se é contexto genérico de altcoins/criptomoedas
+        for regex in self._generic_context_regex:
+            if regex.search(title):
+                # Encontrou padrão genérico no título - usar subject de altcoins
+                return EntityType.THEME, 'altcoins', 'diverse altcoins', True
 
         # Fallback para tema genérico
-        return EntityType.THEME, None, 'cryptocurrency market'
+        return EntityType.THEME, None, 'cryptocurrency market', True
 
     def _identify_action(self, title: str) -> NewsAction:
         """Identifica a ação/verbo principal no título"""

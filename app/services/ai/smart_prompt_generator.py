@@ -31,6 +31,7 @@ Changelog v3.0:
 
 import hashlib
 import random
+import re
 from typing import Optional
 
 from app.core.logging import logger
@@ -86,6 +87,19 @@ class SmartPromptGenerator:
         'nude', 'naked', 'sexual', 'porn', 'weapon', 'gun', 'knife',
         'drugs', 'cocaine', 'heroin', 'marijuana', 'drug',
         'murder', 'kill', 'blood', 'gore', 'torture',
+    ]
+
+    # NOVO v3.1: Nomes de criptomoedas específicas a serem removidas em contextos genéricos
+    SPECIFIC_CRYPTO_NAMES = [
+        'bitcoin', 'btc', 'ethereum', 'eth', 'solana', 'sol',
+        'cardano', 'ada', 'dogecoin', 'doge', 'ripple', 'xrp',
+        'litecoin', 'ltc', 'polkadot', 'dot', 'avalanche', 'avax',
+        'polygon', 'matic', 'chainlink', 'link', 'cosmos', 'atom',
+        'toncoin', 'ton', 'arbitrum', 'arb', 'optimism', 'op',
+        'aptos', 'apt', 'sui', 'near', 'shiba', 'shib',
+        'uniswap', 'uni', 'aave', 'compound', 'maker', 'mkr',
+        'stellar', 'xlm', 'monero', 'xmr', 'tron', 'trx',
+        'bnb', 'binance coin', 'pepe', 'bonk', 'wif', 'floki',
     ]
 
     def __init__(
@@ -164,7 +178,13 @@ class SmartPromptGenerator:
             # 5. Sanitizar prompt final
             prompt = self._sanitize_prompt(prompt)
 
-            # 6. Garantir variação
+            # 6. NOVO v3.1: Sanitizar contextos genéricos (remover moedas específicas)
+            prompt = self._sanitize_generic_context(prompt, context)
+
+            # 7. Validar e otimizar prompt (remover duplicatas, limitar tamanho)
+            prompt = self._validate_and_optimize_prompt(prompt)
+
+            # 8. Garantir variação
             prompt = self._ensure_variation(prompt)
 
             logger.debug(f"[PromptGen v3.0] Prompt ({len(prompt)} chars): {prompt[:300]}...")
@@ -297,6 +317,93 @@ class SmartPromptGenerator:
     def _hash_prompt(self, prompt: str) -> str:
         """Gera hash simplificado do prompt"""
         return hashlib.md5(prompt[:150].encode()).hexdigest()[:8]
+
+    def _validate_and_optimize_prompt(self, prompt: str) -> str:
+        """
+        Valida e otimiza o prompt antes do envio para a API de imagem.
+
+        - Remove frases duplicadas
+        - Limita tamanho do prompt
+        - Remove redundâncias
+
+        Args:
+            prompt: Prompt a ser otimizado
+
+        Returns:
+            Prompt otimizado
+        """
+        # Dividir em sentenças/frases
+        sentences = prompt.split(', ')
+        seen = set()
+        unique_sentences = []
+
+        for s in sentences:
+            # Normalizar para comparação
+            s_normalized = s.strip().lower()
+
+            # Ignorar frases vazias ou muito curtas
+            if not s_normalized or len(s_normalized) < 3:
+                continue
+
+            # Verificar duplicatas
+            if s_normalized not in seen:
+                seen.add(s_normalized)
+                unique_sentences.append(s.strip())
+
+        result = ', '.join(unique_sentences)
+
+        # Limitar tamanho (APIs podem ter limite de ~4000 chars, usamos 1500 para segurança)
+        MAX_PROMPT_LENGTH = 1500
+        if len(result) > MAX_PROMPT_LENGTH:
+            # Cortar no último separador completo
+            result = result[:MAX_PROMPT_LENGTH].rsplit(', ', 1)[0]
+
+        return result
+
+    def _sanitize_generic_context(self, prompt: str, context: NewsContext) -> str:
+        """
+        Remove menções a criptomoedas específicas em contextos genéricos.
+
+        Em notícias como "Altcoins sobem 15%", não queremos que o prompt
+        mencione moedas específicas como Bitcoin ou Ethereum, pois isso
+        faria a imagem parecer ser sobre uma moeda específica.
+
+        Args:
+            prompt: Prompt original
+            context: Contexto da notícia
+
+        Returns:
+            Prompt com moedas específicas removidas (se contexto genérico)
+        """
+        # Só aplicar se for contexto genérico
+        if not context.is_generic_context:
+            return prompt
+
+        result = prompt
+
+        # Substituir nomes de moedas específicas por termos genéricos
+        for crypto in self.SPECIFIC_CRYPTO_NAMES:
+            # Usar word boundary para não pegar partes de palavras
+            pattern = rf'\b{re.escape(crypto)}\b'
+            # Substituir por termo genérico apropriado
+            result = re.sub(
+                pattern,
+                'cryptocurrency',
+                result,
+                flags=re.IGNORECASE
+            )
+
+        # Remover referências duplicadas criadas pela substituição
+        result = re.sub(
+            r'\bcryptocurrency\s+cryptocurrency\b',
+            'cryptocurrency',
+            result,
+            flags=re.IGNORECASE
+        )
+
+        logger.debug(f"[PromptGen v3.1] Sanitização de contexto genérico aplicada")
+
+        return result
 
     def _generate_fallback_prompt(self, category: Optional[str] = None) -> str:
         """Gera prompt fallback editorial seguro"""

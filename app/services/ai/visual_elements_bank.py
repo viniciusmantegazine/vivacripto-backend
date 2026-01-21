@@ -500,8 +500,20 @@ class EditorialVisualElementsBank:
                "clean messenger-style product shot",
         'arbitrum': "blue-orange Arbitrum logo as modern 3D symbol, "
                     "layer 2 tech product photography",
+        'arb': "blue-orange Arbitrum logo as modern 3D symbol, "
+               "layer 2 tech product photography",
         'optimism': "red Optimism logo as bold 3D circular element, "
                     "optimistic tech product photography",
+        'op': "red Optimism logo as bold 3D circular element, "
+              "optimistic tech product photography",
+        'aptos': "teal-green Aptos logo as modern hexagonal 3D object, "
+                 "clean Web3 product photography",
+        'apt': "teal-green Aptos logo as modern hexagonal 3D object, "
+               "clean Web3 product photography",
+        'sui': "blue Sui water droplet logo as fluid 3D element, "
+               "modern Move language tech photography",
+        'near': "dark Near Protocol logo with gradient accent, "
+                "sharded blockchain product photography",
     }
 
     STABLECOIN_SUBJECTS = {
@@ -515,6 +527,18 @@ class EditorialVisualElementsBank:
                "DeFi stablecoin product photography",
         'busd': "yellow Binance USD logo on exchange-branded surface, "
                 "professional stablecoin photography",
+        'frax': "blue-purple FRAX logo as algorithmic stablecoin symbol, "
+                "DeFi stability visualization",
+        'tusd': "TrueUSD logo as institutional stablecoin symbol, "
+                "trust and transparency photography",
+        'lusd': "LUSD Liquity logo as decentralized stablecoin symbol, "
+                "DeFi collateral visualization",
+        'pyusd': "PayPal USD logo on payment platform backdrop, "
+                 "mainstream stablecoin adoption photography",
+        'usdd': "USDD Tron logo as algorithmic stablecoin, "
+                "decentralized stability photography",
+        'gusd': "Gemini Dollar logo on regulated exchange backdrop, "
+                "institutional compliant stablecoin photography",
     }
 
     EXCHANGE_SUBJECTS = {
@@ -651,6 +675,32 @@ class EditorialVisualElementsBank:
                    "crypto airdrop conceptual photography",
         'market': "clean financial charts on professional monitor, "
                   "market analysis photography",
+        # === SUBJECTS PARA ALTCOINS GENÉRICAS (sem moeda específica) ===
+        'altcoin': "diverse collection of cryptocurrency coins arranged professionally, "
+                   "multiple token symbols without specific brand focus, "
+                   "generic crypto portfolio visualization",
+        'altcoins': "diverse collection of cryptocurrency coins arranged professionally, "
+                    "multiple token symbols without specific brand focus, "
+                    "generic crypto portfolio visualization",
+        'tokens': "abstract token representations as professional 3D coins, "
+                  "diverse crypto assets without specific branding, "
+                  "portfolio diversity visualization",
+        'criptomoedas': "professional arrangement of diverse crypto coins, "
+                        "multiple cryptocurrency symbols in balanced composition, "
+                        "market diversity photography",
+        'criptomoeda': "professional arrangement of diverse crypto coins, "
+                       "multiple cryptocurrency symbols in balanced composition, "
+                       "market diversity photography",
+        'crypto': "clean cryptocurrency market visualization, "
+                  "professional financial dashboard with multiple assets, "
+                  "diverse portfolio representation",
+        'cryptos': "clean cryptocurrency market visualization, "
+                   "professional financial dashboard with multiple assets, "
+                   "diverse portfolio representation",
+        # Subject genérico para mercado
+        'mercado_cripto': "professional trading floor with cryptocurrency displays, "
+                          "diverse digital assets on financial screens, "
+                          "market overview visualization",
     }
 
     # === BACKGROUNDS POR SENTIMENTO (mantido para fallback) ===
@@ -731,6 +781,31 @@ class EditorialVisualElementsBank:
         'avax': "Avalanche red (#E84142), bold crimson, powerful whites",
         'chainlink': "Chainlink blue (#375BD2), connected navy, tech whites",
         'link': "Chainlink blue (#375BD2), connected navy, tech whites",
+        # Litecoin
+        'litecoin': "silver-blue (#345D9D), metallic gray (#A6A9AA), professional whites",
+        'ltc': "silver-blue (#345D9D), metallic gray (#A6A9AA), professional whites",
+        # Polkadot
+        'polkadot': "Polkadot pink (#E6007A), white dots, modern magenta accents",
+        'dot': "Polkadot pink (#E6007A), white dots, modern magenta accents",
+        # Cosmos
+        'cosmos': "Cosmos purple (#5064FB), deep space blue (#2E3148), starfield whites",
+        'atom': "Cosmos purple (#5064FB), deep space blue (#2E3148), starfield whites",
+        # Toncoin
+        'toncoin': "Toncoin blue (#0088CC), telegram gradient, messenger whites",
+        'ton': "Toncoin blue (#0088CC), telegram gradient, messenger whites",
+        # Arbitrum
+        'arbitrum': "Arbitrum blue (#28A0F0), orange accent (#FF6B00), tech whites",
+        'arb': "Arbitrum blue (#28A0F0), orange accent (#FF6B00), tech whites",
+        # Optimism
+        'optimism': "Optimism red (#FF0420), bold crimson, optimistic whites",
+        'op': "Optimism red (#FF0420), bold crimson, optimistic whites",
+        # Aptos
+        'aptos': "Aptos teal (#06BCC1), modern gradient, Web3 whites",
+        'apt': "Aptos teal (#06BCC1), modern gradient, Web3 whites",
+        # Sui
+        'sui': "Sui blue (#6FBCF0), water gradient, fluid whites",
+        # Near
+        'near': "Near black (#000000), gradient accent (#00C1DE), stark whites",
     }
 
     # === OVERLAYS DE DADOS ===
@@ -805,6 +880,22 @@ class EditorialVisualElementsBank:
         "professional layout with headline space on left portion",
     ]
 
+    # === PREFERÊNCIAS DE ENTIDADE POR AÇÃO ===
+    # Define quais tipos de entidade são mais relevantes para cada ação
+
+    ACTION_ENTITY_PREFERENCES = {
+        'enfrenta': [EntityType.GOVERNMENT, EntityType.COMPANY],
+        'parceria': [EntityType.COMPANY, EntityType.EXCHANGE, EntityType.BANK],
+        'adota': [EntityType.COMPANY, EntityType.BANK],
+        'processa': [EntityType.GOVERNMENT, EntityType.COMPANY],
+        'investe': [EntityType.BANK, EntityType.COMPANY],
+        'integra': [EntityType.COMPANY, EntityType.EXCHANGE],
+        'compete': [EntityType.CRYPTO, EntityType.EXCHANGE],
+        'supera': [EntityType.CRYPTO],
+        'proibe': [EntityType.GOVERNMENT],
+        'aprova': [EntityType.GOVERNMENT],
+    }
+
     # === MÉTODOS DE COMPOSIÇÃO ===
 
     def get_action_element(self, action: str) -> Optional[str]:
@@ -813,6 +904,37 @@ class EditorialVisualElementsBank:
         if action_lower in self.ACTION_VISUAL_ELEMENTS:
             return random.choice(self.ACTION_VISUAL_ELEMENTS[action_lower])
         return None
+
+    def get_best_secondary_entity(
+        self,
+        secondary_entities: List,
+        action: str
+    ) -> Optional[str]:
+        """
+        Retorna a entidade secundária mais relevante para o contexto da ação.
+
+        Args:
+            secondary_entities: Lista de EntityMention
+            action: Ação principal da notícia
+
+        Returns:
+            Display name da entidade mais relevante ou None
+        """
+        if not secondary_entities:
+            return None
+
+        action_lower = action.lower()
+        preferred_types = self.ACTION_ENTITY_PREFERENCES.get(action_lower, [])
+
+        # Buscar entidade do tipo preferido
+        if preferred_types:
+            for entity_type in preferred_types:
+                for entity in secondary_entities:
+                    if entity.entity_type == entity_type:
+                        return entity.display_name
+
+        # Fallback para primeira entidade (maior relevância)
+        return secondary_entities[0].display_name
 
     def get_dual_entity_scene(
         self,
@@ -999,13 +1121,17 @@ class EditorialVisualElementsBank:
         self,
         sentiment: NewsSentiment,
         entity_type: EntityType,
-        entity_name: Optional[str]
+        entity_name: Optional[str],
+        entity_display: Optional[str] = None
     ) -> str:
-        """Retorna paleta de cores apropriada"""
+        """Retorna paleta de cores apropriada com fallback inteligente"""
         if entity_type in [EntityType.CRYPTO, EntityType.STABLECOIN] and entity_name:
             entity_key = entity_name.lower()
             if entity_key in self.CRYPTO_COLORS:
                 return self.CRYPTO_COLORS[entity_key]
+            # Fallback inteligente: gerar paleta genérica para crypto não mapeada
+            if entity_display and entity_display != 'cryptocurrency market':
+                return f"{entity_display} brand colors, professional cryptocurrency palette, clean whites"
 
         if entity_type in self.COLOR_PALETTES:
             type_palettes = self.COLOR_PALETTES[entity_type]
@@ -1129,6 +1255,38 @@ class EditorialVisualElementsBank:
             journalistic_scene = self.get_journalistic_scene(
                 'regulation_negative', entity=entity_display
             )
+        elif news_type == NewsType.ADOPTION:
+            journalistic_scene = self.get_journalistic_scene(
+                'adoption_corporate',
+                company=secondary_entity or 'major company',
+                crypto=entity_display
+            )
+        elif news_type == NewsType.SECURITY and sentiment == NewsSentiment.NEGATIVE:
+            journalistic_scene = self.get_journalistic_scene(
+                'security_breach', entity=entity_display
+            )
+        elif news_type == NewsType.PARTNERSHIP:
+            journalistic_scene = self.get_journalistic_scene(
+                'partnership_announcement',
+                entity1=entity_display,
+                entity2=secondary_entity or 'partner company'
+            )
+        elif news_type == NewsType.LAUNCH:
+            journalistic_scene = self.get_journalistic_scene(
+                'technology_launch', entity=entity_display
+            )
+        elif news_type == NewsType.LEGAL:
+            journalistic_scene = self.get_journalistic_scene(
+                'legal_action', entity=entity_display
+            )
+        elif news_type == NewsType.MINING:
+            journalistic_scene = self.get_journalistic_scene(
+                'mining_operation', crypto=entity_display
+            )
+        elif news_type == NewsType.ANALYSIS:
+            journalistic_scene = self.get_journalistic_scene(
+                'market_analysis', crypto=entity_display
+            )
 
         return EditorialComposition(
             photography_style=self.get_photography_style(entity_type),
@@ -1136,7 +1294,7 @@ class EditorialVisualElementsBank:
             action_element=action_element,
             journalistic_scene=journalistic_scene,
             background=background,
-            color_palette=self.get_color_palette(sentiment, entity_type, entity_name),
+            color_palette=self.get_color_palette(sentiment, entity_type, entity_name, entity_display),
             data_overlay=self.get_data_overlay(
                 has_numeric_data, sentiment, action, numeric_context
             ),
