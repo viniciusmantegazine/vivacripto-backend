@@ -114,47 +114,36 @@ class SmartPromptGenerator:
 
     # === CONFIGURAÇÃO DO ESTILO EDITORIAL v3.2 ===
 
-    # === PROTEÇÃO ANTI-WATERMARK E QUALIDADE (NOVO v3.2) ===
+    # === PROTEÇÃO ANTI-WATERMARK E QUALIDADE (v3.2 OTIMIZADO) ===
+    # NOTA: Instruções muito longas podem fazer o Gemini falhar.
+    # Mantemos as proteções concisas mas efetivas.
 
-    # Prefixo de proteção anti-watermark (vai no INÍCIO do prompt para máximo peso)
+    # Prefixo de proteção anti-watermark (CONCISO - vai no INÍCIO do prompt)
     PROTECTION_PREFIX = (
-        "Generate ORIGINAL editorial photography, NOT stock photo reproduction. "
-        "Create clean professional journalistic image WITHOUT watermarks or third-party branding. "
-        "NO Getty Images, NO Shutterstock, NO iStock, NO Unsplash marks. "
-        "NO CoinDesk logo, NO CoinTelegraph branding, NO CoinRepo watermark. "
+        "Original editorial photo, no watermarks, no stock logos, no third-party branding. "
     )
 
-    # Sufixo de proteção de qualidade (vai no FINAL do prompt)
+    # Sufixo de proteção de qualidade (CONCISO - vai no FINAL do prompt)
     QUALITY_PROTECTION_SUFFIX = (
-        "CRITICAL QUALITY REQUIREMENTS: "
-        "absolutely NO watermarks in corners or edges, "
-        "NO stock photo service logos (Getty, Shutterstock, iStock, Unsplash, Pexels), "
-        "NO news publication branding visible (CoinDesk, CoinTelegraph, CoinRepo, Bitcoin Magazine), "
-        "NO copyright symbols or credits text, NO third-party logos, "
-        "NO cropped or cut-off elements, NO incomplete text (if text appears it must be fully readable), "
-        "complete composition with proper margins, all elements fully visible within frame, "
-        "original editorial aesthetic NOT stock photo reproduction, "
-        "publication-ready without licensing concerns"
+        "clean complete composition, no cropped elements, no watermarks in corners, "
+        "no Getty/Shutterstock/iStock marks, publication-ready original image"
     )
 
     # Reforços anti-watermark para usar estrategicamente
     ANTI_WATERMARK_REINFORCEMENTS = [
-        "without any watermarks",
-        "no stock photo marks visible",
-        "clean professional image without external branding",
-        "original editorial photography",
-        "publication-ready quality",
-        "no third-party branding marks",
-        "journalism standard quality",
-        "no copyright marks visible",
-        "complete composition without crops",
+        "without watermarks",
+        "no stock photo marks",
+        "clean professional image",
+        "original editorial style",
+        "publication-ready",
+        "no branding marks",
+        "complete composition",
     ]
 
-    # Prefixo de proibição (mantido + expandido)
+    # Prefixo de proibição (mantido CONCISO)
     AVOID_PREFIX = (
         "NO abstract networks, NO digital particles, NO sci-fi effects, "
-        "NO blockchain visualizations, NO neon cyberpunk, NO matrix code, "
-        "NO watermarks, NO stock photo logos, NO third-party branding. "
+        "NO blockchain visualizations, NO neon cyberpunk, NO watermarks. "
     )
 
     # Referência de estilo condensada
@@ -535,68 +524,40 @@ class SmartPromptGenerator:
         """
         Gera prompt fallback editorial seguro COM PROTEÇÕES ANTI-WATERMARK v3.2
 
-        Todos os fallbacks agora incluem:
-        - Prefixo de proteção anti-watermark
-        - Instruções contra logos de terceiros
-        - Requisitos de composição completa
+        NOTA: Prompts concisos para evitar rejeição pelo Gemini.
         """
-        # Proteção comum para todos os fallbacks
-        protection_base = (
-            "Generate ORIGINAL editorial photography WITHOUT watermarks or third-party branding. "
-            "NO Getty Images, NO Shutterstock, NO iStock marks. "
-            "NO CoinDesk logo, NO CoinTelegraph branding, NO CoinRepo watermark. "
-            "NO abstract networks, NO digital particles. "
-        )
-
-        # Proteção final comum
-        protection_suffix = (
-            "CRITICAL: NO watermarks in corners, NO stock photo logos, "
-            "NO third-party branding, NO cropped elements, "
-            "complete composition with all elements fully visible, "
-            "original editorial quality NOT stock photo reproduction, "
-            "publication-ready without licensing concerns"
-        )
-
         category_fallbacks = {
             'bitcoin': (
-                f"{protection_base}"
+                "Original editorial photo, no watermarks, no stock logos. "
                 "Professional product photography of golden Bitcoin physical coin, "
-                "centered on clean white surface, orange-gold color palette, "
-                "professional studio lighting, original editorial standard, "
-                "high contrast for text readability, "
-                "clear negative space on left third for headline, photo-realistic, "
-                "complete framing with nothing cropped, 16:9 aspect ratio, "
-                f"{protection_suffix}"
+                "centered on clean white surface, orange-gold palette, "
+                "professional studio lighting, high contrast, "
+                "negative space on left for headline, photo-realistic, "
+                "complete framing, 16:9 aspect ratio, no cropped elements"
             ),
             'ethereum': (
-                f"{protection_base}"
-                "Professional product photography of purple-blue Ethereum diamond logo "
-                "as 3D metallic object on gradient background, purple and cyan color palette, "
-                "professional lighting, original editorial standard, "
-                "high contrast for text readability, "
-                "clear negative space for headline overlay, photo-realistic, "
-                "complete framing with nothing cropped, 16:9 aspect ratio, "
-                f"{protection_suffix}"
+                "Original editorial photo, no watermarks, no stock logos. "
+                "Professional photography of purple-blue Ethereum diamond logo, "
+                "3D metallic object on gradient background, purple and cyan palette, "
+                "professional lighting, high contrast, "
+                "negative space for headline overlay, photo-realistic, "
+                "complete framing, 16:9 aspect ratio, no cropped elements"
             ),
             'defi': (
-                f"{protection_base}"
+                "Original editorial photo, no watermarks, no stock logos. "
                 "Professional fintech interface photography, "
                 "clean DeFi protocol visualization on modern backdrop, "
-                "teal and professional blue color palette, "
-                "original editorial standard, high contrast for text readability, "
-                "clear space for headline text, photo-realistic, "
-                "complete framing with nothing cropped, 16:9 aspect ratio, "
-                f"{protection_suffix}"
+                "teal and blue palette, high contrast, "
+                "space for headline text, photo-realistic, "
+                "complete framing, 16:9 aspect ratio, no cropped elements"
             ),
             'regulacao': (
-                f"{protection_base}"
+                "Original editorial photo, no watermarks, no stock logos. "
                 "Government building or institutional architecture photography, "
                 "official regulatory setting with professional lighting, "
-                "navy and gold institutional color palette, "
-                "original editorial standard, high contrast for text readability, "
-                "clear negative space for headline, photo-realistic, "
-                "complete framing with nothing cropped, 16:9 aspect ratio, "
-                f"{protection_suffix}"
+                "navy and gold palette, high contrast, "
+                "negative space for headline, photo-realistic, "
+                "complete framing, 16:9 aspect ratio, no cropped elements"
             ),
         }
 
@@ -604,15 +565,12 @@ class SmartPromptGenerator:
 
         if cat_key not in category_fallbacks:
             return (
-                f"{protection_base}"
+                "Original editorial photo, no watermarks, no stock logos. "
                 "Professional editorial photography for cryptocurrency news, "
-                "clean financial market visualization with professional aesthetic, "
-                "modern blue and white color palette, "
-                "original editorial standard, professional journalism photography, "
-                "high contrast for text readability, "
-                "clear negative space on left third for headline overlay, "
-                "photo-realistic, complete framing with nothing cropped, 16:9 aspect ratio, "
-                f"{protection_suffix}"
+                "clean financial market visualization, "
+                "modern blue and white palette, professional journalism style, "
+                "high contrast, negative space on left for headline, "
+                "photo-realistic, complete framing, 16:9 aspect ratio, no cropped elements"
             )
 
         return category_fallbacks[cat_key]
@@ -729,20 +687,19 @@ class SmartPromptGenerator:
             prompt_base: Prompt original sem proteções
 
         Returns:
-            Prompt com proteções anti-watermark adicionadas
+            Prompt com proteções anti-watermark adicionadas (versão concisa)
         """
         import random
 
-        # Selecionar 2-3 reforços aleatórios
-        reforcos = random.sample(self.ANTI_WATERMARK_REINFORCEMENTS, min(3, len(self.ANTI_WATERMARK_REINFORCEMENTS)))
+        # Selecionar 2 reforços aleatórios (manter conciso)
+        reforcos = random.sample(self.ANTI_WATERMARK_REINFORCEMENTS, 2)
         reforcos_str = ", ".join(reforcos)
 
-        # Montar prompt protegido
+        # Montar prompt protegido (conciso para evitar rejeição)
         prompt_protegido = (
             f"{self.PROTECTION_PREFIX}"
             f"{prompt_base}, "
-            f"{reforcos_str}, "
-            f"{self.QUALITY_PROTECTION_SUFFIX}"
+            f"{reforcos_str}"
         )
 
         return prompt_protegido.strip()
