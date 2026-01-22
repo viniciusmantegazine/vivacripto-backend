@@ -148,7 +148,15 @@ NUNCA use estas construções robóticas ou clichês:
 - Quebras de linha duplas (\\n\\n) entre TODOS os parágrafos
 - Parágrafos com 2-4 frases cada (evite blocos muito longos)
 - Alterne frases curtas e longas para ritmo natural
-</formato_de_saida>"""
+</formato_de_saida>
+
+<requisitos_criticos>
+⚠️ REQUISITOS DE VALIDAÇÃO AUTOMÁTICA - O artigo será REJEITADO se não cumprir:
+
+1. MÍNIMO 250 PALAVRAS: Artigos curtos demais são rejeitados. Desenvolva bem cada parágrafo.
+2. KEYWORDS OBRIGATÓRIAS: O texto DEVE conter termos como "criptomoeda", "cripto", "Bitcoin", "Ethereum", "blockchain", "token" ou "DeFi".
+3. ESTRUTURA H2: O artigo DEVE começar com ## (heading de nível 2).
+</requisitos_criticos>"""
 
     def __init__(self):
         # OpenAI client (fallback)
@@ -298,15 +306,40 @@ Qual o impacto potencial para o mercado, tecnologia ou regulação?
 </estrutura_do_artigo>
 
 <requisitos_tecnicos>
-- Tamanho: 250-480 palavras (MÁXIMO ABSOLUTO: 500)
-- Use a palavra-chave "{keyword_principal}" naturalmente 2-3 vezes no texto
-- Idioma: Português brasileiro fluente e natural
-- Formatação: Quebras de linha duplas (\\n\\n) entre TODOS os parágrafos
-- Estrutura: 3-5 parágrafos conforme necessidade do conteúdo
+⚠️ REQUISITOS OBRIGATÓRIOS - ARTIGO SERÁ REJEITADO SE NÃO CUMPRIR:
+
+1. CONTAGEM DE PALAVRAS:
+   - MÍNIMO ABSOLUTO: 250 palavras (artigos com menos serão REJEITADOS)
+   - IDEAL: 300-400 palavras
+   - MÁXIMO: 500 palavras
+   → Escreva parágrafos completos e bem desenvolvidos para atingir o mínimo.
+
+2. PALAVRAS-CHAVE OBRIGATÓRIAS:
+   O artigo DEVE conter pelo menos UMA destas palavras (validação automática):
+   - "Bitcoin", "BTC", "Ethereum", "ETH", "crypto", "criptomoeda"
+   - "blockchain", "DeFi", "NFT", "token", "moeda digital"
+   → Use "{keyword_principal}" 2-3 vezes E inclua variações como "criptomoeda" ou "cripto".
+
+3. FORMATAÇÃO:
+   - Idioma: Português brasileiro fluente
+   - Quebras de linha duplas (\\n\\n) entre TODOS os parágrafos
+   - Estrutura: 4-5 parágrafos bem desenvolvidos (mínimo 3)
+
+4. ESTRUTURA H2:
+   - O artigo DEVE começar com ## (heading H2)
+   - Exemplo: ## Bitcoin Atinge Nova Máxima Histórica
 </requisitos_tecnicos>
 
 <validacao_obrigatoria>
-Antes de finalizar, VERIFIQUE mentalmente cada item:
+⚠️ CHECKLIST CRÍTICO - Verifique TODOS os itens antes de finalizar:
+
+☐ CONTAGEM: O artigo tem pelo menos 250 palavras?
+   → Conte mentalmente: 5 parágrafos x 50 palavras = 250 palavras mínimo.
+   → Se estiver curto, EXPANDA os parágrafos com mais contexto e detalhes.
+
+☐ KEYWORDS: O texto contém "criptomoeda", "cripto", "Bitcoin", "blockchain" ou similar?
+   → Inclua pelo menos 2-3 termos cripto naturalmente no texto.
+   → Artigos sem keywords cripto serão REJEITADOS automaticamente.
 
 ☐ DADOS: Todos os números, preços, datas e porcentagens vieram da fonte original?
    → Se NÃO estão na fonte, NÃO invente. Use termos vagos ("registrou alta", "apresentou queda").
@@ -317,11 +350,8 @@ Antes de finalizar, VERIFIQUE mentalmente cada item:
 ☐ FLUÊNCIA: O texto flui naturalmente sem frases robóticas?
    → Evite: "Vale ressaltar", "Em conclusão", "É importante mencionar".
 
-☐ CLAREZA: Um iniciante conseguiria entender? Um veterano acharia relevante?
-   → Balance profundidade técnica com acessibilidade.
-
-☐ COESÃO: O artigo tem início, meio e fim bem conectados?
-   → Use transições naturais entre parágrafos.
+☐ ESTRUTURA: O artigo começa com ## e tem 4-5 parágrafos desenvolvidos?
+   → Cada parágrafo deve ter 2-4 frases completas.
 
 ☐ ATRIBUIÇÃO: Dados específicos estão atribuídos à fonte?
    → Use: "Segundo informações divulgadas...", "De acordo com a fonte..."
