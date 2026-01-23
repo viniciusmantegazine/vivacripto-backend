@@ -1,42 +1,59 @@
 """
-Smart Prompt Generator v3.2 - Contextual Editorial Photography Style + Quality Protection
+Smart Prompt Generator v4.0 - AI-Powered Contextual Storytelling + Quality Protection
 Gerador de prompts para imagens de notícias de criptomoedas com STORYTELLING VISUAL
 
-IMPORTANTE: Este módulo gera prompts que CONTAM A HISTÓRIA da notícia em um único olhar.
-Cada imagem deve comunicar imediatamente o contexto, ação e sentimento da notícia.
+## NOVO EM v4.0: ANÁLISE CONTEXTUAL VIA IA
 
-Padrão de referência: Estilo editorial profissional ORIGINAL (não stock photos)
+A partir da v4.0, o sistema usa IA (Gemini/Claude) para analisar o CONTEÚDO COMPLETO
+da notícia, não apenas extrair keywords do título. Isso resulta em:
 
-## PROTEÇÃO ANTI-WATERMARK E QUALIDADE (v3.2)
+✅ Imagens que CONTAM A HISTÓRIA real da notícia
+✅ Elementos visuais ESPECÍFICOS ao contexto (pessoas, instituições, eventos)
+✅ Conexão direta entre texto e visual
+✅ Muito mais relevância e profissionalismo
 
-TODOS os prompts gerados agora incluem proteções contra:
+### EXEMPLO DE DIFERENÇA:
+
+**ANTES (v3.x - baseado em regex/keywords):**
+Título: "SEC aprova ETF de Bitcoin"
+Análise: keywords=["SEC", "aprova", "ETF", "Bitcoin"]
+Prompt: "SEC logo, Bitcoin coin, approval stamp"
+Resultado: Imagem genérica de logo + moeda
+
+**DEPOIS (v4.0 - baseado em contexto completo):**
+Título: "SEC aprova ETF de Bitcoin"
+Conteúdo: "Gary Gensler anunciou... BlackRock será a primeira... NYSE começará negociações..."
+Análise IA: Entende todo o contexto, pessoas, instituições, evento histórico
+Prompt: "Gary Gensler at SEC podium, BlackRock branding, NYSE trading floor,
+        Bitcoin symbol, historic approval atmosphere, institutional celebration"
+Resultado: Imagem que CONTA A HISTÓRIA completa
+
+## MODOS DE OPERAÇÃO:
+
+1. **CONTEXTUAL (NOVO - RECOMENDADO):**
+   - Usa `generate_prompt_contextual()` (async)
+   - Analisa conteúdo completo via Gemini
+   - Gera prompts narrativos específicos
+
+2. **LEGACY (compatibilidade):**
+   - Usa `generate_prompt()` (sync)
+   - Mantém comportamento v3.2 baseado em regex
+   - Útil como fallback quando Gemini indisponível
+
+## PROTEÇÃO ANTI-WATERMARK E QUALIDADE (v3.2+)
+
+TODOS os prompts gerados incluem proteções contra:
 - ❌ Watermarks de bancos de imagens (Getty, Shutterstock, iStock, Unsplash, Pexels)
 - ❌ Logos de outros sites de notícias (CoinDesk, CoinTelegraph, CoinRepo, Bitcoin Magazine)
 - ❌ Símbolos de copyright ou créditos visíveis
 - ❌ Elementos cortados ou incompletos nas bordas
 - ❌ Texto parcialmente visível (ex: "LOBAL" ao invés de "GLOBAL")
 
-PROTEÇÕES IMPLEMENTADAS:
-- PROTECTION_PREFIX: Vai no INÍCIO do prompt para máximo peso
-- QUALITY_PROTECTION_SUFFIX: Vai no FINAL do prompt como reforço
-- ANTI_WATERMARK_REINFORCEMENTS: Frases de reforço usadas estrategicamente
-
-## REGRA CRÍTICA DE CORRESPONDÊNCIA TÍTULO-IMAGEM (v3.1)
-
-A imagem gerada DEVE corresponder EXATAMENTE ao que está no título da notícia:
-
-1. Se título menciona cripto ESPECÍFICA (Bitcoin, Ethereum, Cardano) → usar APENAS essa cripto
-2. Se título usa termo GENÉRICO (Altcoins, Criptomoedas, Mercado) → NUNCA usar cripto específica
-   - Deve mostrar MÚLTIPLAS criptos ou conceito abstrato de mercado
-3. Se título foca em conceito/empresa/tecnologia sem cripto → NÃO usar logos de criptos
-
-### Exemplos:
-- "Altcoins: 2026 marca virada para mercados 24/7" → MÚLTIPLAS criptos, NÃO Cardano sozinha
-- "Bitcoin supera US$ 100.000" → APENAS Bitcoin
-- "Criptomoedas ganham espaço na regulação" → MÚLTIPLAS criptos, conceito genérico
-
-Características dos prompts gerados v3.2:
-- Elementos visuais CONCRETOS com AÇÃO visual (não apenas logos estáticos)
+Características dos prompts gerados v4.0:
+- ANÁLISE CONTEXTUAL PROFUNDA via IA (NOVO v4.0)
+- PROMPTS NARRATIVOS que contam histórias (NOVO v4.0)
+- Elementos visuais ESPECÍFICOS ao contexto (NOVO v4.0)
+- Elementos visuais CONCRETOS com AÇÃO visual
 - Composições DUAL-ENTITY para notícias relacionais
 - Backgrounds CONTEXTUAIS por tipo de notícia
 - Visualização de PERCENTUAIS quando relevante
@@ -44,9 +61,16 @@ Características dos prompts gerados v3.2:
 - Cenas JORNALÍSTICAS que contam histórias
 - HIERARQUIA VISUAL por importância da notícia
 - Prompts OTIMIZADOS e condensados
-- INSTRUÇÃO CRÍTICA de correspondência título-imagem
-- PROTEÇÃO ANTI-WATERMARK em todos os prompts (NOVO v3.2)
-- PROTEÇÃO contra elementos cortados/incompletos (NOVO v3.2)
+- PROTEÇÃO ANTI-WATERMARK em todos os prompts
+- PROTEÇÃO contra elementos cortados/incompletos
+
+Changelog v4.0:
+- Adicionada análise contextual profunda via Gemini (ContextualImageAnalyzer)
+- Adicionado construtor de prompts narrativos (ContextualPromptBuilder)
+- Novo método async generate_prompt_contextual() para análise completa
+- Novo método async generate_prompt_with_metadata_contextual() com metadados
+- Mantida compatibilidade total com métodos v3.2 (sync)
+- Integração transparente: usa contextual se disponível, fallback para legacy
 
 Changelog v3.2:
 - Adicionado PROTECTION_PREFIX para proteção anti-watermark no início do prompt
@@ -96,20 +120,40 @@ from app.services.ai.visual_elements_bank import (
     editorial_visual_elements_bank
 )
 
+# v4.0: Novos módulos de análise contextual
+from app.services.ai.contextual_image_analyzer import (
+    ContextualImageAnalyzer,
+    ContextualAnalysisResult,
+    contextual_image_analyzer
+)
+from app.services.ai.contextual_prompt_builder import (
+    ContextualPromptBuilder,
+    contextual_prompt_builder
+)
+
 
 class SmartPromptGenerator:
     """
-    Gerador de prompts v3.2 - Contextual Editorial Photography Style + Quality Protection
+    Gerador de prompts v4.0 - AI-Powered Contextual Storytelling + Quality Protection
 
     Gera prompts otimizados para Gemini/DALL-E com STORYTELLING VISUAL.
     Cada imagem conta a história da notícia em um único olhar.
 
+    ## NOVIDADE v4.0: ANÁLISE CONTEXTUAL VIA IA
+
+    O método `generate_prompt_contextual()` (async) usa IA para analisar
+    o CONTEÚDO COMPLETO da notícia, gerando prompts muito mais relevantes.
+
+    Os métodos `generate_prompt()` e `generate_prompt_with_metadata()` (sync)
+    continuam disponíveis para compatibilidade.
+
     Foco em:
+    - ANÁLISE CONTEXTUAL PROFUNDA via IA (NOVO v4.0)
     - Ação visual (não apenas entidades estáticas)
     - Contexto narrativo claro
     - Dramaticidade proporcional à magnitude
     - Composições jornalísticas profissionais
-    - PROTEÇÃO contra watermarks, logos indesejados e elementos cortados (v3.2)
+    - PROTEÇÃO contra watermarks, logos indesejados e elementos cortados
     """
 
     # === CONFIGURAÇÃO DO ESTILO EDITORIAL v3.2 ===
@@ -197,23 +241,32 @@ class SmartPromptGenerator:
     def __init__(
         self,
         context_analyzer: Optional[NewsContextAnalyzer] = None,
-        elements_bank: Optional[EditorialVisualElementsBank] = None
+        elements_bank: Optional[EditorialVisualElementsBank] = None,
+        contextual_analyzer: Optional[ContextualImageAnalyzer] = None,
+        prompt_builder: Optional[ContextualPromptBuilder] = None
     ):
         """
         Inicializa o gerador de prompts editoriais
 
         Args:
-            context_analyzer: Analisador de contexto (usa singleton se None)
+            context_analyzer: Analisador de contexto legacy (usa singleton se None)
             elements_bank: Banco de elementos visuais (usa singleton se None)
+            contextual_analyzer: Analisador contextual via IA (NOVO v4.0)
+            prompt_builder: Construtor de prompts narrativos (NOVO v4.0)
         """
+        # Componentes legacy (v3.2) - mantidos para compatibilidade
         self.context_analyzer = context_analyzer or news_context_analyzer
         self.elements_bank = elements_bank or editorial_visual_elements_bank
+
+        # Componentes v4.0 - análise contextual via IA
+        self.contextual_analyzer = contextual_analyzer or contextual_image_analyzer
+        self.prompt_builder = prompt_builder or contextual_prompt_builder
 
         # Cache de hashes para evitar repetição
         self._recent_prompts: list[str] = []
         self._max_cache_size = 50
 
-        logger.info("SmartPromptGenerator v3.2 (Contextual Storytelling + Title Matching + Quality Protection) inicializado")
+        logger.info("SmartPromptGenerator v4.0 (AI-Powered Contextual Storytelling + Quality Protection) inicializado")
 
     def generate_prompt(
         self,
@@ -582,7 +635,9 @@ class SmartPromptGenerator:
         category: Optional[str] = None
     ) -> dict:
         """
-        Gera prompt com metadados completos para logging e debug
+        Gera prompt com metadados completos para logging e debug (MODO LEGACY)
+
+        NOTA: Para análise contextual via IA, use generate_prompt_with_metadata_contextual()
 
         Returns:
             Dict com prompt e metadados da análise v3.0
@@ -612,6 +667,117 @@ class SmartPromptGenerator:
                 'is_generic_context': context.is_generic_context,
             }
         }
+
+    # ====================================================================
+    # v4.0: MÉTODOS ASYNC PARA ANÁLISE CONTEXTUAL VIA IA
+    # ====================================================================
+
+    async def generate_prompt_contextual(
+        self,
+        title: str,
+        content: str,
+        category: Optional[str] = None
+    ) -> str:
+        """
+        Gera um prompt usando ANÁLISE CONTEXTUAL VIA IA (v4.0 RECOMENDADO)
+
+        Este método usa Gemini para analisar o CONTEÚDO COMPLETO da notícia,
+        extraindo contexto semântico profundo para gerar prompts que
+        CONTAM A HISTÓRIA da notícia visualmente.
+
+        Args:
+            title: Título da notícia
+            content: Conteúdo COMPLETO da notícia (não apenas resumo)
+            category: Categoria pré-definida (opcional)
+
+        Returns:
+            Prompt otimizado para geração de imagem editorial com contexto narrativo
+        """
+        try:
+            # 1. Análise contextual profunda via IA
+            logger.info(f"[PromptGen v4.0] Análise contextual: {title[:50]}...")
+            analysis = await self.contextual_analyzer.analyze(title, content, category)
+
+            logger.info(
+                f"[PromptGen v4.0] Análise completa: "
+                f"story='{analysis.story_summary[:40]}...', "
+                f"cryptos={analysis.cryptocurrencies}, "
+                f"institutions={analysis.institutions[:3]}, "
+                f"tone={analysis.tone.value}, "
+                f"confidence={analysis.confidence_score:.2f}"
+            )
+
+            # 2. Construir prompt narrativo
+            prompt = self.prompt_builder.build_prompt(analysis)
+
+            # 3. Garantir variação
+            prompt = self._ensure_variation(prompt)
+
+            logger.debug(f"[PromptGen v4.0] Prompt ({len(prompt)} chars): {prompt[:300]}...")
+            return prompt
+
+        except Exception as e:
+            logger.error(f"[PromptGen v4.0] Erro na análise contextual: {e}")
+            logger.info("[PromptGen v4.0] Fallback para método legacy...")
+            # Fallback para método legacy se análise contextual falhar
+            return self.generate_prompt(title, content, category)
+
+    async def generate_prompt_with_metadata_contextual(
+        self,
+        title: str,
+        content: str,
+        category: Optional[str] = None
+    ) -> dict:
+        """
+        Gera prompt com metadados usando ANÁLISE CONTEXTUAL VIA IA (v4.0 RECOMENDADO)
+
+        Este método fornece tanto o prompt quanto metadados detalhados da análise
+        contextual, útil para logging, debug e auditoria.
+
+        Args:
+            title: Título da notícia
+            content: Conteúdo COMPLETO da notícia
+            category: Categoria opcional
+
+        Returns:
+            Dict com prompt e metadados completos da análise contextual
+        """
+        try:
+            # 1. Análise contextual profunda via IA
+            analysis = await self.contextual_analyzer.analyze(title, content, category)
+
+            # 2. Construir prompt com metadados
+            result = self.prompt_builder.build_prompt_with_metadata(analysis)
+
+            # 3. Garantir variação no prompt
+            result['prompt'] = self._ensure_variation(result['prompt'])
+
+            return result
+
+        except Exception as e:
+            logger.error(f"[PromptGen v4.0] Erro na análise contextual com metadata: {e}")
+            logger.info("[PromptGen v4.0] Fallback para método legacy...")
+            # Fallback para método legacy
+            return self.generate_prompt_with_metadata(title, content, category)
+
+    async def analyze_news_context(
+        self,
+        title: str,
+        content: str,
+        category: Optional[str] = None
+    ) -> ContextualAnalysisResult:
+        """
+        Analisa o contexto da notícia sem gerar prompt (útil para debug)
+
+        Args:
+            title: Título da notícia
+            content: Conteúdo completo da notícia
+            category: Categoria opcional
+
+        Returns:
+            ContextualAnalysisResult com análise completa
+        """
+        return await self.contextual_analyzer.analyze(title, content, category)
 
 
     def validar_imagem_gerada(self, titulo_noticia: str) -> dict:
