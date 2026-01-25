@@ -80,14 +80,30 @@ class NewsAssignment:
     fonte: str
     timestamp: str
     id: Optional[str] = None
-    
+
     def __post_init__(self):
         if self.id is None:
             self.id = str(uuid.uuid4())
-    
-    def get_combined_text(self) -> str:
-        """Retorna texto combinado para comparação"""
-        return f"{self.titulo} {self.resumo}"
+
+    def get_combined_text(self, include_content: bool = True) -> str:
+        """
+        Retorna texto combinado para comparação de similaridade.
+
+        Args:
+            include_content: Se True, inclui os primeiros 500 chars do conteúdo
+                           para comparação semântica mais precisa
+
+        Returns:
+            Texto combinado para análise de similaridade
+        """
+        base_text = f"{self.titulo} {self.resumo}"
+
+        if include_content and self.conteudo:
+            # Incluir primeiros 500 caracteres do conteúdo para melhor comparação semântica
+            content_preview = self.conteudo[:500].strip()
+            return f"{base_text} {content_preview}"
+
+        return base_text
 
 
 @dataclass
@@ -231,12 +247,14 @@ class DuplicateDetector:
                 motivo="Nenhum post publicado nas últimas 24 horas"
             )
         
-        # Comparar com cada post recente
-        assignment_text = assignment.get_combined_text()
+        # Comparar com cada post recente (incluindo conteúdo para melhor precisão)
+        assignment_text = assignment.get_combined_text(include_content=True)
         similarities = []
-        
+
         for post in recent_posts:
-            post_text = f"{post.titulo} {post.resumo}"
+            # Incluir conteúdo do post para comparação mais precisa
+            post_content_preview = post.conteudo[:500] if post.conteudo else ""
+            post_text = f"{post.titulo} {post.resumo} {post_content_preview}"
             
             try:
                 result = self.similarity_engine.calculate(assignment_text, post_text)
