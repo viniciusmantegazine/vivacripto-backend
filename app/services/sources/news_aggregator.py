@@ -22,12 +22,14 @@ class NewsAggregator:
         self._similarity_engine = None
 
     def _get_similarity_engine(self):
-        """Lazy loading do engine de similaridade"""
+        """Lazy loading do engine de similaridade (TF-IDF para performance)"""
         if self._similarity_engine is None:
             try:
                 from app.services.deduplication.similarity_engine import SimilarityFactory
-                self._similarity_engine = SimilarityFactory.create("hybrid")
-                logger.info("Engine de similaridade carregado para deduplicação de fontes")
+                # Usar TF-IDF ao invés de hybrid para melhor performance
+                # Embeddings são muito lentos para deduplicação de fontes em lote
+                self._similarity_engine = SimilarityFactory.create("tfidf")
+                logger.info("Engine TF-IDF carregado para deduplicação de fontes")
             except Exception as e:
                 logger.warning(f"Não foi possível carregar engine de similaridade: {e}")
         return self._similarity_engine
@@ -99,19 +101,16 @@ class NewsAggregator:
             logger.warning("Engine de similaridade não disponível, retornando todas as notícias")
             return news_list
 
-        # Marcar índices de notícias duplicadas
-        duplicates = set()
+        logger.info(f"Iniciando deduplicação de {len(news_list)} notícias...")
         unique_news = []
+        duplicates_found = 0
 
         for i, news_i in enumerate(news_list):
-            if i in duplicates:
-                continue
-
             text_i = self._get_comparison_text(news_i)
             is_duplicate = False
 
             # Comparar com notícias já marcadas como únicas
-            for j, news_j in enumerate(unique_news):
+            for news_j in unique_news:
                 text_j = self._get_comparison_text(news_j)
 
                 try:
@@ -119,11 +118,10 @@ class NewsAggregator:
                     similarity = result.score
 
                     if similarity >= self.SOURCE_DEDUP_THRESHOLD:
-                        # Notícias são similares - decidir qual manter
+                        duplicates_found += 1
                         logger.debug(
-                            f"Similaridade {similarity:.2%} detectada entre fontes:\n"
-                            f"  1. [{news_i.get('source')}] {news_i.get('title', '')[:60]}...\n"
-                            f"  2. [{news_j.get('source')}] {news_j.get('title', '')[:60]}..."
+                            f"Duplicata #{duplicates_found}: {similarity:.0%} - "
+                            f"[{news_i.get('source')}] vs [{news_j.get('source')}]"
                         )
 
                         # Manter a notícia com descrição mais completa
@@ -131,12 +129,8 @@ class NewsAggregator:
                         desc_j = len(news_j.get('description', ''))
 
                         if desc_i > desc_j:
-                            # Substituir a existente pela nova (tem mais conteúdo)
                             idx = unique_news.index(news_j)
                             unique_news[idx] = news_i
-                            logger.debug(f"  → Mantendo versão de [{news_i.get('source')}] (mais detalhada)")
-                        else:
-                            logger.debug(f"  → Mantendo versão de [{news_j.get('source')}] (mais detalhada)")
 
                         is_duplicate = True
                         break
@@ -148,6 +142,11 @@ class NewsAggregator:
             if not is_duplicate:
                 unique_news.append(news_i)
 
+            # Log de progresso a cada 10 notícias
+            if (i + 1) % 10 == 0:
+                logger.debug(f"Deduplicação: {i + 1}/{len(news_list)} processadas")
+
+        logger.info(f"Deduplicação concluída: {duplicates_found} duplicatas encontradas")
         return unique_news
 
     def _get_comparison_text(self, news: Dict) -> str:
