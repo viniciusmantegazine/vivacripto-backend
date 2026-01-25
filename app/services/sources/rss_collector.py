@@ -25,18 +25,18 @@ class RSSCollector:
             "language": "en"
         },
         {
-            "name": "Bitcoin Magazine",
-            "url": "https://bitcoinmagazine.com/.rss/full/",
-            "language": "en"
-        },
-        {
             "name": "CryptoSlate",
             "url": "https://cryptoslate.com/feed/",
             "language": "en"
         },
         {
-            "name": "CoinPaper",
-            "url": "https://coinpaper.com/rss/news",
+            "name": "Decrypt",
+            "url": "https://decrypt.co/feed",
+            "language": "en"
+        },
+        {
+            "name": "The Block",
+            "url": "https://www.theblock.co/rss.xml",
             "language": "en"
         },
     ]
