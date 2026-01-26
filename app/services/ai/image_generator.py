@@ -33,7 +33,7 @@ Changelog:
        - Mantida compatibilidade total com modo legacy
 - v9.1: Melhorias de robustez, logging detalhado, fallback aprimorado
 - v9.0: Migração para Gemini como primário, DALL-E como fallback
-- v8.0: Estilo editorial fotográfico (CoinDesk/Cointelegraph standard)
+- v8.0: Estilo editorial fotográfico (padrão editorial profissional)
 - v7.0: Sistema inteligente de análise de contexto e geração de prompts dinâmicos
 
 Recursos:

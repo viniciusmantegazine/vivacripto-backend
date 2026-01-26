@@ -70,7 +70,7 @@ class ContentGenerator:
 
     # System Prompt v3.0 - Estruturado com tags XML para melhor parsing
     SYSTEM_PROMPT = """<persona>
-Você é o Editor-Chefe do portal VivaCripto, um veículo jornalístico especializado em criptoeconomia para o público brasileiro. Sua formação combina jornalismo financeiro (Bloomberg), tecnologia acessível (The Verge) e expertise cripto (CoinDesk).
+Você é o Editor-Chefe do portal VivaCripto, um veículo jornalístico especializado em criptoeconomia para o público brasileiro. Sua formação combina jornalismo financeiro (Bloomberg), tecnologia acessível (The Verge) e expertise no mercado cripto.
 </persona>
 
 <audiencia>
@@ -138,6 +138,16 @@ NUNCA use estas construções robóticas ou clichês:
 
 5. **METADADOS NO OUTPUT:**
    NUNCA inicie o texto com prefixos como "Título:", "Resumo:", "Corpo:", "Artigo:", etc.
+
+6. **NOMES DE FONTES/SITES DE NOTÍCIAS:**
+   NUNCA mencione o nome do site fonte da notícia no texto gerado.
+   ❌ "Segundo o CoinDesk...", "De acordo com o CoinTelegraph...", "Conforme reportado pelo Bitcoin Magazine..."
+   ❌ "A CoinDesk informou que...", "O portal CryptoSlate publicou..."
+   ✅ "Segundo informações divulgadas...", "De acordo com dados do mercado...", "Conforme reportado..."
+   ✅ "Fontes do setor indicam...", "De acordo com análises recentes..."
+
+   Sites PROIBIDOS de mencionar: CoinDesk, CoinTelegraph, Cointelegraph, CryptoSlate, Bitcoin Magazine, Decrypt, The Block, CoinPaper, CoinRepo, BeInCrypto, NewsBTC, CryptoNews, CoinGecko, CoinMarketCap.
+   O conteúdo deve parecer ORIGINAL do VivaCripto, não uma tradução/cópia atribuída a outro portal.
 </guardrails_de_seguranca>
 
 <formato_de_saida>
@@ -255,11 +265,14 @@ NUNCA use estas construções robóticas ou clichês:
         keyword_principal = cat_config["keywords"][0] if cat_config["keywords"] else "criptomoeda"
 
         user_prompt = f"""<dados_da_fonte>
-Fonte: {source}
 Título Original: {title}
 Conteúdo da Fonte: {description}
 Categoria: {category}
 </dados_da_fonte>
+
+<regra_fonte>
+⚠️ REGRA CRÍTICA: NÃO mencione o nome de NENHUM site de notícias (CoinDesk, CoinTelegraph, Bitcoin Magazine, CryptoSlate, Decrypt, The Block, etc.) no artigo gerado. O conteúdo deve ser escrito como conteúdo ORIGINAL do portal VivaCripto. Use "segundo informações divulgadas", "de acordo com dados do mercado" ou "conforme reportado" para atribuições genéricas.
+</regra_fonte>
 
 <configuracao_editorial>
 Tom recomendado: {cat_config["tom"]}
@@ -440,6 +453,21 @@ Nenhum texto adicional, prefixo ou metadado.
             "**Corpo:**", "**Artigo:**", "**Output:**",
         ]
 
+        # Nomes de sites/fontes de notícias que NUNCA devem aparecer no texto gerado
+        source_site_names = [
+            "CoinDesk", "Coindesk", "coindesk",
+            "CoinTelegraph", "Cointelegraph", "cointelegraph",
+            "CryptoSlate", "cryptoslate",
+            "Bitcoin Magazine", "bitcoin magazine",
+            "Decrypt", "decrypt",
+            "The Block", "the block",
+            "CoinPaper", "coinpaper",
+            "CoinRepo", "coinrepo",
+            "BeInCrypto", "beincrypto",
+            "NewsBTC", "newsbtc",
+            "CryptoNews", "cryptonews",
+        ]
+
         # Frases que indicam possível conselho financeiro (apenas warning)
         nfa_red_flags = [
             "devem considerar comprar",
@@ -504,6 +532,26 @@ Nenhum texto adicional, prefixo ou metadado.
         for phrase in robotic_phrases:
             if phrase in content_lower:
                 logger.warning(f"[Qualidade] Detectada frase robótica/clichê: '{phrase}'")
+
+        # Remover menções a sites de notícias fonte
+        for site_name in source_site_names:
+            if site_name in result:
+                # Substituir padrões comuns: "Segundo o CoinDesk," -> "Segundo informações divulgadas,"
+                result = re.sub(
+                    rf'(?i)\b(segundo|de acordo com|conforme|para)\s+(o|a|o portal|o site)?\s*{re.escape(site_name)}\b[,.]?\s*',
+                    r'\1 informações divulgadas, ',
+                    result
+                )
+                # Substituir padrões "o CoinDesk informou/reportou/publicou"
+                result = re.sub(
+                    rf'(?i)\b(o|a|o portal|o site)\s*{re.escape(site_name)}\s+(informou|reportou|publicou|divulgou|noticiou|revelou)',
+                    r'foi \2',
+                    result
+                )
+                # Remover menções restantes do nome do site
+                if site_name in result:
+                    result = result.replace(site_name, "fontes do setor")
+                    logger.warning(f"[Sanitização] Removida menção ao site fonte: {site_name}")
 
         return result.strip()
     

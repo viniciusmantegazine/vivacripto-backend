@@ -93,18 +93,21 @@ class ContextualPromptBuilder:
     # === PROTEÇÕES DE QUALIDADE ===
 
     PROTECTION_PREFIX = (
-        "Original editorial photo, no watermarks, no stock logos, no third-party branding. "
+        "Original editorial photo, no watermarks, no stock logos, no third-party branding, "
+        "NO news site logos (NO CoinDesk, NO CoinTelegraph, NO Bitcoin Magazine logos). "
     )
 
     QUALITY_PROTECTION_SUFFIX = (
         "clean complete composition, no cropped elements, no watermarks in corners, "
-        "no Getty/Shutterstock/iStock marks, publication-ready original image, "
+        "no Getty/Shutterstock/iStock marks, no CoinDesk/CoinTelegraph/news site branding, "
+        "publication-ready original image, "
         "16:9 aspect ratio, high contrast for text readability"
     )
 
     AVOID_BASE = (
         "NO abstract networks, NO digital particles, NO sci-fi effects, "
-        "NO blockchain visualizations, NO neon cyberpunk, NO watermarks"
+        "NO blockchain visualizations, NO neon cyberpunk, NO watermarks, "
+        "NO news website logos or branding (CoinDesk, CoinTelegraph, Bitcoin Magazine, CryptoSlate, Decrypt)"
     )
 
     # === TEMPLATES DE ESTILO ===
@@ -200,6 +203,22 @@ class ContextualPromptBuilder:
         ),
     }
 
+    # === NOMES DE SITES DE NOTÍCIAS PROIBIDOS EM PROMPTS ===
+    # Esses nomes devem ser removidos do prompt para evitar que a IA gere logos/branding
+    PROHIBITED_SOURCE_NAMES = [
+        "CoinDesk", "Coindesk", "coindesk",
+        "CoinTelegraph", "Cointelegraph", "cointelegraph",
+        "CryptoSlate", "cryptoslate",
+        "Bitcoin Magazine", "bitcoin magazine",
+        "Decrypt", "decrypt.co",
+        "The Block", "theblock",
+        "CoinPaper", "coinpaper",
+        "CoinRepo", "coinrepo",
+        "BeInCrypto", "beincrypto",
+        "NewsBTC", "newsbtc",
+        "CryptoNews", "cryptonews",
+    ]
+
     # === TEMPLATES PARA EVENTOS ===
 
     EVENT_TEMPLATES = {
@@ -239,12 +258,58 @@ class ContextualPromptBuilder:
             prompt = self._assemble_prompt(components)
             prompt = self._optimize_prompt(prompt, max_length)
 
+            # Filtrar nomes de sites de notícias do prompt final
+            prompt = self._strip_source_names(prompt)
+
             logger.debug(f"[PromptBuilder] Prompt gerado ({len(prompt)} chars): {prompt[:200]}...")
             return prompt
 
         except Exception as e:
             logger.error(f"[PromptBuilder] Erro ao construir prompt: {e}")
             return self._build_fallback_prompt(analysis)
+
+    def _strip_source_names(self, prompt: str) -> str:
+        """
+        Remove nomes de sites de notícias do prompt para evitar que
+        a IA de imagem gere logos/branding desses sites.
+
+        Nomes são removidos APENAS quando aparecem como conteúdo descritivo,
+        NÃO quando fazem parte das instruções AVOID/NO.
+        """
+        import re
+
+        result = prompt
+        for name in self.PROHIBITED_SOURCE_NAMES:
+            # Remover menções que NÃO estejam em contexto de proibição (NO/AVOID)
+            # Ex: "CoinDesk reported..." -> "reported..."
+            # Mas preservar: "NO CoinDesk logos" (instrução de proibição)
+            result = re.sub(
+                rf'(?<!NO )(?<!no )\b{re.escape(name)}\s+(reported|published|announced|revealed|said|stated|according)',
+                r'\1',
+                result,
+                flags=re.IGNORECASE
+            )
+            # Remover "according to CoinDesk" patterns
+            result = re.sub(
+                rf'(?i)according to\s+{re.escape(name)}\b[,.]?\s*',
+                '',
+                result
+            )
+            # Remover "CoinDesk" sozinho em contextos descritivos (não em instruções AVOID/NO)
+            # Usar lookbehind para não remover de "NO CoinDesk"
+            result = re.sub(
+                rf'(?<!NO )(?<!no )(?<!\/)\b{re.escape(name)}\b(?!\s+logo)(?!\s+brand)',
+                'news sources',
+                result,
+                flags=re.IGNORECASE,
+                count=0
+            )
+
+        # Limpar espaços duplos resultantes
+        result = re.sub(r'\s{2,}', ' ', result)
+        result = re.sub(r',\s*,', ',', result)
+
+        return result
 
     def _build_components(self, analysis: ContextualAnalysisResult) -> PromptComponents:
         """Constrói os componentes individuais do prompt"""
@@ -425,6 +490,7 @@ class ContextualPromptBuilder:
         # Evitar elementos não relacionados à história
         avoid_items.append("Generic cryptocurrency imagery unrelated to this story")
         avoid_items.append("Elements not mentioned in the news story")
+        avoid_items.append("Any news website logos or branding (CoinDesk, CoinTelegraph, Bitcoin Magazine, CryptoSlate, Decrypt, The Block)")
 
         return f"AVOID: {'. '.join(avoid_items)}"
 

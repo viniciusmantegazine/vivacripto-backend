@@ -164,13 +164,15 @@ class SmartPromptGenerator:
 
     # Prefixo de proteção anti-watermark (CONCISO - vai no INÍCIO do prompt)
     PROTECTION_PREFIX = (
-        "Original editorial photo, no watermarks, no stock logos, no third-party branding. "
+        "Original editorial photo, no watermarks, no stock logos, no third-party branding, "
+        "NO news site logos (NO CoinDesk, NO CoinTelegraph, NO Bitcoin Magazine logos). "
     )
 
     # Sufixo de proteção de qualidade (CONCISO - vai no FINAL do prompt)
     QUALITY_PROTECTION_SUFFIX = (
         "clean complete composition, no cropped elements, no watermarks in corners, "
-        "no Getty/Shutterstock/iStock marks, publication-ready original image"
+        "no Getty/Shutterstock/iStock marks, no CoinDesk/CoinTelegraph/news site branding, "
+        "publication-ready original image"
     )
 
     # Reforços anti-watermark para usar estrategicamente
@@ -187,7 +189,8 @@ class SmartPromptGenerator:
     # Prefixo de proibição (mantido CONCISO)
     AVOID_PREFIX = (
         "NO abstract networks, NO digital particles, NO sci-fi effects, "
-        "NO blockchain visualizations, NO neon cyberpunk, NO watermarks. "
+        "NO blockchain visualizations, NO neon cyberpunk, NO watermarks, "
+        "NO news website logos or branding (CoinDesk, CoinTelegraph, Bitcoin Magazine, CryptoSlate, Decrypt). "
     )
 
     # Referência de estilo condensada
