@@ -167,5 +167,20 @@ class Settings(BaseSettings):
     # Sentry
     SENTRY_DSN: str = ""
 
+    # Twitter/X API
+    TWITTER_API_KEY: str = ""
+    TWITTER_API_SECRET: str = ""
+    TWITTER_ACCESS_TOKEN: str = ""
+    TWITTER_ACCESS_SECRET: str = ""
+    TWITTER_ENABLED: bool = False
+
+    # Instagram Graph API
+    INSTAGRAM_ACCESS_TOKEN: str = ""
+    INSTAGRAM_BUSINESS_ACCOUNT_ID: str = ""
+    INSTAGRAM_ENABLED: bool = False
+
+    # Social Publishing
+    SOCIAL_PUBLISHING_ENABLED: bool = False
+
 
 settings = Settings()

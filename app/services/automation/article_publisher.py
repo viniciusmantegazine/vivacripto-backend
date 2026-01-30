@@ -13,8 +13,9 @@ from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.crud.crud_post import crud_post
-from app.db.models import Category
+from app.db.models import Category, Post
 from app.schemas.post import PostCreate, PostUpdate
 from app.services.ai.category_classifier import category_classifier
 from app.services.ai.image_generator import ImageGenerator
@@ -57,10 +58,14 @@ class ArticlePublisher:
             # Preparar dados do post com validação de campos meta
             post_data = self._prepare_post_data(article, content_html, image_url, category.id)
 
-            await crud_post.create_post(db, post_data, auto_commit=False)
+            new_post = await crud_post.create_post(db, post_data, auto_commit=False)
             await db.commit()
 
             logger.info(f"Artigo '{article['title'][:50]}...' publicado com sucesso")
+
+            # Publicar nas redes sociais (não bloqueia em caso de falha)
+            await self._publish_to_social_media(new_post, db)
+
             return True
 
         except Exception as e:
@@ -218,3 +223,43 @@ class ArticlePublisher:
             canonical_url=None,
             category_id=category_id,
         )
+
+    async def _publish_to_social_media(
+        self, post: Post, db: AsyncSession
+    ) -> None:
+        """
+        Publica o artigo nas redes sociais habilitadas.
+        Esta operação não bloqueia a publicação principal em caso de falha.
+
+        Args:
+            post: Post recém-criado
+            db: Sessão do banco de dados
+        """
+        if not settings.SOCIAL_PUBLISHING_ENABLED:
+            return
+
+        try:
+            from app.services.social import SocialPublisher
+
+            social_publisher = SocialPublisher()
+            result = await social_publisher.publish(post, db)
+
+            if result.has_any_success:
+                logger.info(
+                    f"Publicação social concluída para '{post.title[:40]}...'",
+                    extra={
+                        "post_id": str(post.id),
+                        "twitter_success": result.twitter.success if result.twitter else None,
+                    }
+                )
+            else:
+                logger.warning(
+                    f"Nenhuma rede social publicou com sucesso para '{post.title[:40]}...'"
+                )
+
+        except Exception as e:
+            # Log error but don't fail the main publication
+            logger.error(
+                f"Erro na publicação social (não bloqueante): {e}",
+                extra={"post_id": str(post.id) if post else None}
+            )

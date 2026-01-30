@@ -124,10 +124,34 @@ class NewsletterSubscriber(Base):
 class AutomationLog(Base):
     """Automation log model"""
     __tablename__ = 'automation_logs'
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     run_id = Column(UUID(as_uuid=True), nullable=False)
     level = Column(String(20), nullable=False)
     message = Column(Text, nullable=False)
     log_metadata = Column(JSONB)
     created_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+class SocialPost(Base):
+    """Social media post tracking model"""
+    __tablename__ = 'social_posts'
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    post_id = Column(UUID(as_uuid=True), ForeignKey('posts.id', ondelete='CASCADE'), nullable=False)
+    platform = Column(String(50), nullable=False)  # "twitter", "instagram"
+    platform_post_id = Column(String(255), nullable=True)  # ID do post na plataforma
+    platform_url = Column(Text, nullable=True)  # URL do post na plataforma
+    status = Column(String(20), nullable=False, default='pending')  # "pending", "success", "failed"
+    error_message = Column(Text, nullable=True)
+    published_at = Column(DateTime, default=utc_now, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+    # Relationships
+    post = relationship("Post", backref="social_posts")
+
+    # Constraints
+    __table_args__ = (
+        CheckConstraint("platform IN ('twitter', 'instagram', 'linkedin')", name='check_social_platform'),
+        CheckConstraint("status IN ('pending', 'success', 'failed')", name='check_social_status'),
+    )
