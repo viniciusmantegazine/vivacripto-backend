@@ -3,6 +3,7 @@ Twitter/X API adapter for publishing tweets.
 Uses Tweepy library for Twitter API v2 integration.
 """
 import asyncio
+import io
 from typing import Optional
 from dataclasses import dataclass
 
@@ -130,13 +131,16 @@ class TwitterAdapter:
                 response.raise_for_status()
                 image_data = response.content
 
+            # Convert bytes to file-like object for Tweepy
+            image_file = io.BytesIO(image_data)
+
             # Upload to Twitter (sync operation)
             loop = asyncio.get_event_loop()
             media = await loop.run_in_executor(
                 None,
                 lambda: api.media_upload(
                     filename="image.jpg",
-                    file=image_data,
+                    file=image_file,
                 )
             )
 
