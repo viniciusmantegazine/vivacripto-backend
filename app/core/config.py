@@ -135,6 +135,9 @@ class Settings(BaseSettings):
     # Google Gemini
     GEMINI_API_KEY: str = ""
 
+    # Anthropic Claude
+    ANTHROPIC_API_KEY: str = ""
+
     # Cloudinary
     CLOUDINARY_CLOUD_NAME: str = ""
     CLOUDINARY_API_KEY: str = ""

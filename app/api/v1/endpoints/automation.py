@@ -11,7 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.base import get_db
 from app.services.automation.news_pipeline import NewsPipeline
 from app.services.ai.content_generator import ContentGenerator
+from app.services.ai.weekly_report_generator import weekly_report_generator
 from app.services.automation.quality_validator import QualityValidator
+from app.services.automation.article_publisher import ArticlePublisher
+from app.schemas.report import WeeklyReportRequest, WeeklyReportResponse
 from app.core.logging import logger
 from app.core.security import verify_automation_token
 from app.core.rate_limiter import limiter, RATE_LIMITS
@@ -148,3 +151,114 @@ async def test_content_generation(
             error_response["error_detail"] = str(e)
             error_response["traceback"] = traceback.format_exc()
         return error_response
+
+
+@router.post("/weekly-report", response_model=WeeklyReportResponse)
+@limiter.limit(RATE_LIMITS["automation"])
+async def generate_weekly_report(
+    request: Request,
+    report_request: WeeklyReportRequest,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_automation_token)
+):
+    """
+    Gera e publica um relatório semanal de análise macro + Bitcoin.
+
+    Este endpoint é projetado para ser chamado esporadicamente (semanalmente),
+    não como parte do pipeline de automação diária.
+
+    Usa Claude Opus para gerar análises profundas do mercado de criptomoedas.
+
+    Requer:
+    - Authorization: Bearer {AUTOMATION_TOKEN}
+    - Body: WeeklyReportRequest com publish (bool)
+
+    Se publish=True: Publica o relatório imediatamente
+    Se publish=False: Retorna preview do relatório sem publicar
+    """
+    logger.info("Geração de relatório semanal iniciada")
+
+    try:
+        # Verificar se Claude está disponível
+        if not weekly_report_generator.claude_available:
+            return WeeklyReportResponse(
+                success=False,
+                title="",
+                slug="",
+                excerpt="",
+                errors=["Claude não configurado. Defina ANTHROPIC_API_KEY no ambiente."]
+            )
+
+        # Gerar relatório
+        report = await weekly_report_generator.generate_report()
+
+        if not report:
+            return WeeklyReportResponse(
+                success=False,
+                title="",
+                slug="",
+                excerpt="",
+                errors=["Falha ao gerar relatório semanal"]
+            )
+
+        # Se não for para publicar, retorna preview
+        if not report_request.publish:
+            return WeeklyReportResponse(
+                success=True,
+                title=report["title"],
+                slug=report["slug"],
+                excerpt=report["excerpt"],
+                image_url=report.get("image_url"),
+                word_count=report.get("word_count", 0),
+                preview_content=report["content_markdown"],
+                errors=[]
+            )
+
+        # Publicar relatório
+        publisher = ArticlePublisher()
+        published = await publisher.publish_article(report, db)
+
+        if not published:
+            return WeeklyReportResponse(
+                success=False,
+                title=report["title"],
+                slug=report["slug"],
+                excerpt=report["excerpt"],
+                image_url=report.get("image_url"),
+                word_count=report.get("word_count", 0),
+                errors=["Relatório gerado mas falha ao publicar no banco"]
+            )
+
+        # Buscar post criado para obter ID
+        from app.crud.crud_post import crud_post
+        created_post = await crud_post.get_post_by_slug(db, report["slug"])
+        post_id = str(created_post.id) if created_post else None
+
+        logger.info(f"Relatório semanal publicado: {report['title']}")
+
+        return WeeklyReportResponse(
+            success=True,
+            post_id=post_id,
+            title=report["title"],
+            slug=report["slug"],
+            excerpt=report["excerpt"],
+            image_url=report.get("image_url"),
+            word_count=report.get("word_count", 0),
+            errors=[]
+        )
+
+    except Exception as e:
+        logger.exception(f"Erro ao gerar relatório semanal: {e}")
+        from app.core.config import settings
+
+        errors = ["Erro interno ao gerar relatório semanal"]
+        if settings.DEBUG:
+            errors.append(str(e))
+
+        return WeeklyReportResponse(
+            success=False,
+            title="",
+            slug="",
+            excerpt="",
+            errors=errors
+        )
