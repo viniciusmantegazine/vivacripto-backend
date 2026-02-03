@@ -163,13 +163,18 @@ seguindo RIGOROSAMENTE a estrutura definida no system prompt.
 
 Data de referência: {datetime.utcnow().strftime("%d/%m/%Y")}
 
-IMPORTANTE:
-1. Siga a estrutura de 7 partes obrigatória
-2. Use dados públicos e bem conhecidos do mercado
-3. Mantenha tom analítico e profissional
-4. Inclua o disclaimer de não ser aconselhamento financeiro
-5. Mínimo 1500 palavras, máximo 3000 palavras
-6. Formate em Markdown com ## para seções principais e ### para subseções
+REGRAS DE FORMATAÇÃO OBRIGATÓRIAS:
+1. NÃO inclua título principal - comece direto com "## Cenário Macroeconômico dos EUA"
+2. NÃO use emojis em nenhum lugar do texto
+3. Use ## para seções principais (ex: ## Cenário Macroeconômico dos EUA)
+4. Use ### para subseções numeradas (ex: ### 1.1 Política Monetária)
+5. Use **negrito** para valores numéricos e termos importantes
+6. Use listas com hífen (-) para itens
+7. Separe seções com --- (linha horizontal)
+8. Mínimo 1500 palavras, máximo 3000 palavras
+9. Inclua disclaimer de não ser aconselhamento financeiro no final
+10. Use dados públicos e bem conhecidos do mercado
+11. Mantenha tom analítico e profissional
 
 Gere o relatório completo agora:"""
 
@@ -219,60 +224,26 @@ Gere o relatório completo agora:"""
         return content
 
     async def _generate_title(self, content: str) -> str:
-        """Gera um título para o relatório baseado no conteúdo"""
-
-        # Extrair data atual para o título
-        today = datetime.utcnow()
-        week_str = today.strftime("%d/%m/%Y")
-
-        # Prompt para gerar título
-        title_prompt = f"""Com base no relatório de análise semanal abaixo, gere um título
-curto e impactante (máximo 80 caracteres) que capture a essência da semana.
-
-O título deve:
-- Ser informativo e profissional
-- Mencionar Bitcoin ou mercado cripto
-- Refletir o tom geral da análise (otimista, pessimista ou neutro)
-- NÃO incluir a data (será adicionada separadamente)
-
-Conteúdo do relatório (primeiros 500 caracteres):
-{content[:500]}...
-
-Responda APENAS com o título, sem aspas ou explicações:"""
-
-        try:
-            response = await self.claude_client.messages.create(
-                model=self.CLAUDE_FALLBACK_MODEL,  # Usar modelo mais rápido para título
-                max_tokens=100,
-                temperature=0.5,
-                messages=[
-                    {"role": "user", "content": title_prompt}
-                ]
-            )
-
-            title = response.content[0].text.strip()
-            # Limitar tamanho e limpar
-            title = title.replace('"', '').replace("'", "")[:80]
-
-            return title
-
-        except Exception as e:
-            logger.warning(f"Falha ao gerar título: {e}. Usando título padrão.")
-            return f"Análise Semanal Bitcoin - {week_str}"
+        """Retorna o título fixo do relatório semanal"""
+        # Título fixo para manter consistência com o formato "Giro semanal"
+        return "Giro semanal do mercado cripto"
 
     def _generate_excerpt(self, content: str) -> str:
         """Gera um excerpt do relatório (primeiras 2-3 frases)"""
 
-        # Pegar as primeiras linhas que não são cabeçalhos
+        # Pegar as primeiras linhas que não são cabeçalhos ou listas
         lines = content.split("\n")
         excerpt_parts = []
 
         for line in lines:
             line = line.strip()
-            # Pular linhas vazias e cabeçalhos
-            if not line or line.startswith("#") or line.startswith("═"):
+            # Pular linhas vazias, cabeçalhos, separadores e listas
+            if not line or line.startswith("#") or line.startswith("═") or line.startswith("-") or line.startswith("---"):
                 continue
-            # Pegar apenas texto normal
+            # Pular linhas que começam com "Analise:" ou "Liste:"
+            if line.startswith("Analise:") or line.startswith("Liste:"):
+                continue
+            # Pegar apenas texto normal (parágrafos)
             excerpt_parts.append(line)
             if len(" ".join(excerpt_parts)) > 200:
                 break
