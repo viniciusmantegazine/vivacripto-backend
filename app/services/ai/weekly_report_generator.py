@@ -44,7 +44,7 @@ class WeeklyReportGenerator:
     """
 
     # Modelos Claude
-    CLAUDE_MODEL = "claude-opus-4-1-20250116"
+    CLAUDE_MODEL = "claude-opus-4-20250514"
     CLAUDE_FALLBACK_MODEL = "claude-sonnet-4-20250514"
 
     # Configurações de geração
