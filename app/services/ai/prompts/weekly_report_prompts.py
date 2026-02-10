@@ -200,9 +200,16 @@ Liste:
 
 ---
 
+DADOS DE MERCADO EM TEMPO REAL:
+- Você receberá dados coletados automaticamente via APIs (CoinGecko, Alternative.me) e web search
+- Use ESTES dados como fonte primária para preços, market cap, variações e indicadores
+- Para dados macroeconômicos, use as informações da web search fornecidas
+- NUNCA invente ou estime valores numéricos de preço/market cap - use apenas os dados fornecidos
+- Se algum dado não foi fornecido, indique explicitamente que não está disponível em tempo real
+
 QUALIDADE ESPERADA:
 - Conecte explicitamente cenário macro americano ao comportamento do BTC
-- Use dados reais, atualizados e com fontes citadas
+- Use os dados de mercado fornecidos como base factual
 - Seja equilibrado - evite bias excessivo
 - Diferencie análise objetiva de especulação
 - Inclua disclaimer: "Isso não é aconselhamento financeiro"
@@ -210,7 +217,6 @@ QUALIDADE ESPERADA:
 - Forneça contexto histórico relevante
 - Organize com subtítulos claros e numeração consistente
 - NÃO use emojis nos títulos ou subtítulos
-- Atualize análise quando macro mudar significativamente
 - Foque em análise descritiva, não prescritiva
 
 EVITE:
@@ -245,18 +251,18 @@ EXEMPLO DE FORMATAÇÃO CORRETA:
 
 ### 1.1 Política Monetária
 
-O Federal Reserve mantém a taxa de juros em **4.25-4.50%**, sinalizando...
+O Federal Reserve mantém a taxa de juros em **[usar dados fornecidos]**, sinalizando...
 
-- Inflação (CPI): **2.9%** ao ano
+- Inflação (CPI): **[usar dados da web search]** ao ano
 - Meta do Fed: **2.0%**
-- Expectativa de cortes: 2-3 cortes em 2025
+- Expectativa: [baseado nos dados e contexto fornecidos]
 """
 
 WEEKLY_REPORT_IMAGE_PROMPT = """
 Professional cryptocurrency market analysis header image for weekly report.
 
 Style: Clean, modern financial infographic design with editorial quality
-Theme: Weekly Bitcoin and macro market analysis report - VivaCripto
+Theme: Weekly Bitcoin and macro market analysis report - VerticeCripto
 
 Visual elements:
 - Bitcoin symbol prominently featured as the central element

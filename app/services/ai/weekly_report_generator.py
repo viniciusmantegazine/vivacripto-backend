@@ -157,11 +157,20 @@ class WeeklyReportGenerator:
     async def _generate_content(self) -> Optional[str]:
         """Gera o conteúdo principal do relatório usando Claude Opus"""
 
-        # User prompt solicita a geração do relatório
+        # Coletar dados de mercado em tempo real
+        from app.services.ai.market_data_collector import market_data_collector
+
+        logger.info("Coletando dados de mercado em tempo real...")
+        market_data = await market_data_collector.collect_all()
+        logger.info(f"Dados de mercado coletados: {len(market_data)} caracteres")
+
+        # User prompt com dados reais injetados
         user_prompt = f"""Gere um relatório semanal completo de análise do mercado de criptomoedas,
 seguindo RIGOROSAMENTE a estrutura definida no system prompt.
 
 Data de referência: {datetime.utcnow().strftime("%d/%m/%Y")}
+
+{market_data}
 
 REGRAS DE FORMATAÇÃO OBRIGATÓRIAS:
 1. NÃO inclua título principal - comece direto com "## Cenário Macroeconômico dos EUA"
@@ -173,7 +182,7 @@ REGRAS DE FORMATAÇÃO OBRIGATÓRIAS:
 7. Separe seções com --- (linha horizontal)
 8. Mínimo 1500 palavras, máximo 3000 palavras
 9. Inclua disclaimer de não ser aconselhamento financeiro no final
-10. Use dados públicos e bem conhecidos do mercado
+10. Use os DADOS DE MERCADO fornecidos acima como fonte primária para preços e indicadores
 11. Mantenha tom analítico e profissional
 
 Gere o relatório completo agora:"""
