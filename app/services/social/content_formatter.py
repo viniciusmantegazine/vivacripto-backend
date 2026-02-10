@@ -109,7 +109,7 @@ class SocialContentFormatter:
         Twitter has a 280 character limit. URLs count as 23 characters.
         Format: {title} {hashtags} {url}
         """
-        url = f"{settings.FRONTEND_URL}/{slug}?utm_source=twitter&utm_medium=social&utm_campaign=auto_post"
+        url = f"{settings.FRONTEND_URL}/posts/{slug}?utm_source=twitter&utm_medium=social&utm_campaign=auto_post"
         hashtags = self._get_hashtags(category_slug, limit=3)
         hashtags_text = " ".join(f"#{tag}" for tag in hashtags)
 
