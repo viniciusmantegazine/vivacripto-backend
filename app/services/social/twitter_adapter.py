@@ -25,7 +25,7 @@ class TwitterPublishResult:
 class TwitterAdapter:
     """Adapter for Twitter/X API v2"""
 
-    TWITTER_USERNAME = "vivacripto"  # Update with actual username
+    TWITTER_USERNAME = "verticecripto"
 
     def __init__(self):
         self._client = None

@@ -2,6 +2,7 @@
 Content formatter for social media posts.
 Formats content for different social media platforms with appropriate length and hashtags.
 """
+import re
 from typing import List, Optional
 from dataclasses import dataclass
 
@@ -29,12 +30,72 @@ class SocialContentFormatter:
         "airdrop": ["Airdrop", "Crypto", "FreeCrypto"],
     }
 
-    BASE_HASHTAGS = ["VivaCripto", "Criptomoedas"]
+    BASE_HASHTAGS = ["VerticeCripto", "Criptomoedas"]
 
     TWITTER_MAX_LENGTH = 280
     TWITTER_URL_LENGTH = 23  # Twitter encurta URLs para 23 caracteres
 
     INSTAGRAM_MAX_LENGTH = 2200
+
+    # Nomes próprios: lowercase -> capitalização correta
+    _PROPER_NOUNS_MAP = {
+        # Criptomoedas
+        "bitcoin": "Bitcoin",
+        "ethereum": "Ethereum",
+        "solana": "Solana",
+        "cardano": "Cardano",
+        "polkadot": "Polkadot",
+        "chainlink": "Chainlink",
+        "avalanche": "Avalanche",
+        "polygon": "Polygon",
+        "ripple": "Ripple",
+        "dogecoin": "Dogecoin",
+        "litecoin": "Litecoin",
+        "tether": "Tether",
+        "uniswap": "Uniswap",
+        "aave": "Aave",
+        # Tickers
+        "btc": "BTC",
+        "eth": "ETH",
+        "sol": "SOL",
+        "ada": "ADA",
+        "xrp": "XRP",
+        "bnb": "BNB",
+        "doge": "DOGE",
+        "usdt": "USDT",
+        "usdc": "USDC",
+        # Empresas/Exchanges
+        "binance": "Binance",
+        "coinbase": "Coinbase",
+        "kraken": "Kraken",
+        "bybit": "Bybit",
+        "blackrock": "BlackRock",
+        "microstrategy": "MicroStrategy",
+        "grayscale": "Grayscale",
+        "opensea": "OpenSea",
+        "metamask": "MetaMask",
+        # Conceitos
+        "defi": "DeFi",
+        "nft": "NFT",
+        "nfts": "NFTs",
+        "dao": "DAO",
+        "daos": "DAOs",
+        "web3": "Web3",
+        "gamefi": "GameFi",
+        # Instituições/Siglas
+        "sec": "SEC",
+        "cvm": "CVM",
+        "eua": "EUA",
+        "etf": "ETF",
+        "etfs": "ETFs",
+        "fed": "Fed",
+        # Pessoas
+        "trump": "Trump",
+        "musk": "Musk",
+        "vitalik": "Vitalik",
+        # Marca
+        "verticecripto": "VerticeCripto",
+    }
 
     def format_for_twitter(
         self,
@@ -48,7 +109,7 @@ class SocialContentFormatter:
         Twitter has a 280 character limit. URLs count as 23 characters.
         Format: {title} {hashtags} {url}
         """
-        url = f"{settings.FRONTEND_URL}/{slug}"
+        url = f"{settings.FRONTEND_URL}/{slug}?utm_source=twitter&utm_medium=social&utm_campaign=auto_post"
         hashtags = self._get_hashtags(category_slug, limit=3)
         hashtags_text = " ".join(f"#{tag}" for tag in hashtags)
 
@@ -57,8 +118,9 @@ class SocialContentFormatter:
         reserved_space = self.TWITTER_URL_LENGTH + 2 + len(hashtags_text)
         max_title_length = self.TWITTER_MAX_LENGTH - reserved_space
 
-        # Truncate title if needed
-        truncated_title = self._truncate_text(title, max_title_length)
+        # Apply sentence case (pt-BR) and truncate if needed
+        title_formatted = self._to_sentence_case(title)
+        truncated_title = self._truncate_text(title_formatted, max_title_length)
 
         text = f"{truncated_title}\n\n{hashtags_text}\n\n{url}"
 
@@ -113,6 +175,25 @@ class SocialContentFormatter:
             hashtags=hashtags,
             url=None,  # Instagram doesn't allow clickable links in captions
         )
+
+    def _to_sentence_case(self, text: str) -> str:
+        """Converts Title Case to sentence case following Portuguese rules.
+
+        Only the first word and proper nouns are capitalized.
+        Example: "Bitcoin Atinge Nova Máxima Histórica" -> "Bitcoin atinge nova máxima histórica"
+        """
+        if not text:
+            return text
+
+        # Lowercase everything, then capitalize first letter
+        result = text[0].upper() + text[1:].lower()
+
+        # Re-capitalize known proper nouns using word boundaries
+        for lower_form, correct_form in self._PROPER_NOUNS_MAP.items():
+            pattern = re.compile(r'\b' + re.escape(lower_form) + r'\b', re.IGNORECASE)
+            result = pattern.sub(correct_form, result)
+
+        return result
 
     def _get_hashtags(
         self,
