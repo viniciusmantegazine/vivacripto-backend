@@ -224,9 +224,9 @@ Gere o relatório completo agora:"""
         return content
 
     async def _generate_title(self, content: str) -> str:
-        """Retorna o título fixo do relatório semanal"""
-        # Título fixo para manter consistência com o formato "Giro semanal"
-        return "Giro semanal do mercado cripto"
+        """Retorna o título do relatório semanal com número da semana atual"""
+        week_number = datetime.utcnow().isocalendar()[1]
+        return f"Giro semanal do mercado cripto semana {week_number:02d}"
 
     def _generate_excerpt(self, content: str) -> str:
         """Gera um excerpt do relatório (primeiras 2-3 frases)"""
