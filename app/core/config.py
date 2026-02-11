@@ -29,6 +29,8 @@ class Settings(BaseSettings):
         "http://localhost:5173",
         "https://vivacripto.com.br",
         "https://www.vivacripto.com.br",
+        "https://verticecripto.com.br",
+        "https://www.verticecripto.com.br",
     ]
 
     @field_validator("CORS_ORIGINS", mode="before")
