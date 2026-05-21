@@ -16,9 +16,18 @@ class QualityValidator:
         "blockchain", "defi", "nft", "token", "moeda digital"
     ]
     
-    # Limites de qualidade v2.0 - Estrutura flexível
-    MIN_WORD_COUNT = 250  # Mínimo para garantir substância
-    MAX_WORD_COUNT = 500  # Máximo para manter artigos concisos
+    # Limites de qualidade v2.0 - Estrutura flexível (defaults; pode ser override no __init__)
+    MIN_WORD_COUNT = 250  # Default mínimo
+    MAX_WORD_COUNT = 500  # Default máximo
+
+    def __init__(self, min_words: int = None, max_words: int = None):
+        """
+        Args:
+            min_words: Override do limite mínimo de palavras (default 250)
+            max_words: Override do limite máximo de palavras (default 500)
+        """
+        self.min_word_count = min_words if min_words is not None else self.MIN_WORD_COUNT
+        self.max_word_count = max_words if max_words is not None else self.MAX_WORD_COUNT
     MIN_TITLE_LENGTH = 30
     MAX_TITLE_LENGTH = 100  # Aumentado de 70 para 100
     MIN_EXCERPT_LENGTH = 80
@@ -85,13 +94,13 @@ class QualityValidator:
         """Valida a contagem de palavras do conteúdo"""
         content = article.get("content_markdown", "")
         word_count = len(content.split())
-        
-        if word_count < self.MIN_WORD_COUNT:
-            return False, f"Conteúdo muito curto ({word_count} palavras, mínimo {self.MIN_WORD_COUNT})"
-        
-        if word_count > self.MAX_WORD_COUNT:
-            return False, f"Conteúdo muito longo ({word_count} palavras, máximo {self.MAX_WORD_COUNT})"
-        
+
+        if word_count < self.min_word_count:
+            return False, f"Conteúdo muito curto ({word_count} palavras, mínimo {self.min_word_count})"
+
+        if word_count > self.max_word_count:
+            return False, f"Conteúdo muito longo ({word_count} palavras, máximo {self.max_word_count})"
+
         return True, ""
     
     def _validate_keywords(self, article: Dict) -> Tuple[bool, str]:
