@@ -2,7 +2,7 @@
 Quality Validation Service
 Valida a qualidade do conteúdo gerado
 """
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 from loguru import logger
 import re
 
@@ -20,7 +20,7 @@ class QualityValidator:
     MIN_WORD_COUNT = 250  # Default mínimo
     MAX_WORD_COUNT = 500  # Default máximo
 
-    def __init__(self, min_words: int = None, max_words: int = None):
+    def __init__(self, min_words: Optional[int] = None, max_words: Optional[int] = None):
         """
         Args:
             min_words: Override do limite mínimo de palavras (default 250)
