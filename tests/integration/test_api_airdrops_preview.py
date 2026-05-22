@@ -12,24 +12,9 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
-# ── garante que o módulo app.db.base não quebre ao criar o engine no SQLite ──
-# O conftest já define DATABASE_URL=sqlite+aiosqlite:///:memory: mas o engine
-# no app/db/base.py passa pool_size/max_overflow que o SQLite não aceita.
-# Patchamos create_async_engine ANTES de qualquer import do app.
-_engine_mock = MagicMock()
-_engine_mock.begin = MagicMock()
-_engine_patcher = patch(
-    "sqlalchemy.ext.asyncio.create_async_engine",
-    return_value=_engine_mock,
-)
-_engine_patcher.start()
-
-# Agora importamos o app (e indiretamente app.db.base) com o engine mockado
-from app.core.config import settings  # noqa: E402
-from app.db.base import get_db  # noqa: E402
-from app.main import app  # noqa: E402
-
-_engine_patcher.stop()
+from app.core.config import settings
+from app.db.base import get_db
+from app.main import app
 
 
 @pytest_asyncio.fixture

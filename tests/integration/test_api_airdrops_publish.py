@@ -14,19 +14,7 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
-# Patch create_async_engine ANTES de qualquer import que carregue app.db.base
-import sqlalchemy.ext.asyncio as _sa_async
-_orig_create_engine = _sa_async.create_async_engine
-
-def _safe_create_engine(*args, **kwargs):
-    kwargs.pop("pool_size", None)
-    kwargs.pop("max_overflow", None)
-    kwargs["url"] = "sqlite+aiosqlite:///:memory:" if "url" not in kwargs and args else kwargs.get("url")
-    return _orig_create_engine("sqlite+aiosqlite:///:memory:", **{k: v for k, v in kwargs.items() if k in ("echo", "future")})
-
-_sa_async.create_async_engine = _safe_create_engine
-
-from app.core.config import settings  # noqa: E402
+from app.core.config import settings
 
 
 def _make_article(referral: str, official: str) -> dict:

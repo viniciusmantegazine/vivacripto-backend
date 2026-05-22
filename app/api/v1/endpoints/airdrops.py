@@ -66,8 +66,8 @@ async def generate_airdrop_post(
     try:
         article = await generator.generate(
             project_name=body.project_name,
-            official_url=str(body.official_url),
-            referral_url=str(body.referral_url),
+            official_url=str(body.official_url).rstrip("/"),
+            referral_url=str(body.referral_url).rstrip("/"),
         )
     except ResearchFailedError as e:
         logger.error(f"Airdrop: pesquisa web falhou: {e}")
@@ -141,8 +141,9 @@ async def generate_airdrop_post(
     created = await crud_post.get_post_by_slug(db, article["slug"])
     post_id = str(created.id) if created else None
 
-    # Revalidação ISR (não bloqueante)
-    await _revalidate_frontend()
+    # Revalidação ISR (fire-and-forget — não bloqueia o response)
+    import asyncio as _asyncio
+    _asyncio.create_task(_revalidate_frontend())
 
     logger.info(f"Airdrop post publicado: {article['title'][:50]}")
     return AirdropPostResponse(
