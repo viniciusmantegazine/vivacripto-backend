@@ -16,18 +16,21 @@ class TestQualityValidator:
 
     @pytest.fixture
     def valid_article(self) -> dict:
-        """Create a valid article with all required fields."""
+        """Create a valid article with all required fields (~800 words, SEO-friendly)."""
+        # Bloco repetível com keywords cripto para atingir o mínimo de 700 palavras
+        # do validator. Mantém estrutura válida (H2 + múltiplos parágrafos).
+        paragraph = (
+            "O mercado de Bitcoin e demais criptomoedas registrou movimentos relevantes "
+            "no período recente. Analistas do setor cripto avaliam que a dinâmica entre "
+            "Ethereum, blockchain de camada um e protocolos DeFi pode redefinir a alocação "
+            "de capital institucional ao longo dos próximos trimestres. A discussão "
+            "envolve fundos cripto, ETFs spot, tokenização de ativos reais e regulação."
+        )  # ~50 palavras
+        body = "\n\n".join([paragraph] * 14)  # ~700 palavras de corpo
+        content = f"## Bitcoin em Alta\n\nO Bitcoin atingiu uma nova máxima histórica nesta semana, superando a marca de $100.000 pela primeira vez na história. A criptomoeda mais valiosa do mundo continua sua trajetória de valorização institucional.\n\n{body}"
         return {
             "title": "Bitcoin Atinge Nova Máxima Histórica em 2024",
-            "content_markdown": """## Bitcoin em Alta
-
-O Bitcoin atingiu uma nova máxima histórica nesta semana, superando a marca de $100.000 pela primeira vez na história. A criptomoeda mais valiosa do mundo continua sua trajetória de valorização.
-
-Analistas apontam que a entrada de investidores institucionais, especialmente através dos ETFs aprovados nos Estados Unidos, foi o principal catalisador dessa alta histórica.
-
-O mercado de criptomoedas como um todo reagiu positivamente, com Ethereum e outras altcoins também registrando ganhos expressivos. A dominância do BTC permanece acima de 50%.
-
-Especialistas recomendam cautela apesar do otimismo, lembrando que o mercado crypto é conhecido por sua volatilidade extrema.""",
+            "content_markdown": content,
             "excerpt": "Bitcoin supera $100.000 pela primeira vez na história, impulsionado por ETFs e investidores institucionais. Mercado crypto celebra marco histórico.",
             "meta_description": "Bitcoin atinge nova máxima histórica de $100.000 em 2024. Entenda os fatores por trás da alta e o que esperar do mercado de criptomoedas.",
             "meta_title": "Bitcoin Bate Recorde: $100k pela Primeira Vez",
@@ -94,8 +97,8 @@ A bolsa de valores teve uma semana muito boa. Os resultados foram excelentes."""
 
     def test_validate_article_content_too_long(self, validator: QualityValidator, valid_article: dict):
         """Test validation fails when content is too long."""
-        # Create content with more than 500 words
-        valid_article["content_markdown"] = "## Bitcoin\n\n" + ("Bitcoin crypto blockchain defi token " * 120)
+        # Create content with more than 1500 words (new MAX_WORD_COUNT)
+        valid_article["content_markdown"] = "## Bitcoin\n\n" + ("Bitcoin crypto blockchain defi token " * 340)
 
         is_valid, errors = validator.validate_article(valid_article)
 

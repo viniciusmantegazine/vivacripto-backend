@@ -16,9 +16,10 @@ class QualityValidator:
         "blockchain", "defi", "nft", "token", "moeda digital"
     ]
     
-    # Limites de qualidade v2.0 - Estrutura flexível (defaults; pode ser override no __init__)
-    MIN_WORD_COUNT = 250  # Default mínimo
-    MAX_WORD_COUNT = 500  # Default máximo
+    # Limites de qualidade v3.0 - Defaults SEO-friendly para pipeline RSS de notícias
+    # (pipelines especializados como airdrop/weekly_report passam override no __init__)
+    MIN_WORD_COUNT = 700  # Default mínimo: artigos com menos não rankeiam em nicho competitivo
+    MAX_WORD_COUNT = 1500  # Default máximo: permite profundidade sem virar artigo enciclopédico
 
     def __init__(
         self,

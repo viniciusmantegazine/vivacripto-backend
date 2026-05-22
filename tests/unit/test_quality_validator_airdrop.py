@@ -53,17 +53,22 @@ def test_rejects_above_custom_max_words():
     assert any("800 palavras" in e and "máximo 750" in e for e in errors)
 
 
-def test_default_constructor_preserves_original_behavior():
-    """Sem argumentos, validator deve manter 250-500 (compatibilidade)"""
+def test_default_constructor_uses_seo_friendly_defaults():
+    """Sem argumentos, validator usa defaults 700-1500 (pipeline RSS SEO-friendly)"""
     validator = QualityValidator()
-    article = _article_with_word_count(400)
+    article = _article_with_word_count(900)
     is_valid, _ = validator.validate_article(article)
     assert is_valid
 
-    article_too_long = _article_with_word_count(600)
+    article_too_short = _article_with_word_count(400)
+    is_valid, errors = validator.validate_article(article_too_short)
+    assert not is_valid
+    assert any("mínimo 700" in e for e in errors)
+
+    article_too_long = _article_with_word_count(1700)
     is_valid, errors = validator.validate_article(article_too_long)
     assert not is_valid
-    assert any("máximo 500" in e for e in errors)
+    assert any("máximo 1500" in e for e in errors)
 
 
 def _article_intro_then_h2(words: int = 600) -> dict:

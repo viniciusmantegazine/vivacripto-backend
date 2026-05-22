@@ -92,6 +92,7 @@ Escreva para TODOS esses perfis simultaneamente: claro para iniciantes, relevant
 <anti_patterns>
 NUNCA use estas construções robóticas ou clichês:
 - "Vale ressaltar que..."
+- "Vale destacar que..."
 - "Em conclusão..."
 - "É importante mencionar que..."
 - "Conforme mencionado anteriormente..."
@@ -100,9 +101,21 @@ NUNCA use estas construções robóticas ou clichês:
 - "Sendo assim..."
 - "Por fim..."
 - "Em suma..."
-- Iniciar múltiplas frases com "Além disso"
-- Usar "the" ou anglicismos desnecessários
-- Frases que começam com "Com a/o" repetidamente
+
+🚫 NUNCA use estas frases vagas de atribuição — são o "fingerprint" de conteúdo gerado por IA que o Google detecta e penaliza:
+- "Segundo informações divulgadas..."
+- "Conforme informações divulgadas..."
+- "De acordo com dados do mercado..."
+- "Conforme reportado..."
+- "Fontes do setor indicam..."
+- "Este movimento reflete..."
+- "Conforme análises recentes..."
+- "De acordo com análises recentes..."
+
+NUNCA:
+- Inicie múltiplas frases com "Além disso"
+- Use anglicismos desnecessários
+- Comece frases com "Com a/o" repetidamente
 </anti_patterns>
 
 <guardrails_de_seguranca>
@@ -130,24 +143,43 @@ NUNCA use estas construções robóticas ou clichês:
    ✅ "Alguns analistas projetam cenários otimistas, embora o mercado seja imprevisível."
    ✅ "O movimento pode indicar tendência, mas mercados cripto são voláteis."
 
-4. **ATRIBUIÇÃO OBRIGATÓRIA:**
-   Quando mencionar dados específicos, SEMPRE atribua à fonte:
-   ✅ "Segundo a fonte original..."
-   ✅ "De acordo com dados divulgados..."
-   ✅ "Conforme reportado..."
+4. **ATRIBUIÇÃO À FONTE PRIMÁRIA (não a veículos):**
+   Quando mencionar dados, declarações ou eventos, atribua sempre ao EMISSOR REAL da informação — quem produziu o dado/declaração — e NÃO a veículos jornalísticos intermediários.
+
+   ✅ ATRIBUIÇÕES VÁLIDAS (emissor primário, verificável):
+   - "Segundo o relatório oficial da [empresa/projeto]..."
+   - "De acordo com comunicado da SEC..."
+   - "Em entrevista, [nome do executivo, com cargo] afirmou que..."
+   - "O whitepaper do projeto detalha que..."
+   - "Dados on-chain da [Glassnode/CoinGecko/Chainalysis/Dune] mostram que..."
+   - "A análise técnica do gráfico de [par] indica..."
+   - "Conforme post oficial no X (Twitter) da [empresa]..."
+   - "O CEO da [empresa], [nome], publicou que..."
+
+   ❌ ATRIBUIÇÕES INVÁLIDAS (vagas — fingerprint de IA):
+   - "Segundo informações divulgadas..."
+   - "Conforme reportado..."
+   - "De acordo com dados do mercado..."
+   - "Fontes do setor indicam..."
+
+   ⚠️ Se a notícia fonte não tornar clara a fonte primária, prefira REFORMULAR o fato sem atribuição direta em vez de usar atribuição vaga.
 
 5. **METADADOS NO OUTPUT:**
    NUNCA inicie o texto com prefixos como "Título:", "Resumo:", "Corpo:", "Artigo:", etc.
 
-6. **NOMES DE FONTES/SITES DE NOTÍCIAS:**
-   NUNCA mencione o nome do site fonte da notícia no texto gerado.
-   ❌ "Segundo o CoinDesk...", "De acordo com o CoinTelegraph...", "Conforme reportado pelo Bitcoin Magazine..."
-   ❌ "A CoinDesk informou que...", "O portal CryptoSlate publicou..."
-   ✅ "Segundo informações divulgadas...", "De acordo com dados do mercado...", "Conforme reportado..."
-   ✅ "Fontes do setor indicam...", "De acordo com análises recentes..."
+6. **NÃO MENCIONE VEÍCULOS JORNALÍSTICOS CONCORRENTES:**
+   NUNCA mencione nomes de sites de notícias cripto no texto gerado.
 
-   Sites PROIBIDOS de mencionar: CoinDesk, CoinTelegraph, Cointelegraph, CryptoSlate, Bitcoin Magazine, Decrypt, The Block, CoinPaper, CoinRepo, BeInCrypto, NewsBTC, CryptoNews, CoinGecko, CoinMarketCap.
-   O conteúdo deve parecer ORIGINAL do VivaCripto, não uma tradução/cópia atribuída a outro portal.
+   Sites PROIBIDOS de citar: CoinDesk, CoinTelegraph, Cointelegraph, CryptoSlate, Bitcoin Magazine, Decrypt, The Block, CoinPaper, CoinRepo, BeInCrypto, NewsBTC, CryptoNews.
+
+   ⚠️ IMPORTANTE: A regra é NÃO usar veículos como atribuição — mas isso NÃO significa usar frases vagas como "segundo informações divulgadas" (proibidas no item 4 e nos anti_patterns).
+
+   ✅ Caminho correto: atribua à FONTE PRIMÁRIA (empresa, regulador, executivo, relatório oficial, dados on-chain) — ver item 4.
+
+   ✅ Provedores de DADOS técnicos PODEM ser citados (não são veículos jornalísticos):
+   - CoinGecko, CoinMarketCap, Glassnode, Chainalysis, Dune Analytics, Messari, DefiLlama, Nansen, TradingView.
+
+   Se a notícia original só cita o veículo e não a fonte primária, REFORMULE o fato sem atribuição em vez de usar frase vaga.
 </guardrails_de_seguranca>
 
 <formato_de_saida>
@@ -271,7 +303,21 @@ Categoria: {category}
 </dados_da_fonte>
 
 <regra_fonte>
-⚠️ REGRA CRÍTICA: NÃO mencione o nome de NENHUM site de notícias (CoinDesk, CoinTelegraph, Bitcoin Magazine, CryptoSlate, Decrypt, The Block, etc.) no artigo gerado. O conteúdo deve ser escrito como conteúdo ORIGINAL do portal VivaCripto. Use "segundo informações divulgadas", "de acordo com dados do mercado" ou "conforme reportado" para atribuições genéricas.
+⚠️ REGRA CRÍTICA DE ATRIBUIÇÃO:
+
+1. NÃO mencione nomes de VEÍCULOS jornalísticos concorrentes (CoinDesk, CoinTelegraph, Bitcoin Magazine, CryptoSlate, Decrypt, The Block, BeInCrypto, NewsBTC).
+
+2. TAMBÉM NÃO use frases vagas como substituto — elas são fingerprint de IA que o Google penaliza:
+   ❌ PROIBIDO: "segundo informações divulgadas", "conforme reportado", "de acordo com dados do mercado", "fontes do setor indicam".
+
+3. CAMINHO CORRETO: atribua à FONTE PRIMÁRIA — quem produziu/emitiu a informação:
+   ✅ Empresa/projeto: "Segundo o relatório da [nome da empresa]..."
+   ✅ Regulador: "De acordo com comunicado da SEC/CVM/SFC..."
+   ✅ Executivo: "[Nome], CEO da [empresa], afirmou que..."
+   ✅ Documento técnico: "O whitepaper detalha que..."
+   ✅ Provedor de dados (não é veículo): "Dados da Glassnode/CoinGecko/Chainalysis/Dune mostram..."
+
+4. Se a fonte primária não estiver clara na notícia original, REFORMULE o fato em voz direta sem atribuir — não use atribuição vaga.
 </regra_fonte>
 
 <configuracao_editorial>
@@ -285,89 +331,109 @@ Transforme os dados acima em um artigo jornalístico completo para o portal Viva
 </tarefa>
 
 <estrutura_do_artigo>
+O artigo deve ter ESTRUTURA HIERÁRQUICA com múltiplos subtítulos H2 — cada um cobrindo uma seção distinta, NÃO parafraseando o título principal. Estrutura obrigatória:
 
-## [Manchete Interna H2]
-Crie um subtítulo impactante e informativo que resuma o ângulo da matéria.
-NÃO use clickbait. Foque no valor informativo real.
+## [Manchete Interna H2 — ângulo principal da matéria]
+Subtítulo informativo, sem clickbait, que abra um ângulo específico (não repetir o título).
 
-**Parágrafo 1 - Lead Jornalístico:**
-Responda de forma direta: Quem? O quê? Quando? Onde? Por quê?
-Use a técnica da pirâmide invertida - o essencial vem primeiro.
+**Lead jornalístico (1 parágrafo):**
+Responda Quem? O quê? Quando? Onde? Por quê? em 3-5 frases.
+Use pirâmide invertida — o essencial vem primeiro.
 O leitor deve entender a notícia completa apenas lendo este parágrafo.
 
-**Parágrafos 2-3 - Contexto e Profundidade:**
-Desenvolva a notícia com detalhes PRESENTES NA FONTE.
-⚠️ IMPORTANTE: Use APENAS dados que estão explicitamente na fonte fornecida.
+## [H2 — Contexto e detalhes]
+**2-3 parágrafos** desenvolvendo a notícia com dados PRESENTES NA FONTE.
 
-Se a fonte mencionar termos técnicos, explique-os naturalmente:
+Se a fonte mencionar termos técnicos, explique-os naturalmente (sem parecer didático):
 - ETF: Fundo negociado em bolsa que replica o desempenho de um ativo
 - Halving: Evento programado que reduz pela metade a recompensa de mineração
 - DeFi: Ecossistema de finanças descentralizadas sem intermediários tradicionais
 - Layer 2: Soluções de segunda camada para escalabilidade de blockchains
 - Staking: Processo de bloquear criptomoedas para validar transações e receber recompensas
 
-Adicione contexto histórico ou de mercado quando RELEVANTE e VERIFICÁVEL.
+Adicione contexto histórico ou de mercado quando RELEVANTE e VERIFICÁVEL na fonte.
 
-**Parágrafo Final - Impacto e Relevância:**
-Explique por que isso importa para o leitor brasileiro.
-Qual o impacto potencial para o mercado, tecnologia ou regulação?
+⚠️ Use APENAS dados que estão explicitamente na fonte. NÃO invente números, datas, percentuais.
 
-⚠️ REGRA CRÍTICA: NÃO faça recomendações de investimento.
-⚠️ NÃO preveja preços ou movimentos de mercado como certezas.
-✅ Limite-se a analisar possíveis desdobramentos de forma neutra.
+## [H2 — Impacto no Brasil] (OBRIGATÓRIO)
+**1-2 parágrafos** com ângulo brasileiro específico. Esta seção é o diferencial editorial — sem ela, o artigo é apenas tradução de conteúdo gringo (Google penaliza).
 
+Aborde pelo menos UM destes ângulos (o que fizer mais sentido pra notícia):
+- Regulação: como CVM, BCB, Lei 14.478/2022 (marco cripto BR), Receita Federal afetam ou são afetados.
+- Mercado local: impacto em exchanges nacionais (Mercado Bitcoin, Foxbit, NovaDAX, BitPreço), liquidez em real, paridade BTC/BRL.
+- Investidor BR: impacto fiscal (IN 1.888 da Receita), tributação de ganho de capital cripto, declaração de IR.
+- Comparação: como o fato se compara a iniciativas/regulação brasileiras similares.
+
+Se nenhum ângulo BR for aplicável, mencione brevemente por que e como o leitor brasileiro pode acompanhar o desenrolar.
+
+## [H2 — Próximos passos / O que observar]
+**1 parágrafo** de fechamento analítico (NÃO conclusivo robótico).
+
+Indique o que observar a seguir: próximas datas, votações, releases, eventos. Conecte ao contexto maior do mercado cripto.
+
+⚠️ REGRAS CRÍTICAS:
+- NÃO faça recomendações de investimento.
+- NÃO preveja preços/movimentos como certezas.
+- NÃO use frases robóticas de fechamento ("em conclusão", "por fim", "em suma").
+- ✅ Limite-se a analisar possíveis desdobramentos de forma neutra.
 </estrutura_do_artigo>
 
 <requisitos_tecnicos>
 ⚠️ REQUISITOS OBRIGATÓRIOS - ARTIGO SERÁ REJEITADO SE NÃO CUMPRIR:
 
 1. CONTAGEM DE PALAVRAS:
-   - MÍNIMO ABSOLUTO: 250 palavras (artigos com menos serão REJEITADOS)
-   - IDEAL: 300-400 palavras
-   - MÁXIMO: 500 palavras
-   → Escreva parágrafos completos e bem desenvolvidos para atingir o mínimo.
+   - MÍNIMO ABSOLUTO: 700 palavras (artigos com menos serão REJEITADOS)
+   - IDEAL: 900-1200 palavras
+   - MÁXIMO: 1500 palavras
+   → Profundidade real, não enchimento. Cada parágrafo deve agregar informação ou contexto novo.
 
 2. PALAVRAS-CHAVE OBRIGATÓRIAS:
    O artigo DEVE conter pelo menos UMA destas palavras (validação automática):
    - "Bitcoin", "BTC", "Ethereum", "ETH", "crypto", "criptomoeda"
    - "blockchain", "DeFi", "NFT", "token", "moeda digital"
-   → Use "{keyword_principal}" 2-3 vezes E inclua variações como "criptomoeda" ou "cripto".
+   → Use "{keyword_principal}" 3-5 vezes (densidade natural) E variações como "criptomoeda" ou "cripto".
 
 3. FORMATAÇÃO:
    - Idioma: Português brasileiro fluente
    - Quebras de linha duplas (\\n\\n) entre TODOS os parágrafos
-   - Estrutura: 4-5 parágrafos bem desenvolvidos (mínimo 3)
+   - 4 seções H2 distintas (manchete, contexto, impacto Brasil, próximos passos)
+   - Parágrafos com 3-5 frases cada (evite blocos extremos: nem 1 frase, nem 10)
 
 4. ESTRUTURA H2:
    - O artigo DEVE começar com ## (heading H2)
-   - Exemplo: ## Bitcoin Atinge Nova Máxima Histórica
+   - DEVE conter PELO MENOS 3 H2s distintos (não parafrasear o título principal)
+   - Cada H2 abre uma seção temática diferente
 </requisitos_tecnicos>
 
 <validacao_obrigatoria>
 ⚠️ CHECKLIST CRÍTICO - Verifique TODOS os itens antes de finalizar:
 
-☐ CONTAGEM: O artigo tem pelo menos 250 palavras?
-   → Conte mentalmente: 5 parágrafos x 50 palavras = 250 palavras mínimo.
-   → Se estiver curto, EXPANDA os parágrafos com mais contexto e detalhes.
+☐ CONTAGEM: O artigo tem entre 700 e 1500 palavras?
+   → Se estiver curto, EXPANDA com contexto verificável, não com enchimento.
+   → Se passou de 1500, CORTE redundâncias.
 
 ☐ KEYWORDS: O texto contém "criptomoeda", "cripto", "Bitcoin", "blockchain" ou similar?
-   → Inclua pelo menos 2-3 termos cripto naturalmente no texto.
-   → Artigos sem keywords cripto serão REJEITADOS automaticamente.
+   → Inclua 3-5 termos cripto naturalmente — não force keyword stuffing.
 
 ☐ DADOS: Todos os números, preços, datas e porcentagens vieram da fonte original?
-   → Se NÃO estão na fonte, NÃO invente. Use termos vagos ("registrou alta", "apresentou queda").
+   → Se NÃO estão na fonte, NÃO invente. Use termos qualitativos ("registrou alta", "apresentou queda").
 
 ☐ NFA: Existe alguma frase que soa como conselho de investimento?
    → Se SIM, reformule para tom neutro e informativo.
 
-☐ FLUÊNCIA: O texto flui naturalmente sem frases robóticas?
-   → Evite: "Vale ressaltar", "Em conclusão", "É importante mencionar".
+☐ FLUÊNCIA: O texto flui sem frases-tique de IA?
+   → PROIBIDAS: "vale ressaltar", "em conclusão", "é importante mencionar", "segundo informações divulgadas", "conforme reportado", "fontes do setor indicam", "este movimento reflete".
 
-☐ ESTRUTURA: O artigo começa com ## e tem 4-5 parágrafos desenvolvidos?
-   → Cada parágrafo deve ter 2-4 frases completas.
+☐ ESTRUTURA: O artigo tem 4 seções H2 distintas, cada uma com 1-3 parágrafos?
+   → 4 H2s: Manchete principal, Contexto/Detalhes, Impacto no Brasil, Próximos passos.
+   → H2s NÃO podem parafrasear o título principal — cada um cobre seção diferente.
 
-☐ ATRIBUIÇÃO: Dados específicos estão atribuídos à fonte?
-   → Use: "Segundo informações divulgadas...", "De acordo com a fonte..."
+☐ SEÇÃO BRASIL: O artigo tem uma seção específica com ângulo brasileiro (regulação CVM/BCB, exchanges nacionais, tributação)?
+   → Esta seção é OBRIGATÓRIA. Sem ela = artigo rejeitado.
+
+☐ ATRIBUIÇÃO: Dados específicos estão atribuídos à FONTE PRIMÁRIA (não a veículos nem a frases vagas)?
+   → ✅ "Segundo relatório da [empresa]...", "De acordo com comunicado da SEC...", "Dados da Glassnode..."
+   → ❌ "Segundo informações divulgadas...", "Conforme reportado...", "Fontes do setor..."
 </validacao_obrigatoria>
 
 <output>
@@ -404,7 +470,7 @@ Nenhum texto adicional, prefixo ou metadado.
                         {"role": "user", "content": user_prompt}
                     ],
                     temperature=0.4,
-                    max_tokens=900,
+                    max_tokens=2500,
                 )
                 content = response.choices[0].message.content.strip()
                 logger.info("[OpenAI] Conteúdo gerado com sucesso (fallback)")
@@ -533,25 +599,36 @@ Nenhum texto adicional, prefixo ou metadado.
             if phrase in content_lower:
                 logger.warning(f"[Qualidade] Detectada frase robótica/clichê: '{phrase}'")
 
-        # Remover menções a sites de notícias fonte
+        # Remover menções a veículos jornalísticos concorrentes (v4.0)
+        # ATENÇÃO: NÃO injetar frases-tique como "informações divulgadas"/"fontes do setor"
+        # — esse é o fingerprint de IA que o Google penaliza. Se o LLM violou o prompt,
+        # remover a frase introdutória inteira e logar ERROR para investigação.
         for site_name in source_site_names:
             if site_name in result:
-                # Substituir padrões comuns: "Segundo o CoinDesk," -> "Segundo informações divulgadas,"
+                logger.error(
+                    f"[Sanitização CRÍTICA] LLM violou regra e citou veículo '{site_name}'. "
+                    f"Removendo frase atributiva. Revisar prompt se reincidir."
+                )
+                # Remover frase introdutória completa: "Segundo o CoinDesk, ..."
                 result = re.sub(
-                    rf'(?i)\b(segundo|de acordo com|conforme|para)\s+(o|a|o portal|o site)?\s*{re.escape(site_name)}\b[,.]?\s*',
-                    r'\1 informações divulgadas, ',
+                    rf'(?i)\b(segundo|de acordo com|conforme|para|por)\s+(o|a|o portal|o site)?\s*{re.escape(site_name)}\b\s*[,.]?\s*',
+                    '',
                     result
                 )
-                # Substituir padrões "o CoinDesk informou/reportou/publicou"
+                # Remover construções "o CoinDesk informou/reportou/publicou X" -> "X"
                 result = re.sub(
-                    rf'(?i)\b(o|a|o portal|o site)\s*{re.escape(site_name)}\s+(informou|reportou|publicou|divulgou|noticiou|revelou)',
-                    r'foi \2',
+                    rf'(?i)\b(o|a|o portal|o site)?\s*{re.escape(site_name)}\s+(informou|reportou|publicou|divulgou|noticiou|revelou)\s+que\s+',
+                    '',
                     result
                 )
-                # Remover menções restantes do nome do site
+                # Remoção final: deletar qualquer ocorrência restante do nome
                 if site_name in result:
-                    result = result.replace(site_name, "fontes do setor")
-                    logger.warning(f"[Sanitização] Removida menção ao site fonte: {site_name}")
+                    result = result.replace(site_name, "")
+
+        # Limpar artefatos de remoção (espaços duplos, vírgulas órfãs)
+        result = re.sub(r'\s{2,}', ' ', result)
+        result = re.sub(r'\s+([,.;:])', r'\1', result)
+        result = re.sub(r'([,.;:])\s*\1+', r'\1', result)
 
         return result.strip()
     
