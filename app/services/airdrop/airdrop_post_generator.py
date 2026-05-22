@@ -108,7 +108,11 @@ class AirdropPostGenerator:
         article = await self._generate_with_claude(user_prompt)
 
         if article is None:
-            logger.error("AirdropPostGenerator: Claude não retornou artigo válido")
+            logger.warning("AirdropPostGenerator: Claude falhou, tentando Gemini")
+            article = await self._generate_with_gemini(user_prompt)
+
+        if article is None:
+            logger.error("AirdropPostGenerator: ambos os modelos falharam")
             return None
 
         # garante slug
@@ -138,6 +142,37 @@ class AirdropPostGenerator:
             return self._parse_json(text)
         except Exception as e:
             logger.error(f"AirdropPostGenerator: Claude falhou: {e}")
+            return None
+
+    async def _generate_with_gemini(self, user_prompt: str) -> Optional[Dict]:
+        """
+        Fallback usando google-genai (Gemini Flash).
+
+        Reaproveita o client já configurado no ContentGenerator existente.
+        Se algo der errado, retorna None.
+        """
+        try:
+            cg = self.content_generator  # lazy import
+            if cg is None:
+                return None
+            client = getattr(cg, "gemini_client", None)
+            if client is None:
+                logger.warning("AirdropPostGenerator: ContentGenerator sem client Gemini")
+                return None
+
+            # Gemini usa um prompt único (concatena system + user)
+            combined = AIRDROP_SYSTEM_PROMPT + "\n\n---\n\n" + user_prompt
+
+            response = await client.aio.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=combined,
+            )
+            text = getattr(response, "text", None)
+            if not text:
+                return None
+            return self._parse_json(text)
+        except Exception as e:
+            logger.error(f"AirdropPostGenerator: Gemini fallback falhou: {e}")
             return None
 
     def _parse_json(self, text: str) -> Optional[Dict]:
