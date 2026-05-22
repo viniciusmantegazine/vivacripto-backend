@@ -206,6 +206,22 @@ class AirdropPostGenerator:
                     return True
         return False
 
+    @staticmethod
+    def _section_text(content: str, heading_keyword: str) -> str:
+        """
+        Retorna o texto da seção H2 cujo heading (sem acentos) contém o
+        keyword fornecido (também sem acentos). Vazio se não encontrar.
+        """
+        kw = AirdropPostGenerator._strip_accents(heading_keyword)
+        sections = re.split(r"(?=^##\s)", content, flags=re.MULTILINE)
+        for section in sections:
+            first_line = section.split("\n", 1)[0]
+            if first_line.startswith("## "):
+                heading_norm = AirdropPostGenerator._strip_accents(first_line)
+                if kw in heading_norm:
+                    return section
+        return ""
+
     def _post_validate(
         self,
         article: Dict,
@@ -214,24 +230,35 @@ class AirdropPostGenerator:
     ) -> list:
         """
         Verifica:
-        - referral_url está presente no markdown (match tolerante)
-        - official_url está presente no markdown (match tolerante)
+        - referral_url presente na seção "Como participar" (não só "em algum lugar")
+        - official_url presente no markdown (qualquer seção)
         - frase-chave do disclosure presente (Unicode-normalized)
         Retorna lista de erros (vazia se ok).
         """
         errors = []
         content = article.get("content_markdown", "")
-        if not self._url_appears_in_markdown(referral_url, content):
-            errors.append(f"link de referência ({referral_url}) ausente no conteúdo")
+
+        participar_section = self._section_text(content, "como participar")
+        if not self._url_appears_in_markdown(referral_url, participar_section):
+            errors.append(
+                f"link de referência ({referral_url}) ausente na seção "
+                '"Como participar"'
+            )
+
         if not self._url_appears_in_markdown(official_url, content):
             errors.append(f"link oficial ({official_url}) ausente no bloco de disclosure")
+
         normalized = self._strip_accents(content)
         if "nao constitui recomendacao" not in normalized:
             errors.append("frase 'não constitui recomendação' ausente no disclosure")
         return errors
 
     async def _generate_with_claude(self, user_prompt: str) -> Optional[Dict]:
-        """Chama Claude e parsa o JSON de saída. Retorna None em falha."""
+        """
+        Chama Claude e parsa o JSON. Usa prompt caching no system prompt
+        (estável, ~2KB) — reduz custo/latência em retries e chamadas
+        seguidas dentro de 5min.
+        """
         if not self.claude_available or self.claude_client is None:
             return None
         try:
@@ -239,7 +266,13 @@ class AirdropPostGenerator:
                 model=self.CLAUDE_MODEL,
                 max_tokens=self.MAX_TOKENS,
                 temperature=self.TEMPERATURE,
-                system=AIRDROP_SYSTEM_PROMPT,
+                system=[
+                    {
+                        "type": "text",
+                        "text": AIRDROP_SYSTEM_PROMPT,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ],
                 messages=[{"role": "user", "content": user_prompt}],
             )
             text = response.content[0].text
@@ -250,10 +283,8 @@ class AirdropPostGenerator:
 
     async def _generate_with_gemini(self, user_prompt: str) -> Optional[Dict]:
         """
-        Fallback usando google-genai (Gemini Flash).
-
-        Reaproveita o client já configurado no ContentGenerator existente.
-        Se algo der errado, retorna None.
+        Fallback usando google-genai. Reaproveita o client e o model name
+        do ContentGenerator pra não divergir quando o projeto upgradear.
         """
         try:
             cg = self.content_generator  # lazy import
@@ -264,11 +295,12 @@ class AirdropPostGenerator:
                 logger.warning("AirdropPostGenerator: ContentGenerator sem client Gemini")
                 return None
 
+            model_name = getattr(cg, "GEMINI_MODEL", "gemini-2.5-flash")
             # Gemini usa um prompt único (concatena system + user)
             combined = AIRDROP_SYSTEM_PROMPT + "\n\n---\n\n" + user_prompt
 
             response = await client.aio.models.generate_content(
-                model="gemini-2.5-flash",
+                model=model_name,
                 contents=combined,
             )
             text = getattr(response, "text", None)

@@ -66,3 +66,29 @@ def test_strip_accents_handles_combining_chars_nfd():
 
     nfd = unicodedata.normalize("NFD", "não constitui recomendação")
     assert "nao constitui recomendacao" in AirdropPostGenerator._strip_accents(nfd)
+
+
+def test_section_text_extracts_correct_h2_block():
+    content = (
+        "Intro.\n\n"
+        "## Sobre o projeto\n\nTexto sobre.\n\n"
+        "## Como participar\n\nAcesse [aqui](https://ref/abc).\n\n"
+        "## Informações importantes\n\nDisclosure."
+    )
+    s = AirdropPostGenerator._section_text(content, "como participar")
+    assert "Acesse [aqui]" in s
+    assert "Sobre o projeto" not in s
+    assert "Disclosure" not in s
+
+
+def test_section_text_ignores_accents_in_heading_match():
+    content = "## Informações importantes\n\nx"
+    # keyword sem acento bate com heading acentuada
+    assert "Informações importantes" in AirdropPostGenerator._section_text(
+        content, "informacoes"
+    )
+
+
+def test_section_text_returns_empty_when_section_missing():
+    content = "## Outra coisa\n\ntexto"
+    assert AirdropPostGenerator._section_text(content, "como participar") == ""
