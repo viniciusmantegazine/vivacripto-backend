@@ -2,6 +2,16 @@
 Pytest configuration and shared fixtures for VivaCripto Backend tests.
 """
 import asyncio
+import os
+import secrets
+
+# Defaults de env vars exigidas pela validação de Settings(), aplicados ANTES
+# de qualquer import que carregue app.core.config (direta ou indiretamente).
+os.environ.setdefault("SECRET_KEY", secrets.token_urlsafe(32))
+os.environ.setdefault("AUTOMATION_TOKEN", secrets.token_urlsafe(32))
+os.environ.setdefault("REVALIDATE_SECRET", secrets.token_urlsafe(32))
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+
 from datetime import datetime, timezone
 from typing import AsyncGenerator, Generator
 from unittest.mock import AsyncMock, MagicMock, patch
