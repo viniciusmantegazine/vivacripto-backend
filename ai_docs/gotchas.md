@@ -129,6 +129,51 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 
 ---
 
+### 6. Testes — UUID PostgreSQL vs SQLite
+
+**Sintoma**: Qualquer teste que use a fixture `db_session` quebra com:
+```
+sqlalchemy.exc.CompileError: Compiler can't render element of type UUID
+```
+
+**Causa**: `app/db/models.py` importa `UUID` de `sqlalchemy.dialects.postgresql` (tipo Postgres-only). Os testes rodam SQLite in-memory que não compila esse tipo.
+
+**Solução atual**: Testes do endpoint de airdrop **mockam `AsyncSession`** em vez de usar `db_session` real. Veja `tests/integration/test_api_airdrops_*.py` que usam `MagicMock()` no `dependency_overrides[get_db]`.
+
+**Solução definitiva (não aplicada ainda)**: Trocar `from sqlalchemy.dialects.postgresql import UUID` por um `TypeDecorator` que use `CHAR(36)` em SQLite e `UUID` em Postgres. ~49 testes existentes destravariam.
+
+---
+
+### 7. Testes — Rate Limiter Compartilhado
+
+**Sintoma**: Tests de integração começam a retornar 429 quando rodados em sequência, mesmo isoladamente bem.
+
+**Causa**: `slowapi.Limiter` é singleton por processo. O contador é compartilhado entre tests do mesmo endpoint.
+
+**Solução**: `tests/conftest.py` faz monkey-patch de `slowapi.Limiter.limit` pra um no-op decorator. Isso desativa rate limiting em **todos** os testes.
+
+**Implicação**: Não dá pra testar lógica de rate limit via pytest sem reverter esse patch.
+
+```python
+# tests/conftest.py
+import slowapi
+slowapi.Limiter.limit = _noop_limit
+```
+
+---
+
+### 8. Tests — Env Vars Default
+
+**Sintoma**: `Settings()` falha em testes com "SECRET_KEY inválida" ao importar `app.core.config`.
+
+**Causa**: `Settings()` valida `SECRET_KEY` no construtor. Sem `.env`, falta a variável.
+
+**Solução**: `tests/conftest.py` faz `os.environ.setdefault(...)` pras 4 envs obrigatórias **antes** de qualquer import que carregue config. Aplicado em module-level no topo do conftest.
+
+**Implicação**: Testes que queiram validar comportamento de "SECRET_KEY ausente" devem usar `monkeypatch.delenv("SECRET_KEY")`.
+
+---
+
 ## Comportamentos Contra-Intuitivos
 
 ### 1. Datetime - UTC vs Local

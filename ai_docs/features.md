@@ -198,7 +198,72 @@ DEDUPLICATION_ENGINE = "embedding"
 
 ---
 
-### 6. Gestão de Posts (CRUD)
+### 6. Geração de Posts sobre Airdrops
+
+**Descrição**: Endpoint manual que recebe nome de um projeto cripto + link oficial + link de referência do operador, pesquisa o projeto na web e gera um artigo educacional de 500-750 palavras com guardrails NFA, ou publica direto na categoria Airdrop.
+
+**Casos de Uso**:
+- Cobertura editorial de airdrops conhecidos
+- Monetização via link de referência com disclosure obrigatória
+- Manter categoria "Airdrop" populada (RSS quase não cobre)
+
+**Componentes Envolvidos**:
+- `app/api/v1/endpoints/airdrops.py` - Endpoint HTTP (preview + publish)
+- `app/services/airdrop/airdrop_post_generator.py` - Orquestrador IA
+- `app/services/airdrop/web_researcher.py` - Pesquisa DDG + fetch HTML
+- `app/services/ai/prompts/airdrop_prompts.py` - System prompt + builder
+- `app/schemas/airdrop.py` - Request/response schemas
+
+**Características**:
+| Aspecto | Detalhe |
+|---------|---------|
+| **Modelo Primário** | Claude Sonnet 4.6 (com prompt caching) |
+| **Modelo Fallback** | Gemini Flash (via ContentGenerator) |
+| **Word Count** | 500-750 palavras |
+| **Pesquisa Web** | DuckDuckGo (`ddgs`) + fetch httpx + BeautifulSoup |
+| **Top URLs** | 5 (4 do DDG + 1 oficial) |
+| **Categoria** | Sempre `airdrop` (forçada via `force_category_slug`) |
+| **Limite diário** | 5 publicações/dia (separado do pipeline RSS) |
+
+**Fluxo de Execução**:
+```
+1. Auth + rate limit + validação Pydantic
+   │
+2. WebResearcher.gather_context()
+   ├── 3 queries DDG paralelas
+   ├── Blocklist (social/vídeo) + whitelist boost (CoinDesk, etc.)
+   ├── Fetch paralelo top 5 URLs (oficial sempre incluída)
+   ├── Extração de texto via BeautifulSoup (trunca a 3000 chars)
+   └── Monta bloco "=== FONTES PESQUISADAS ===" pro prompt
+   │
+3. AirdropPostGenerator.generate()
+   ├── Claude Sonnet 4.6 com prompt caching no system prompt
+   ├── Fallback Gemini se Claude falhar
+   ├── Validação extra: referral_url na seção "## Como participar",
+   │   official_url no markdown, disclosure NFA presente
+   ├── Regenera 1x com hint de correção se validação falhar
+   └── Imagem só gerada se publish=true (economia)
+   │
+4. QualityValidator(min_words=500, max_words=750)
+   │
+5. Se publish=false → retorna preview markdown
+   Se publish=true →
+   ├── Verifica AIRDROP_DAILY_LIMIT (5/dia, escopo: categoria airdrop)
+   ├── _resolve_unique_slug (retry com sufixo -2, -3, ...)
+   ├── ArticlePublisher com force_category_slug="airdrop"
+   └── _revalidate_frontend fire-and-forget
+```
+
+**Guardrails NFA Específicos**:
+- Disclosure fixo no bloco final (texto exato no system prompt)
+- Validação que link de referência está dentro de `## Como participar`
+- Validação que link oficial aparece no disclosure
+- Validação que frase "não constitui recomendação" aparece (Unicode-normalized)
+- `project_name` sanitizado contra prompt injection (strip control chars, cap 200)
+
+---
+
+### 7. Gestão de Posts (CRUD)
 
 **Descrição**: API completa para criar, ler, atualizar e deletar artigos.
 
@@ -225,7 +290,7 @@ DEDUPLICATION_ENGINE = "embedding"
 
 ---
 
-### 7. Newsletter
+### 8. Newsletter
 
 **Descrição**: Sistema de inscrição para newsletter com validação de email e proteção contra duplicatas.
 

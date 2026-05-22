@@ -30,6 +30,8 @@ Authorization: Bearer <AUTOMATION_TOKEN>
 - `DELETE /posts/{id}` - Deletar post
 - `POST /automation/trigger` - Executar pipeline
 - `POST /automation/test-generation` - Testar geração
+- `POST /automation/weekly-report` - Relatório semanal
+- `POST /airdrops/generate-post` - Geração de post sobre airdrop
 
 ### Tokens Disponíveis
 
@@ -385,6 +387,91 @@ POST /api/v1/automation/test-generation
 
 ---
 
+### Airdrops
+
+#### Gerar Post sobre Airdrop
+
+```http
+POST /api/v1/airdrops/generate-post
+```
+
+**Autenticação**: Requerida (`AUTOMATION_TOKEN`)
+**Rate Limit**: 5/min
+**Limite diário**: 5 publicações/dia (`AIRDROP_DAILY_LIMIT`, contado só na categoria `airdrop`, separado do limite do pipeline RSS)
+
+**Descrição**: Endpoint manual que pesquisa um projeto cripto na web (DuckDuckGo + fetch das URLs ranqueadas), gera um artigo educacional de 500-750 palavras com tom neutro (compliance NFA) sobre o projeto e seu programa de airdrop, embute o link de referência do operador no bloco "Como participar" e inclui disclosure obrigatória no final.
+
+Suporta dois modos via flag `publish`:
+- `publish=false` (default): retorna preview em markdown sem persistir e sem gerar imagem (economia de Cloudinary/Gemini-img)
+- `publish=true`: persiste como post com categoria `airdrop`, dispara revalidação ISR fire-and-forget
+
+**Request Body**:
+```json
+{
+  "project_name": "LayerZero",
+  "official_url": "https://layerzero.network",
+  "referral_url": "https://app.layerzero.foundation/ref/abc123",
+  "publish": false
+}
+```
+
+**Campos**:
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| `project_name` | string | Sim | Nome do projeto (2-100 chars) |
+| `official_url` | HttpUrl | Sim | Site oficial — sempre incluído como FONTE 1 da pesquisa |
+| `referral_url` | HttpUrl | Sim | Link de referência do operador — vai inline no markdown |
+| `publish` | bool | Não | Default `false`. `true` = persiste no DB |
+
+**Resposta de Sucesso** (200 — preview):
+```json
+{
+  "success": true,
+  "post_id": null,
+  "title": "LayerZero: o que é o protocolo e como participar do airdrop",
+  "slug": "layerzero-o-que-e-protocolo-airdrop",
+  "excerpt": "Conheca o LayerZero, protocolo de interoperabilidade...",
+  "image_url": null,
+  "word_count": 612,
+  "sources_used": [
+    "https://layerzero.network",
+    "https://coindesk.com/...",
+    "https://docs.layerzero.network/..."
+  ],
+  "preview_content": "## Sobre o projeto LayerZero\n\n..."
+}
+```
+
+**Resposta de Sucesso** (200 — publish): mesma estrutura, com `post_id` preenchido, `image_url` apontando pra Cloudinary, e `preview_content: null`.
+
+**Códigos de Erro**:
+- `401`: Token inválido ou ausente
+- `422`: Body inválido (URL malformada, `project_name` vazio) OU conteúdo gerado falhou validação de qualidade/regenerou 2x sem sucesso
+- `429`: Rate limit (5/min) ou limite diário de airdrops atingido (5/dia)
+- `500`: Falha ao persistir no banco (publish=true)
+- `502`: Pesquisa web falhou totalmente (nem o site oficial nem nenhuma fonte secundária responderam)
+
+**Compliance NFA (Not Financial Advice)**:
+- Tom obrigatório neutro, jornalístico
+- Frases proibidas (rejeitadas no retry de validação): "oportunidade imperdível", "garantia de retorno", etc.
+- Disclosure fixo no bloco final do artigo
+- Link de referência forçado dentro da seção `## Como participar` (validação pós-geração)
+
+**Pesquisa Web**:
+- 3 queries no DuckDuckGo (`{nome} airdrop`, `{nome} como participar`, `{nome} token tokenomics`)
+- Blocklist: reddit, x.com, twitter, youtube, tiktok, telegram, discord
+- Whitelist boost: CoinDesk, CoinMarketCap, CoinGecko, Cointelegraph, Decrypt, The Block, etc.
+- Top 5 URLs (4 do DDG + 1 oficial), fetch paralelo via httpx
+- Cada fonte truncada a 3000 chars no contexto enviado pra IA
+- Timeout global: 45s; timeout DDG: 15s; timeout por URL: 10s
+
+**Modelos de IA**:
+- Primário: Claude Sonnet 4.6 (com prompt caching no system prompt)
+- Fallback: Gemini Flash via `ContentGenerator` existente
+- Validação pós-geração regenera 1x se link de referência/oficial/disclosure ausente
+
+---
+
 ### Health Checks
 
 #### Health Check Básico
@@ -447,6 +534,7 @@ GET /api/v1/health/database
 | Busca (`GET /posts/search`) | 30/min |
 | Escrita (`POST/PUT/DELETE /posts`) | 20/min |
 | Automação (`POST /automation/*`) | 5/min |
+| Airdrops (`POST /airdrops/*`) | 5/min |
 | Newsletter | 10/min |
 | Health checks | 1000/min |
 
@@ -558,6 +646,28 @@ class PostList(BaseModel):
     page: int
     page_size: int
     total_pages: int
+```
+
+### AirdropPostRequest / AirdropPostResponse
+
+```python
+class AirdropPostRequest(BaseModel):
+    project_name: str = Field(..., min_length=2, max_length=100)
+    official_url: HttpUrl
+    referral_url: HttpUrl
+    publish: bool = False
+
+
+class AirdropPostResponse(BaseModel):
+    success: bool
+    post_id: Optional[str] = None        # só preenchido quando publish=true
+    title: str
+    slug: str
+    excerpt: str
+    image_url: Optional[str] = None      # só preenchido quando publish=true
+    word_count: int = 0
+    sources_used: List[str] = []         # URLs efetivamente consultadas na pesquisa
+    preview_content: Optional[str] = None  # só preenchido quando publish=false
 ```
 
 ---
