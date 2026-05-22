@@ -89,9 +89,15 @@ class AirdropPostGenerator:
         project_name: str,
         official_url: str,
         referral_url: str,
+        generate_image: bool = True,
     ) -> Optional[Dict]:
         """
         Roda o fluxo completo: pesquisa → IA → validação extra → article dict.
+
+        Args:
+            generate_image: Se False, pula a geração de imagem (útil em
+                preview pra não desperdiçar chamadas Cloudinary/Gemini-img
+                em conteúdo que pode ser descartado).
         """
         research = await self.web_researcher.gather_context(project_name, official_url)
 
@@ -107,7 +113,9 @@ class AirdropPostGenerator:
         if not article.get("slug"):
             article["slug"] = slugify(article.get("title", project_name))
 
-        article["image_url"] = await self._generate_image(article)
+        article["image_url"] = (
+            await self._generate_image(article) if generate_image else None
+        )
         article["sources_used"] = research.sources_used
         article["word_count"] = len(article.get("content_markdown", "").split())
         return article

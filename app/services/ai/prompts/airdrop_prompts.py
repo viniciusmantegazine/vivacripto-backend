@@ -79,6 +79,16 @@ REGRAS DOS CAMPOS:
 """.strip()
 
 
+def _sanitize_user_value(value: str) -> str:
+    """
+    Remove caracteres de controle (newlines, tabs, etc.) de valores
+    injetados em prompt. Defesa contra prompt injection via project_name.
+    """
+    # Remove newlines, tabs e outros controle; colapsa whitespace
+    cleaned = " ".join(value.split())
+    return cleaned[:200]  # cap defensivo
+
+
 def build_airdrop_user_prompt(
     project_name: str,
     official_url: str,
@@ -89,13 +99,16 @@ def build_airdrop_user_prompt(
     """
     Monta o prompt de usuário injetando dados do projeto e contexto pesquisado.
     """
+    safe_name = _sanitize_user_value(project_name)
+    safe_official = _sanitize_user_value(official_url)
+    safe_referral = _sanitize_user_value(referral_url)
     return f"""
 DATA ATUAL: {current_date}
 
-PROJETO: {project_name}
-LINK OFICIAL: {official_url}
+PROJETO: {safe_name}
+LINK OFICIAL: {safe_official}
 LINK DE REFERÊNCIA (operador do portal — usar no inline da seção "Como participar"):
-{referral_url}
+{safe_referral}
 
 OBRIGATÓRIO:
 - O artigo final precisa ter entre 500 e 750 palavras.

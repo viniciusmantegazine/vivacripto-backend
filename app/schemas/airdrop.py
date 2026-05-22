@@ -16,7 +16,10 @@ class AirdropPostRequest(BaseModel):
 
 
 class AirdropPostResponse(BaseModel):
-    """Response do endpoint de airdrop (preview ou publicação)"""
+    """Response do endpoint de airdrop (preview ou publicação).
+
+    Todas as falhas viram HTTPException; este schema só carrega sucesso.
+    """
 
     success: bool
     post_id: Optional[str] = None
@@ -27,4 +30,3 @@ class AirdropPostResponse(BaseModel):
     word_count: int = 0
     sources_used: List[str] = []
     preview_content: Optional[str] = None
-    errors: List[str] = []

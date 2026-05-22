@@ -4,14 +4,13 @@ Testes de integração do endpoint /api/v1/airdrops/generate-post — modo previ
 Usa um httpx.AsyncClient direto contra o app, com get_db override mockado,
 pra contornar a incompatibilidade UUID/SQLite pré-existente no projeto.
 """
-import os
-import sys
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
+from app.api.v1.endpoints.airdrops import get_generator
 from app.core.config import settings
 from app.db.base import get_db
 from app.main import app
@@ -19,14 +18,25 @@ from app.main import app
 
 @pytest_asyncio.fixture
 async def airdrop_api_client():
-    """Cliente HTTP que substitui get_db por um mock (sem DB real)."""
+    """
+    Cliente HTTP que mocka get_db (sem DB real) e expõe um MagicMock
+    como generator via dependency override.
+    """
 
     async def fake_get_db():
         yield MagicMock()
 
+    mock_generator = MagicMock()
+
+    def fake_get_generator():
+        return mock_generator
+
     app.dependency_overrides[get_db] = fake_get_db
+    app.dependency_overrides[get_generator] = fake_get_generator
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # disponibiliza o mock via atributo pro teste customizar
+        client.mock_generator = mock_generator
         yield client
     app.dependency_overrides.clear()
 
@@ -101,22 +111,18 @@ async def test_preview_returns_markdown_without_publishing(airdrop_api_client):
         "word_count": 600,
     }
 
-    with patch(
-        "app.api.v1.endpoints.airdrops.AirdropPostGenerator"
-    ) as MockGen:
-        instance = MockGen.return_value
-        instance.generate = AsyncMock(return_value=article)
+    airdrop_api_client.mock_generator.generate = AsyncMock(return_value=article)
 
-        response = await airdrop_api_client.post(
-            "/api/v1/airdrops/generate-post",
-            json={
-                "project_name": "LayerZero",
-                "official_url": "https://layerzero.network",
-                "referral_url": "https://ref.example/abc",
-                "publish": False,
-            },
-            headers={"Authorization": f"Bearer {settings.AUTOMATION_TOKEN}"},
-        )
+    response = await airdrop_api_client.post(
+        "/api/v1/airdrops/generate-post",
+        json={
+            "project_name": "LayerZero",
+            "official_url": "https://layerzero.network",
+            "referral_url": "https://ref.example/abc",
+            "publish": False,
+        },
+        headers={"Authorization": f"Bearer {settings.AUTOMATION_TOKEN}"},
+    )
 
     assert response.status_code == 200, response.text
     data = response.json()
@@ -127,48 +133,45 @@ async def test_preview_returns_markdown_without_publishing(airdrop_api_client):
         "https://layerzero.network",
         "https://coindesk.com/x",
     ]
+    # Preview NÃO deve pedir imagem (skip pra economizar custo).
+    call_kwargs = airdrop_api_client.mock_generator.generate.call_args.kwargs
+    assert call_kwargs.get("generate_image") is False
 
 
 @pytest.mark.asyncio
 async def test_research_failure_returns_502(airdrop_api_client):
     from app.services.airdrop.web_researcher import ResearchFailedError
 
-    with patch(
-        "app.api.v1.endpoints.airdrops.AirdropPostGenerator"
-    ) as MockGen:
-        instance = MockGen.return_value
-        instance.generate = AsyncMock(side_effect=ResearchFailedError("no sources"))
+    airdrop_api_client.mock_generator.generate = AsyncMock(
+        side_effect=ResearchFailedError("no sources")
+    )
 
-        response = await airdrop_api_client.post(
-            "/api/v1/airdrops/generate-post",
-            json={
-                "project_name": "Bogus",
-                "official_url": "https://bogus.example",
-                "referral_url": "https://ref.example/abc",
-                "publish": False,
-            },
-            headers={"Authorization": f"Bearer {settings.AUTOMATION_TOKEN}"},
-        )
+    response = await airdrop_api_client.post(
+        "/api/v1/airdrops/generate-post",
+        json={
+            "project_name": "Bogus",
+            "official_url": "https://bogus.example",
+            "referral_url": "https://ref.example/abc",
+            "publish": False,
+        },
+        headers={"Authorization": f"Bearer {settings.AUTOMATION_TOKEN}"},
+    )
 
     assert response.status_code == 502
 
 
 @pytest.mark.asyncio
 async def test_generator_returns_none_returns_422(airdrop_api_client):
-    with patch(
-        "app.api.v1.endpoints.airdrops.AirdropPostGenerator"
-    ) as MockGen:
-        instance = MockGen.return_value
-        instance.generate = AsyncMock(return_value=None)
+    airdrop_api_client.mock_generator.generate = AsyncMock(return_value=None)
 
-        response = await airdrop_api_client.post(
-            "/api/v1/airdrops/generate-post",
-            json={
-                "project_name": "X",
-                "official_url": "https://x.com",
-                "referral_url": "https://x.com/ref",
-                "publish": False,
-            },
-            headers={"Authorization": f"Bearer {settings.AUTOMATION_TOKEN}"},
-        )
+    response = await airdrop_api_client.post(
+        "/api/v1/airdrops/generate-post",
+        json={
+            "project_name": "X",
+            "official_url": "https://x.com",
+            "referral_url": "https://x.com/ref",
+            "publish": False,
+        },
+        headers={"Authorization": f"Bearer {settings.AUTOMATION_TOKEN}"},
+    )
     assert response.status_code == 422

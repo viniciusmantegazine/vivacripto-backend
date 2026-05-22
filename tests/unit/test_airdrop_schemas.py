@@ -57,7 +57,6 @@ def test_response_serializes_with_all_fields():
         word_count=600,
         sources_used=["https://x.com"],
         preview_content="# x",
-        errors=[],
     )
     payload = resp.model_dump()
     assert payload["success"] is True
@@ -72,4 +71,3 @@ def test_response_optional_fields_default():
     assert resp.word_count == 0
     assert resp.sources_used == []
     assert resp.preview_content is None
-    assert resp.errors == []
