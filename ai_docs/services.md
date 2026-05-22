@@ -446,13 +446,27 @@ class ArticlePublisher:
 ```python
 QualityValidator()                            # default 250-500 (pipeline RSS)
 QualityValidator(min_words=500, max_words=750)  # airdrop endpoint
+QualityValidator(                              # airdrop endpoint completo:
+    min_words=500, max_words=750,
+    require_h2_first=False,                    # aceita intro antes do 1º H2
+)
 ```
+
+> ⚠️ `require_h2_first=True` (default) é a regra do pipeline RSS, onde o
+> conteúdo começa com `## Manchete interna`. O airdrop tem um parágrafo
+> de introdução **antes** do primeiro H2 (ver prompt) — por isso o
+> endpoint precisa passar `False`.
 
 **Métodos Principais**:
 ```python
 class QualityValidator:
-    def __init__(self, min_words: Optional[int] = None, max_words: Optional[int] = None):
-        """Aceita override do word count por instância."""
+    def __init__(
+        self,
+        min_words: Optional[int] = None,
+        max_words: Optional[int] = None,
+        require_h2_first: bool = True,
+    ):
+        """Aceita override do word count e da regra H2-first por instância."""
 
     def validate(self, article: GeneratedArticle) -> ValidationResult:
         """Valida artigo contra regras de qualidade."""

@@ -139,6 +139,72 @@ async def test_preview_returns_markdown_without_publishing(airdrop_api_client):
 
 
 @pytest.mark.asyncio
+async def test_preview_accepts_intro_paragraph_before_first_h2(airdrop_api_client):
+    """
+    Regressão: o prompt do airdrop instrui o LLM a colocar uma introdução
+    antes do primeiro H2. O endpoint precisa aceitar esse formato (e não
+    aplicar a regra H2-first do pipeline RSS).
+    """
+    _pad = (
+        "O projeto bitcoin-x conecta redes blockchain distintas permitindo a comunicacao "
+        "entre Ethereum Arbitrum Optimism Polygon BNB Chain Avalanche e outras redes. "
+        "Isso viabiliza transferencias de tokens e dados sem intermediarios centrais. "
+    )
+    article = {
+        "title": "Bitcoin-X airdrop: o que e o projeto e como participar agora",
+        "slug": "bitcoin-x-airdrop",
+        "excerpt": (
+            "Conheca o projeto bitcoin-x, sua proposta de blockchain educacional "
+            "e veja como participar do airdrop de token disponivel agora."
+        ),
+        "content_markdown": (
+            # Parágrafo de introdução ANTES de qualquer heading — formato airdrop
+            "O bitcoin-x e um projeto de blockchain voltado a interoperabilidade entre "
+            "redes cripto distintas. Este artigo descreve seu programa de airdrop de "
+            "forma neutra, educacional e baseada em fontes publicas disponiveis.\n\n"
+            "## Sobre o projeto bitcoin-x\n\n"
+            + _pad * 7
+            + "\n\n## O programa de airdrop\n\n"
+            + _pad * 6
+            + "\n\n## Como participar\n\n"
+            "Para participar acesse [aqui](https://ref.example/abc) e siga o cadastro. "
+            + _pad * 4
+            + "\n\n## Informações importantes\n\n"
+            "Este conteudo nao constitui recomendacao de investimento. "
+            "Sempre faca sua propria pesquisa antes de participar de qualquer airdrop de crypto. "
+            "Acesse o site oficial em [https://bitcoinx.example](https://bitcoinx.example). "
+        ),
+        "meta_title": "Bitcoin-X airdrop: guia rapido",
+        "meta_description": (
+            "Bitcoin-X e um projeto blockchain educacional. Veja como participar "
+            "do airdrop pelo site oficial e cadastre-se com seguranca em poucos passos."
+        ),
+        "image_url": None,
+        "sources_used": ["https://bitcoinx.example"],
+        "word_count": 600,
+    }
+
+    airdrop_api_client.mock_generator.generate = AsyncMock(return_value=article)
+
+    response = await airdrop_api_client.post(
+        "/api/v1/airdrops/generate-post",
+        json={
+            "project_name": "bitcoin-x",
+            "official_url": "https://bitcoinx.example",
+            "referral_url": "https://ref.example/abc",
+            "publish": False,
+        },
+        headers={"Authorization": f"Bearer {settings.AUTOMATION_TOKEN}"},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["success"] is True
+    # Conteúdo retornado começa com parágrafo de intro, não com H2
+    assert body["preview_content"].lstrip().startswith("O bitcoin-x")
+
+
+@pytest.mark.asyncio
 async def test_research_failure_returns_502(airdrop_api_client):
     from app.services.airdrop.web_researcher import ResearchFailedError
 

@@ -20,14 +20,24 @@ class QualityValidator:
     MIN_WORD_COUNT = 250  # Default mínimo
     MAX_WORD_COUNT = 500  # Default máximo
 
-    def __init__(self, min_words: Optional[int] = None, max_words: Optional[int] = None):
+    def __init__(
+        self,
+        min_words: Optional[int] = None,
+        max_words: Optional[int] = None,
+        require_h2_first: bool = True,
+    ):
         """
         Args:
             min_words: Override do limite mínimo de palavras (default 250)
             max_words: Override do limite máximo de palavras (default 500)
+            require_h2_first: Se True (default), exige que content_markdown
+                comece com H2 — regra do pipeline RSS de notícias. Desligar
+                para conteúdo educacional (ex: airdrop) que tem parágrafo
+                de introdução antes do primeiro heading.
         """
         self.min_word_count = min_words if min_words is not None else self.MIN_WORD_COUNT
         self.max_word_count = max_words if max_words is not None else self.MAX_WORD_COUNT
+        self.require_h2_first = require_h2_first
     MIN_TITLE_LENGTH = 30
     MAX_TITLE_LENGTH = 100  # Aumentado de 70 para 100
     MIN_EXCERPT_LENGTH = 80
@@ -217,7 +227,7 @@ class QualityValidator:
         logger.debug(f"Validando estrutura v2.0. Conteúdo bruto (primeiros 200 chars): {content[:200]}")
         
         # 1. Verificar se começa com H2 (manchete interna)
-        if not content.strip().startswith("##"):
+        if self.require_h2_first and not content.strip().startswith("##"):
             logger.warning(f"REJEITADO: Conteúdo não começa com H2 (manchete interna)")
             return False, "Conteúdo deve começar com manchete interna (H2)"
         

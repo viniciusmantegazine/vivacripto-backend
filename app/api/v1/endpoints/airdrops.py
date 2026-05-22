@@ -155,8 +155,13 @@ async def generate_airdrop_post(
             detail="Falha ao gerar conteúdo válido (modelo retornou nulo após retry)",
         )
 
-    # Valida qualidade (palavras + estrutura + título + excerpt)
-    validator = QualityValidator(min_words=500, max_words=750)
+    # Valida qualidade (palavras + estrutura + título + excerpt).
+    # require_h2_first=False: o prompt do airdrop manda um parágrafo de
+    # introdução antes do primeiro H2 (formato educacional), enquanto o
+    # default do validator (pipeline RSS) exige H2 já na primeira linha.
+    validator = QualityValidator(
+        min_words=500, max_words=750, require_h2_first=False
+    )
     is_valid, errors = validator.validate_article(article)
     if not is_valid:
         logger.warning(f"Airdrop: validação reprovou ({errors})")
