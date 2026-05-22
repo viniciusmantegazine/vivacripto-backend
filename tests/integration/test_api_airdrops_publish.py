@@ -77,10 +77,11 @@ async def test_publish_true_persists_post_and_returns_id(airdrop_api_client):
     airdrop_api_client.mock_generator.generate = AsyncMock(return_value=article)
 
     with patch("app.api.v1.endpoints.airdrops.crud_post") as mock_crud, \
+         patch("app.api.v1.endpoints.airdrops._count_airdrop_posts_since",
+               new=AsyncMock(return_value=0)), \
          patch("app.api.v1.endpoints.airdrops.ArticlePublisher") as MockPublisher, \
          patch("app.api.v1.endpoints.airdrops._revalidate_frontend", AsyncMock()):
 
-        mock_crud.get_recent_posts = AsyncMock(return_value=[])
         # Slug livre na primeira tentativa
         mock_crud.get_post_by_slug = AsyncMock(side_effect=[None, fake_post])
         publisher_instance = MockPublisher.return_value
@@ -114,19 +115,21 @@ async def test_publish_true_persists_post_and_returns_id(airdrop_api_client):
 
 @pytest.mark.asyncio
 async def test_publish_blocked_when_daily_limit_reached(airdrop_api_client):
-    """Se já tem 10 posts hoje, publish=True retorna 429."""
-    from app.services.automation.news_pipeline import NewsPipeline
+    """Se já bateu o limite diário de airdrops, publish=True retorna 429."""
+    from app.api.v1.endpoints.airdrops import AIRDROP_DAILY_LIMIT
 
     article = _make_article("https://ref.example/abc", "https://layerzero.network")
-    fake_posts = [MagicMock() for _ in range(NewsPipeline.MAX_POSTS_PER_DAY)]
 
     airdrop_api_client.mock_generator.generate = AsyncMock(return_value=article)
 
-    with patch("app.api.v1.endpoints.airdrops.crud_post") as mock_crud, \
-         patch("app.api.v1.endpoints.airdrops.ArticlePublisher") as MockPublisher, \
-         patch("app.api.v1.endpoints.airdrops._revalidate_frontend", AsyncMock()):
-
-        mock_crud.get_recent_posts = AsyncMock(return_value=fake_posts)
+    with patch(
+        "app.api.v1.endpoints.airdrops._count_airdrop_posts_since",
+        new=AsyncMock(return_value=AIRDROP_DAILY_LIMIT),
+    ), patch(
+        "app.api.v1.endpoints.airdrops.ArticlePublisher"
+    ) as MockPublisher, patch(
+        "app.api.v1.endpoints.airdrops._revalidate_frontend", AsyncMock()
+    ):
         publisher_instance = MockPublisher.return_value
         publisher_instance.publish_article = AsyncMock(return_value=True)
 
@@ -153,10 +156,11 @@ async def test_publish_failure_returns_500(airdrop_api_client):
     airdrop_api_client.mock_generator.generate = AsyncMock(return_value=article)
 
     with patch("app.api.v1.endpoints.airdrops.crud_post") as mock_crud, \
+         patch("app.api.v1.endpoints.airdrops._count_airdrop_posts_since",
+               new=AsyncMock(return_value=0)), \
          patch("app.api.v1.endpoints.airdrops.ArticlePublisher") as MockPublisher, \
          patch("app.api.v1.endpoints.airdrops._revalidate_frontend", AsyncMock()):
 
-        mock_crud.get_recent_posts = AsyncMock(return_value=[])
         mock_crud.get_post_by_slug = AsyncMock(return_value=None)
         publisher_instance = MockPublisher.return_value
         publisher_instance.publish_article = AsyncMock(return_value=False)
@@ -188,10 +192,11 @@ async def test_publish_appends_suffix_on_slug_collision(airdrop_api_client):
     # 1ª e 2ª chamadas: slugs já existem; 3ª: livre; 4ª (final, lookup do post): retorna fake_post
     existing = MagicMock()
     with patch("app.api.v1.endpoints.airdrops.crud_post") as mock_crud, \
+         patch("app.api.v1.endpoints.airdrops._count_airdrop_posts_since",
+               new=AsyncMock(return_value=0)), \
          patch("app.api.v1.endpoints.airdrops.ArticlePublisher") as MockPublisher, \
          patch("app.api.v1.endpoints.airdrops._revalidate_frontend", AsyncMock()):
 
-        mock_crud.get_recent_posts = AsyncMock(return_value=[])
         mock_crud.get_post_by_slug = AsyncMock(
             side_effect=[existing, existing, None, fake_post]
         )

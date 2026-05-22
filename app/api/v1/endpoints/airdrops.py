@@ -23,10 +23,14 @@ from app.schemas.airdrop import AirdropPostRequest, AirdropPostResponse
 from app.services.airdrop.airdrop_post_generator import AirdropPostGenerator
 from app.services.airdrop.web_researcher import ResearchFailedError
 from app.services.automation.article_publisher import ArticlePublisher
-from app.services.automation.news_pipeline import NewsPipeline
 from app.services.automation.quality_validator import QualityValidator
 
 router = APIRouter()
+
+# Limite diário próprio do endpoint de airdrop. Decoupled do pipeline RSS
+# (NewsPipeline.MAX_POSTS_PER_DAY) — airdrop é raro e manual, não deve
+# competir pelo orçamento diário dos posts automáticos.
+AIRDROP_DAILY_LIMIT = 5
 
 # Singleton lazy do generator — evita criar AsyncAnthropic client por request.
 # Inicializado na primeira chamada via get_generator().
@@ -68,6 +72,21 @@ async def _revalidate_frontend() -> None:
                 logger.warning(f"Revalidação retornou {resp.status_code}")
     except Exception as e:
         logger.warning(f"Revalidação falhou (ignorada): {e}")
+
+
+async def _count_airdrop_posts_since(db: AsyncSession, since: datetime) -> int:
+    """Conta posts publicados desde `since` cuja categoria é 'airdrop'."""
+    from sqlalchemy import func, select
+
+    from app.db.models import Category, Post
+
+    stmt = (
+        select(func.count(Post.id))
+        .join(Category, Post.category_id == Category.id)
+        .where(Post.published_at >= since, Category.slug == "airdrop")
+    )
+    result = await db.execute(stmt)
+    return int(result.scalar() or 0)
 
 
 async def _resolve_unique_slug(db: AsyncSession, base_slug: str) -> str:
@@ -160,15 +179,16 @@ async def generate_airdrop_post(
             preview_content=article["content_markdown"],
         )
 
-    # Publish: verificar limite diário
+    # Publish: verificar limite diário do AIRDROP especificamente.
+    # Conta apenas posts com category.slug == "airdrop" no dia atual (UTC).
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    today_posts = await crud_post.get_recent_posts(db, since=today_start)
-    if len(today_posts) >= NewsPipeline.MAX_POSTS_PER_DAY:
+    airdrops_today = await _count_airdrop_posts_since(db, today_start)
+    if airdrops_today >= AIRDROP_DAILY_LIMIT:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=(
-                f"Limite diário de posts atingido "
-                f"({len(today_posts)}/{NewsPipeline.MAX_POSTS_PER_DAY})"
+                f"Limite diário de airdrops atingido "
+                f"({airdrops_today}/{AIRDROP_DAILY_LIMIT})"
             ),
         )
 

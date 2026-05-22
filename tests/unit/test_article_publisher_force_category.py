@@ -118,3 +118,46 @@ def test_publish_article_signature_accepts_force_category_slug():
     assert "force_category_slug" in sig.parameters
     param = sig.parameters["force_category_slug"]
     assert param.default is None
+
+
+@pytest.mark.asyncio
+async def test_publish_article_public_path_with_force_slug_skips_classifier():
+    """
+    Testa o caminho público publish_article com force_category_slug,
+    mockando crud_post.create_post (não testa persistência real, mas
+    valida que a orquestração chama classifier=None e force=airdrop).
+    """
+    mock_image_gen = MagicMock()
+    mock_image_gen.generate_and_upload_image = AsyncMock(return_value="https://img/x.jpg")
+    publisher = ArticlePublisher(image_generator=mock_image_gen)
+
+    existing = Category(id=uuid4(), name="Airdrop", slug="airdrop")
+    db = _mock_db_with_existing_category(existing)
+    db.commit = AsyncMock()
+    db.rollback = AsyncMock()
+
+    article = {
+        "title": "Layerzero airdrop tem cadastro aberto para token nativo",
+        "slug": "layerzero-airdrop-cadastro-aberto",
+        "content_markdown": "## Sobre\n\nx\n\nx",
+        "excerpt": "Layerzero abriu cadastro para o seu airdrop de token nativo do projeto.",
+        "meta_title": "Layerzero airdrop",
+        "meta_description": (
+            "Layerzero abriu cadastro para o seu airdrop de token nativo do projeto agora."
+        ),
+    }
+
+    mock_post = MagicMock()
+    with patch(
+        "app.services.automation.article_publisher.category_classifier"
+    ) as mock_classifier, patch(
+        "app.services.automation.article_publisher.crud_post.create_post",
+        new=AsyncMock(return_value=mock_post),
+    ):
+        ok = await publisher.publish_article(
+            article, db, force_category_slug="airdrop"
+        )
+
+    assert ok is True
+    mock_classifier.classify.assert_not_called()
+    db.commit.assert_awaited_once()
