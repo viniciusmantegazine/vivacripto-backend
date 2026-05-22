@@ -11,6 +11,7 @@ e trunca conteúdo extraído por fonte.
 """
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 from urllib.parse import urlparse
@@ -18,6 +19,11 @@ from urllib.parse import urlparse
 import httpx
 from bs4 import BeautifulSoup
 from loguru import logger
+
+try:
+    from ddgs import DDGS  # ddgs >= 7.0
+except ImportError:  # pragma: no cover
+    from duckduckgo_search import DDGS  # legacy fallback
 
 
 BLOCKED_DOMAINS = {
@@ -162,3 +168,110 @@ class WebResearcher:
         except Exception as e:
             logger.warning(f"WebResearcher: falha ao fetch {url}: {e}")
             return None
+
+    DDG_RESULTS_PER_QUERY = 4
+
+    def _build_queries(self, project_name: str) -> List[str]:
+        return [
+            f"{project_name} airdrop",
+            f"{project_name} como participar",
+            f"{project_name} token tokenomics",
+        ]
+
+    def _search_ddg(self, project_name: str) -> List[Tuple[str, int]]:
+        """
+        Executa as 3 buscas no DDG (síncrono via ddgs). Retorna lista de
+        (url, rank) onde rank é a posição global (menor = melhor).
+        """
+        candidates: List[Tuple[str, int]] = []
+        global_rank = 0
+        try:
+            with DDGS() as ddgs:
+                for query in self._build_queries(project_name):
+                    try:
+                        results = list(
+                            ddgs.text(query, max_results=self.DDG_RESULTS_PER_QUERY)
+                        )
+                    except Exception as e:
+                        logger.warning(f"WebResearcher: DDG falhou para '{query}': {e}")
+                        continue
+                    for item in results:
+                        url = item.get("href") or item.get("url") or ""
+                        if url:
+                            global_rank += 1
+                            candidates.append((url, global_rank))
+        except Exception as e:
+            logger.warning(f"WebResearcher: erro ao iniciar DDGS: {e}")
+        return candidates
+
+    async def gather_context(
+        self,
+        project_name: str,
+        official_url: str,
+    ) -> ResearchResult:
+        """
+        Pesquisa, fetch e consolida texto sobre o projeto.
+
+        Raises:
+            ResearchFailedError: se a página oficial não pôde ser baixada
+                e nenhuma fonte secundária foi obtida.
+        """
+        # 1) busca DDG (síncrono — rodar em thread pra não bloquear loop)
+        raw_candidates = await asyncio.to_thread(self._search_ddg, project_name)
+
+        # 2) filtragem
+        candidates = self._apply_blocklist(raw_candidates)
+        candidates = self._dedup_by_domain(candidates)
+        candidates = self._apply_whitelist_boost(candidates)
+
+        # 3) seleção (oficial sempre incluída como FONTE 1)
+        selected_urls = self._select_top(candidates, official_url, top_n=TOP_N_URLS)
+        logger.info(f"WebResearcher: vai fetch {len(selected_urls)} URLs para '{project_name}'")
+
+        # 4) fetch paralelo
+        async with httpx.AsyncClient() as client:
+            fetch_tasks = [self._fetch_url(client, url) for url in selected_urls]
+            texts = await asyncio.gather(*fetch_tasks, return_exceptions=False)
+
+        # 5) emparelhar urls x textos, descartar falhas
+        official_text: Optional[str] = None
+        secondary_blocks: List[Tuple[str, str]] = []
+        for url, text in zip(selected_urls, texts):
+            if not text:
+                continue
+            if url == official_url:
+                official_text = text
+            else:
+                secondary_blocks.append((url, text))
+
+        # 6) regra dura: precisa de pelo menos a oficial OU 1 secundária
+        if official_text is None and not secondary_blocks:
+            raise ResearchFailedError(
+                f"Não foi possível baixar nenhuma fonte para '{project_name}'"
+            )
+
+        # 7) montar bloco consolidado
+        parts = [f'=== FONTES PESQUISADAS PARA "{project_name}" ===\n']
+        sources_used: List[str] = []
+        index = 1
+
+        if official_text is not None:
+            parts.append(f"[FONTE {index} - OFICIAL] {official_url}\n{official_text}\n")
+            sources_used.append(official_url)
+            index += 1
+        else:
+            logger.warning(
+                f"WebResearcher: página oficial {official_url} indisponível, "
+                "seguindo só com secundárias"
+            )
+
+        for url, text in secondary_blocks:
+            parts.append(f"[FONTE {index}] {url}\n{text}\n")
+            sources_used.append(url)
+            index += 1
+
+        parts.append("=== FIM DAS FONTES ===")
+        return ResearchResult(
+            sources_text="\n".join(parts),
+            sources_used=sources_used,
+        )
