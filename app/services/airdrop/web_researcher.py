@@ -12,9 +12,11 @@ e trunca conteúdo extraído por fonte.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from urllib.parse import urlparse
 
+import httpx
+from bs4 import BeautifulSoup
 from loguru import logger
 
 
@@ -123,3 +125,40 @@ class WebResearcher:
             urls.remove(official_url)
         selected = [official_url] + urls[: max(0, top_n - 1)]
         return selected[:top_n]
+
+    def _extract_text(self, html: str) -> str:
+        """
+        Extrai texto limpo do HTML.
+        - Remove <script>, <style>, <nav>, <footer>, <header>, <aside>
+        - Normaliza whitespace
+        - Trunca a SOURCE_TRUNCATE_CHARS
+        """
+        soup = BeautifulSoup(html, "html.parser")
+        for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
+            tag.decompose()
+        text = soup.get_text(separator=" ", strip=True)
+        # Normaliza múltiplos espaços
+        text = " ".join(text.split())
+        return text[:SOURCE_TRUNCATE_CHARS]
+
+    async def _fetch_url(
+        self, client: httpx.AsyncClient, url: str
+    ) -> Optional[str]:
+        """
+        Fetch HTTP de uma URL. Retorna texto extraído ou None se:
+        - Erro HTTP (timeout, 4xx, 5xx, conexão)
+        - Content-Type não é HTML
+        """
+        try:
+            response = await client.get(url, timeout=10.0, follow_redirects=True)
+            if response.status_code != 200:
+                logger.warning(f"WebResearcher: status {response.status_code} para {url}")
+                return None
+            content_type = response.headers.get("content-type", "").lower()
+            if "html" not in content_type:
+                logger.debug(f"WebResearcher: pulando {url} (content-type={content_type})")
+                return None
+            return self._extract_text(response.text)
+        except Exception as e:
+            logger.warning(f"WebResearcher: falha ao fetch {url}: {e}")
+            return None
