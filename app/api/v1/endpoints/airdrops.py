@@ -5,7 +5,9 @@ Endpoint manual para gerar (e opcionalmente publicar) posts sobre airdrops
 de projetos cripto. Combina pesquisa web + IA com guardrails NFA.
 """
 import traceback
+from datetime import datetime
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,13 +15,33 @@ from app.core.config import settings
 from app.core.logging import logger
 from app.core.rate_limiter import RATE_LIMITS, limiter
 from app.core.security import verify_automation_token
+from app.crud.crud_post import crud_post
 from app.db.base import get_db
 from app.schemas.airdrop import AirdropPostRequest, AirdropPostResponse
 from app.services.airdrop.airdrop_post_generator import AirdropPostGenerator
 from app.services.airdrop.web_researcher import ResearchFailedError
+from app.services.automation.article_publisher import ArticlePublisher
+from app.services.automation.news_pipeline import NewsPipeline
 from app.services.automation.quality_validator import QualityValidator
 
 router = APIRouter()
+
+
+async def _revalidate_frontend() -> None:
+    """Dispara revalidação ISR no frontend. Não-bloqueante."""
+    try:
+        if not settings.FRONTEND_URL:
+            logger.warning("FRONTEND_URL ausente — pulando revalidação")
+            return
+        url = f"{settings.FRONTEND_URL}/api/revalidate"
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(url, json={"secret": settings.REVALIDATE_SECRET})
+            if resp.status_code == 200:
+                logger.info("Revalidação frontend OK")
+            else:
+                logger.warning(f"Revalidação retornou {resp.status_code}")
+    except Exception as e:
+        logger.warning(f"Revalidação falhou (ignorada): {e}")
 
 
 @router.post("/generate-post", response_model=AirdropPostResponse)
@@ -79,16 +101,59 @@ async def generate_airdrop_post(
             detail={"message": "Artigo não passou na validação de qualidade", "errors": errors},
         )
 
-    # publish=True será tratado em task posterior; por enquanto, sempre preview
+    # Preview
+    if not body.publish:
+        return AirdropPostResponse(
+            success=True,
+            post_id=None,
+            title=article["title"],
+            slug=article["slug"],
+            excerpt=article.get("excerpt", ""),
+            image_url=article.get("image_url"),
+            word_count=article.get("word_count", 0),
+            sources_used=article.get("sources_used", []),
+            preview_content=article["content_markdown"],
+            errors=[],
+        )
+
+    # Publish: verificar limite diário
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_posts = await crud_post.get_recent_posts(db, since=today_start)
+    if len(today_posts) >= NewsPipeline.MAX_POSTS_PER_DAY:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                f"Limite diário de posts atingido "
+                f"({len(today_posts)}/{NewsPipeline.MAX_POSTS_PER_DAY})"
+            ),
+        )
+
+    publisher = ArticlePublisher()
+    published = await publisher.publish_article(
+        article, db, force_category_slug="airdrop"
+    )
+    if not published:
+        raise HTTPException(
+            status_code=500, detail="Falha ao gravar artigo no banco"
+        )
+
+    # Buscar post pra obter ID
+    created = await crud_post.get_post_by_slug(db, article["slug"])
+    post_id = str(created.id) if created else None
+
+    # Revalidação ISR (não bloqueante)
+    await _revalidate_frontend()
+
+    logger.info(f"Airdrop post publicado: {article['title'][:50]}")
     return AirdropPostResponse(
         success=True,
-        post_id=None,
+        post_id=post_id,
         title=article["title"],
         slug=article["slug"],
         excerpt=article.get("excerpt", ""),
         image_url=article.get("image_url"),
         word_count=article.get("word_count", 0),
         sources_used=article.get("sources_used", []),
-        preview_content=article["content_markdown"],
+        preview_content=None,
         errors=[],
     )
