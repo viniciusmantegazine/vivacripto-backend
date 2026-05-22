@@ -89,14 +89,40 @@ class AirdropPostGenerator:
         referral_url: str,
     ) -> Optional[Dict]:
         """
-        Roda o fluxo completo: pesquisa → IA → article dict.
-
-        Returns:
-            Dict no shape esperado por ArticlePublisher.publish_article, com
-            campos extras `sources_used` e `word_count`, ou None em falha.
+        Roda o fluxo completo: pesquisa → IA → validação extra → article dict.
         """
         research = await self.web_researcher.gather_context(project_name, official_url)
 
+        article = await self._generate_validated(
+            project_name=project_name,
+            official_url=official_url,
+            referral_url=referral_url,
+            research=research,
+        )
+        if article is None:
+            return None
+
+        if not article.get("slug"):
+            article["slug"] = slugify(article.get("title", project_name))
+
+        article["image_url"] = await self._generate_image(article)
+        article["sources_used"] = research.sources_used
+        article["word_count"] = len(article.get("content_markdown", "").split())
+        return article
+
+    async def _generate_validated(
+        self,
+        project_name: str,
+        official_url: str,
+        referral_url: str,
+        research: ResearchResult,
+        correction_hint: Optional[str] = None,
+    ) -> Optional[Dict]:
+        """
+        Gera com Claude (fallback Gemini), valida link de referência/oficial.
+        Se falhar a validação, regenera UMA vez com hint de correção.
+        Retorna None se ainda falhar.
+        """
         user_prompt = build_airdrop_user_prompt(
             project_name=project_name,
             official_url=official_url,
@@ -104,27 +130,62 @@ class AirdropPostGenerator:
             sources_text=research.sources_text,
             current_date=datetime.utcnow().strftime("%Y-%m-%d"),
         )
+        if correction_hint:
+            user_prompt += f"\n\nINSTRUÇÃO DE CORREÇÃO:\n{correction_hint}"
 
         article = await self._generate_with_claude(user_prompt)
-
         if article is None:
             logger.warning("AirdropPostGenerator: Claude falhou, tentando Gemini")
             article = await self._generate_with_gemini(user_prompt)
-
         if article is None:
-            logger.error("AirdropPostGenerator: ambos os modelos falharam")
             return None
 
-        # garante slug
-        if not article.get("slug"):
-            article["slug"] = slugify(article.get("title", project_name))
+        errors = self._post_validate(article, referral_url, official_url)
+        if not errors:
+            return article
 
-        # gera imagem (não-bloqueante)
-        article["image_url"] = await self._generate_image(article)
+        # Regenera UMA vez
+        if correction_hint is not None:
+            logger.error(f"AirdropPostGenerator: validação falhou após retry: {errors}")
+            return None
 
-        article["sources_used"] = research.sources_used
-        article["word_count"] = len(article.get("content_markdown", "").split())
-        return article
+        hint = (
+            "A geração anterior tinha estes problemas: "
+            + "; ".join(errors)
+            + ". Corrija no novo JSON."
+        )
+        logger.warning(f"AirdropPostGenerator: regenerando uma vez ({errors})")
+        return await self._generate_validated(
+            project_name=project_name,
+            official_url=official_url,
+            referral_url=referral_url,
+            research=research,
+            correction_hint=hint,
+        )
+
+    def _post_validate(
+        self,
+        article: Dict,
+        referral_url: str,
+        official_url: str,
+    ) -> list:
+        """
+        Verifica:
+        - referral_url está presente no markdown
+        - official_url está presente no markdown
+        - string-chave do disclosure presente
+        Retorna lista de erros (vazia se ok).
+        """
+        errors = []
+        content = article.get("content_markdown", "")
+        if referral_url not in content:
+            errors.append(f"link de referência ({referral_url}) ausente no conteúdo")
+        if official_url not in content:
+            errors.append(f"link oficial ({official_url}) ausente no bloco de disclosure")
+        normalized = content.lower().replace("ã", "a").replace("ç", "c")
+        if "nao constitui recomendacao" not in normalized:
+            errors.append("frase 'não constitui recomendação' ausente no disclosure")
+        return errors
 
     async def _generate_with_claude(self, user_prompt: str) -> Optional[Dict]:
         """Chama Claude e parsa o JSON de saída. Retorna None em falha."""
