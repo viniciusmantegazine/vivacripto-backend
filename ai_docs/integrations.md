@@ -87,6 +87,65 @@ OPENAI_API_KEY=sk-xxx
 
 ---
 
+### Anthropic Claude API
+
+**Tipo**: API REST
+**Propósito**: Geração analítica profunda (relatórios semanais + posts de airdrop)
+**SDK**: `anthropic >= 0.18.0`
+
+**Modelos Utilizados**:
+| Modelo | Propósito |
+|--------|-----------|
+| `claude-opus-4-20250514` | Relatórios semanais (`weekly_report_generator`) |
+| `claude-sonnet-4-6` | Geração de posts de airdrop (`airdrop_post_generator`) |
+
+**Configuração**:
+```bash
+ANTHROPIC_API_KEY=sk-ant-xxx
+```
+
+**Otimização**:
+- `airdrop_post_generator` usa **prompt caching** (`cache_control: ephemeral`) no system prompt — ~50% de desconto em retries dentro de 5 min e em chamadas back-to-back.
+
+**Tratamento de Falhas**:
+- Airdrop: fallback automático pra Gemini Flash via `ContentGenerator.gemini_client`
+- Weekly report: sem fallback (relatório semanal exige Claude)
+
+**Arquivos**:
+- `app/services/ai/weekly_report_generator.py`
+- `app/services/airdrop/airdrop_post_generator.py`
+
+---
+
+### DuckDuckGo Search (ddgs)
+
+**Tipo**: Biblioteca Python (sem API key — scraping)
+**Propósito**: Pesquisa web pra enriquecer contexto do airdrop generator
+**SDK**: `ddgs >= 7.0.0` (fallback legacy: `duckduckgo_search`)
+
+**Operações**:
+- 3 queries por geração de airdrop (`{nome} airdrop`, `{nome} como participar`, `{nome} token tokenomics`)
+- 4 resultados por query → 12 URLs candidatas
+- Filtragem por blocklist (social/vídeo) e whitelist boost (fontes cripto confiáveis)
+- Top 5 selecionadas pra fetch (oficial sempre incluída)
+
+**Configuração**: Nenhuma (sem chave de API)
+
+**Tratamento de Falhas**:
+- Timeout dedicado de 15s (`DDG_TIMEOUT_SECONDS`)
+- Se DDG falhar/timeout, segue com apenas a URL oficial fornecida pelo operador
+- Erros por query são swallowed (loga warning, segue com próxima query)
+
+**Limitações**:
+- Sem garantia de SLA (scraping não-oficial)
+- Rate limits informais do DDG podem retornar resultados vazios em alta volumetria
+- Sem cache local — cada request faz busca nova
+
+**Arquivos**:
+- `app/services/airdrop/web_researcher.py` (`_search_ddg`, `gather_context`)
+
+---
+
 ### Cloudinary
 
 **Tipo**: API REST + CDN

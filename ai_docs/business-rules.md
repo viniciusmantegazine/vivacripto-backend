@@ -2,32 +2,45 @@
 
 ## Regras Críticas
 
-### 1. Limite Diário de Publicações
+### 1. Limites Diários de Publicações
 
-**Descrição**: O sistema limita a quantidade de artigos publicados por dia para manter qualidade e evitar spam.
+**Descrição**: O sistema limita publicações por dia para manter qualidade, controlar custo de API e evitar sobrecarga. Existem **dois limites independentes**, escopados por origem:
+
+| Limite | Constante | Default | Escopo |
+|---|---|---|---|
+| Pipeline RSS | `NewsPipeline.MAX_POSTS_PER_DAY` | 10 | Todos os posts criados via `/automation/trigger` |
+| Airdrop manual | `AIRDROP_DAILY_LIMIT` | 5 | Apenas posts com `category.slug == "airdrop"` |
+
+Os limites **não se sobrepõem**: o limite de airdrop conta apenas posts na categoria airdrop do dia, então o pipeline RSS publicar 10 posts em outras categorias não consome o orçamento de airdrop, e vice-versa.
 
 **Justificativa**:
 - Manter curadoria de qualidade
-- Controlar custos de API (Gemini/OpenAI)
-- Evitar sobrecarga do portal
+- Controlar custos de API (Gemini/OpenAI/Claude)
+- Evitar sobrecarga do portal e do leitor
 
 **Implementação**:
-- Arquivo: `app/services/automation/news_pipeline.py` (linhas 250-273)
-- Arquivo: `app/api/v1/endpoints/automation.py`
+- Arquivo: `app/services/automation/news_pipeline.py` (linhas 250-273) — pipeline RSS
+- Arquivo: `app/api/v1/endpoints/automation.py` — trigger HTTP do pipeline
+- Arquivo: `app/api/v1/endpoints/airdrops.py` — endpoint manual de airdrop (`_count_airdrop_posts_since`)
 
 **Configuração**:
 ```python
-DAILY_POST_LIMIT = 10        # Máximo de posts por dia
+# app/services/automation/news_pipeline.py
+DAILY_POST_LIMIT = 10        # Pipeline RSS, todas as categorias
 POSTS_PER_EXECUTION = 1      # Posts por execução do pipeline
+
+# app/api/v1/endpoints/airdrops.py
+AIRDROP_DAILY_LIMIT = 5      # Apenas categoria 'airdrop'
 ```
 
 **Validações**:
 - Conta posts com `published_at` no dia atual (UTC)
-- Respeita limite por execução individual
-- Retorna erro `DailyLimitReachedError` quando excedido
+- Pipeline RSS conta TODOS os posts; airdrop endpoint conta apenas posts da categoria `airdrop`
+- Retorna 429 quando excedido (airdrop) ou `DailyLimitReachedError` (pipeline)
 
 **Exceções**:
 - Atualizações de posts existentes NÃO contam no limite
+- Preview de airdrop (`publish=false`) NÃO conta no limite (não persiste)
 - Apenas novos posts (`CREATE_NEW`) são contabilizados
 
 ---

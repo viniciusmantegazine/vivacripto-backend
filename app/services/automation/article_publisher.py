@@ -34,13 +34,19 @@ class ArticlePublisher:
         """
         self.image_generator = image_generator or ImageGenerator()
 
-    async def publish_article(self, article: Dict, db: AsyncSession) -> bool:
+    async def publish_article(
+        self,
+        article: Dict,
+        db: AsyncSession,
+        force_category_slug: Optional[str] = None,
+    ) -> bool:
         """
         Publica um novo artigo no banco de dados.
 
         Args:
             article: Dicionário com dados do artigo (title, slug, content_markdown, etc.)
             db: Sessão do banco de dados
+            force_category_slug: Se fornecido, pula o classifier e força esta categoria
 
         Returns:
             True se publicado com sucesso, False caso contrário
@@ -49,8 +55,10 @@ class ArticlePublisher:
             # Converter markdown para HTML
             content_html = self._convert_markdown_to_html(article["content_markdown"])
 
-            # Classificar categoria automaticamente
-            category = await self._get_or_create_category(article, db)
+            # Classificar categoria automaticamente (ou usar override)
+            category = await self._get_or_create_category(
+                article, db, force_category_slug=force_category_slug
+            )
 
             # Gerar imagem (passando categoria para contexto visual)
             image_url = await self._generate_image(article, category.slug)
@@ -121,7 +129,10 @@ class ArticlePublisher:
         )
 
     async def _get_or_create_category(
-        self, article: Dict, db: AsyncSession
+        self,
+        article: Dict,
+        db: AsyncSession,
+        force_category_slug: Optional[str] = None,
     ) -> Category:
         """
         Busca ou cria a categoria para o artigo.
@@ -129,15 +140,19 @@ class ArticlePublisher:
         Args:
             article: Dados do artigo para classificação
             db: Sessão do banco de dados
+            force_category_slug: Se fornecido, pula o classifier e usa este slug
 
         Returns:
             Instância da categoria
         """
-        category_slug = category_classifier.classify(
-            title=article["title"],
-            content=article["content_markdown"],
-            excerpt=article.get("excerpt", ""),
-        )
+        if force_category_slug:
+            category_slug = force_category_slug
+        else:
+            category_slug = category_classifier.classify(
+                title=article["title"],
+                content=article["content_markdown"],
+                excerpt=article.get("excerpt", ""),
+            )
 
         result = await db.execute(
             select(Category).where(Category.slug == category_slug)
@@ -147,7 +162,7 @@ class ArticlePublisher:
         if not category:
             logger.warning(f"Category '{category_slug}' not found, creating...")
             category = Category(
-                name=category_classifier.get_category_name(category_slug),
+                name=category_classifier.get_category_name(category_slug) or category_slug.capitalize(),
                 slug=category_slug,
             )
             db.add(category)

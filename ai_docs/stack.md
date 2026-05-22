@@ -22,8 +22,9 @@
 ### AI e Geração de Conteúdo
 | Biblioteca | Versão | Propósito |
 |------------|--------|-----------|
-| `google-genai` | ≥1.5.0 | Google Gemini API (primário) |
+| `google-genai` | ≥1.5.0 | Google Gemini API (primário do pipeline RSS) |
 | `openai` | ≥1.10.0 | OpenAI GPT/DALL-E (fallback) |
+| `anthropic` | ≥0.18.0 | Claude API (weekly report + airdrop generator) |
 | `sentence-transformers` | 2.2.2 | Embeddings para deduplicação |
 | `scikit-learn` | 1.3.2 | Algoritmos de similaridade |
 | `torch` | 2.0.1 | PyTorch (dependência) |
@@ -34,6 +35,8 @@
 | `httpx` | ≥0.28.1 | Cliente HTTP assíncrono |
 | `aiohttp` | 3.9.1 | HTTP alternativo |
 | `feedparser` | 6.0.11 | Parser de feeds RSS |
+| `ddgs` | ≥7.0.0 | Busca DuckDuckGo (airdrop web research) |
+| `beautifulsoup4` | ≥4.12.0 | Parser HTML (extração de fontes do airdrop) |
 
 ### Segurança e Autenticação
 | Biblioteca | Versão | Propósito |

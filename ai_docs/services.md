@@ -7,16 +7,24 @@ O VivaCripto Backend organiza sua lógica de negócio em serviços especializado
 ```
 app/services/
 ├── ai/                      # Serviços de Inteligência Artificial
-│   ├── content_generator.py     # Geração de artigos
+│   ├── content_generator.py     # Geração de artigos (pipeline RSS)
 │   ├── image_generator.py       # Geração de imagens
 │   ├── category_classifier.py   # Classificação automática
 │   ├── smart_prompt_generator.py # Otimização de prompts
 │   ├── news_context_analyzer.py  # Análise de contexto
-│   └── visual_elements_bank.py   # Banco de elementos visuais
+│   ├── visual_elements_bank.py   # Banco de elementos visuais
+│   ├── weekly_report_generator.py # Relatórios semanais (Claude Opus)
+│   ├── market_data_collector.py # Dados de mercado em tempo real
+│   └── prompts/                 # Prompts isolados por uso
+│       ├── weekly_report_prompts.py
+│       └── airdrop_prompts.py   # System prompt + builder do airdrop
+├── airdrop/                 # Geração de posts sobre airdrops (manual)
+│   ├── airdrop_post_generator.py # Orquestrador Claude + Gemini fallback
+│   └── web_researcher.py        # DDG search + fetch HTML + extração
 ├── automation/              # Pipeline de Automação
 │   ├── news_pipeline.py         # Orquestrador principal
-│   ├── article_publisher.py     # Publicação de artigos
-│   └── quality_validator.py     # Validação de qualidade
+│   ├── article_publisher.py     # Publicação (suporta force_category_slug)
+│   └── quality_validator.py     # Validação (palavras parametrizáveis)
 ├── sources/                 # Coleta de Notícias
 │   ├── news_aggregator.py       # Agregador multi-fonte
 │   ├── rss_collector.py         # Coletor de RSS
@@ -208,6 +216,117 @@ BLOCKED_WORDS = [
 
 ---
 
+## Serviços de Airdrop (app/services/airdrop/)
+
+Módulo dedicado pra geração manual de posts sobre airdrops. Separado de `ai/` e `automation/` porque combina pesquisa web + LLM + lógica de publicação de forma específica do caso, e não compartilha o pipeline RSS.
+
+### AirdropPostGenerator
+
+**Arquivo**: `airdrop_post_generator.py`
+**Responsabilidade**: Orquestrar pesquisa web → Claude (fallback Gemini) → validação extra → dict de artigo pronto pra publicação.
+
+**Características**:
+| Aspecto | Detalhe |
+|---------|---------|
+| **Modelo Primário** | `claude-sonnet-4-6` (com prompt caching) |
+| **Modelo Fallback** | Gemini Flash (via `ContentGenerator.gemini_client`) |
+| **Temperatura** | 0.5 (mais conservador que weekly_report) |
+| **Max Tokens** | 3000 |
+| **Singleton** | Sim, via FastAPI `Depends(get_generator)` |
+
+**Métodos Principais**:
+```python
+class AirdropPostGenerator:
+    async def generate(
+        self,
+        project_name: str,
+        official_url: str,
+        referral_url: str,
+        generate_image: bool = True,
+    ) -> Optional[Dict]:
+        """Fluxo completo: pesquisa → IA → validação → article dict."""
+
+    async def _generate_validated(self, ..., correction_hint=None):
+        """Gera + valida + regenera 1x com hint se falhar."""
+
+    def _post_validate(self, article, referral_url, official_url) -> list:
+        """Verifica referral na seção 'Como participar',
+        oficial no markdown, frase NFA presente."""
+
+    @staticmethod
+    def _url_appears_in_markdown(url, content) -> bool:
+        """Match tolerante: [url](url), <url>, autolink, com/sem
+        trailing slash, query string, fragment."""
+
+    @staticmethod
+    def _strip_accents(text) -> str:
+        """unicodedata NFKD → ASCII lowercase."""
+
+    @staticmethod
+    def _section_text(content, heading_keyword) -> str:
+        """Extrai texto de seção H2 (accent-insensitive)."""
+```
+
+---
+
+### WebResearcher
+
+**Arquivo**: `web_researcher.py`
+**Responsabilidade**: Coletar contexto público sobre um projeto cripto via DuckDuckGo + fetch HTTP + extração de texto.
+
+**Constantes**:
+```python
+BLOCKED_DOMAINS = {"reddit.com", "twitter.com", "x.com",
+                   "youtube.com", "tiktok.com", "telegram.org", "discord.com"}
+
+PREFERRED_DOMAINS = {"coinmarketcap.com", "coingecko.com", "cryptorank.io",
+                     "coindesk.com", "cointelegraph.com", "decrypt.co",
+                     "theblock.co", "cryptoslate.com", "messari.io",
+                     "airdrops.io", "coinlist.co"}
+
+WHITELIST_BOOST = 100         # subtraído do rank pra preferred domains
+SOURCE_TRUNCATE_CHARS = 3000  # cap por fonte
+TOP_N_URLS = 5                # top-N pra fetch (incluindo oficial)
+```
+
+**Timeouts**:
+```python
+OVERALL_TIMEOUT_SECONDS = 45.0   # teto do gather_context inteiro
+DDG_TIMEOUT_SECONDS = 15.0       # busca DDG só
+FETCH_TIMEOUT_SECONDS = 10.0     # por URL no fetch paralelo
+```
+
+**Métodos Principais**:
+```python
+class WebResearcher:
+    async def gather_context(
+        self, project_name: str, official_url: str
+    ) -> ResearchResult:
+        """Pesquisa, fetch e consolida.
+        Raises ResearchFailedError se nem oficial nem secundárias funcionarem,
+        ou se OVERALL_TIMEOUT_SECONDS estourar."""
+
+    def _domain_of(self, url) -> str:        # .removeprefix("www.")
+    def _normalize_url(self, url) -> str:    # case+slash+fragment
+    def _dedup_by_domain(...): ...
+    def _apply_blocklist(...): ...
+    def _apply_whitelist_boost(...): ...
+    def _select_top(...): ...               # garante oficial sempre
+    def _extract_text(html) -> str:         # BeautifulSoup, sem nav/footer/script/style/aside/header
+    async def _fetch_url(...):              # User-Agent realista
+    def _search_ddg(...):                   # síncrono, roda em asyncio.to_thread
+```
+
+**Output**:
+```python
+@dataclass
+class ResearchResult:
+    sources_text: str              # bloco "=== FONTES PESQUISADAS PARA "X" ==="
+    sources_used: List[str]        # URLs efetivamente baixadas
+```
+
+---
+
 ## Serviços de Automação (app/services/automation/)
 
 ### NewsPipeline
@@ -281,28 +400,31 @@ class PipelineResult:
 - Conversão Markdown → HTML
 - Associação de categorias e tags
 
+**Override de categoria** (adicionado no commit `3d1a01c` pra suporte ao endpoint de airdrop):
+```python
+# Comportamento normal: usa category_classifier
+await publisher.publish_article(article, db)
+
+# Força categoria específica (airdrop pula classifier):
+await publisher.publish_article(article, db, force_category_slug="airdrop")
+```
+
 **Métodos Principais**:
 ```python
 class ArticlePublisher:
-    async def publish(
+    async def publish_article(
         self,
-        article: ProcessedArticle,
-        action: ActionType
-    ) -> Optional[Post]:
-        """Publica ou atualiza artigo."""
+        article: Dict,
+        db: AsyncSession,
+        force_category_slug: Optional[str] = None,
+    ) -> bool:
+        """Publica novo artigo. force_category_slug pula classifier."""
 
-    async def _create_new(
-        self,
-        article: ProcessedArticle
-    ) -> Post:
-        """Cria novo post."""
-
-    async def _update_existing(
-        self,
-        article: ProcessedArticle,
-        existing_id: UUID
-    ) -> Post:
+    async def update_article(self, post_id, article, db) -> bool:
         """Atualiza post existente."""
+
+    async def _get_or_create_category(self, article, db, force_category_slug=None):
+        """Resolve categoria. Cria se não existir."""
 ```
 
 ---
@@ -317,26 +439,23 @@ class ArticlePublisher:
 |-------|-------|
 | Título | 30-100 caracteres |
 | Excerpt | 80-200 caracteres |
-| Conteúdo | 250-500 palavras |
+| Conteúdo | 250-500 palavras (default; override via construtor) |
 | Meta Description | 120-180 caracteres |
+
+**Parametrização** (adicionada no commit `54fd3ef`):
+```python
+QualityValidator()                            # default 250-500 (pipeline RSS)
+QualityValidator(min_words=500, max_words=750)  # airdrop endpoint
+```
 
 **Métodos Principais**:
 ```python
 class QualityValidator:
-    def validate(
-        self,
-        article: GeneratedArticle
-    ) -> ValidationResult:
+    def __init__(self, min_words: Optional[int] = None, max_words: Optional[int] = None):
+        """Aceita override do word count por instância."""
+
+    def validate(self, article: GeneratedArticle) -> ValidationResult:
         """Valida artigo contra regras de qualidade."""
-
-    def _validate_title(self, title: str) -> bool:
-        """Valida tamanho do título."""
-
-    def _validate_content(self, content: str) -> bool:
-        """Valida word count."""
-
-    def _count_words(self, text: str) -> int:
-        """Conta palavras em texto."""
 ```
 
 **Resultado**:
