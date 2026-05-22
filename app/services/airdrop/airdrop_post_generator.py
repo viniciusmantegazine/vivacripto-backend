@@ -7,6 +7,8 @@ Orquestra: WebResearcher → Claude Sonnet 4.6 (com fallback Gemini)
 from __future__ import annotations
 
 import json
+import re
+import unicodedata
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -163,6 +165,39 @@ class AirdropPostGenerator:
             correction_hint=hint,
         )
 
+    @staticmethod
+    def _strip_accents(text: str) -> str:
+        """Remove acentos via NFKD, retorna lowercase ASCII."""
+        normalized = unicodedata.normalize("NFKD", text)
+        ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
+        return ascii_text.lower()
+
+    @staticmethod
+    def _url_appears_in_markdown(url: str, content: str) -> bool:
+        """
+        Verifica se a URL aparece no markdown, tolerando:
+        - trailing slash divergente
+        - query string adicional (?utm=...)
+        - markdown link com title attribute
+        - fragments
+        Estratégia: extrai todas as URLs de links markdown [text](url) +
+        links autolink, normaliza, compara base.
+        """
+        target = url.rstrip("/").split("?")[0].split("#")[0]
+        # Char class de URL: exclui whitespace e delimitadores comuns de
+        # markdown (`)`, `]`, `>`, `"`) que NÃO podem aparecer em URLs válidas.
+        link_re = re.compile(
+            r'\]\(\s*([^)\s]+)'           # markdown link: ](url)
+            r'|<(https?://[^>\s]+)>'      # autolink: <url>
+            r'|(https?://[^\s)\]>"]+)'    # URL crua
+        )
+        for match in link_re.finditer(content):
+            for raw in filter(None, match.groups()):
+                candidate = raw.rstrip('.,;').rstrip("/").split("?")[0].split("#")[0]
+                if candidate == target:
+                    return True
+        return False
+
     def _post_validate(
         self,
         article: Dict,
@@ -171,18 +206,18 @@ class AirdropPostGenerator:
     ) -> list:
         """
         Verifica:
-        - referral_url está presente no markdown
-        - official_url está presente no markdown
-        - string-chave do disclosure presente
+        - referral_url está presente no markdown (match tolerante)
+        - official_url está presente no markdown (match tolerante)
+        - frase-chave do disclosure presente (Unicode-normalized)
         Retorna lista de erros (vazia se ok).
         """
         errors = []
         content = article.get("content_markdown", "")
-        if referral_url not in content:
+        if not self._url_appears_in_markdown(referral_url, content):
             errors.append(f"link de referência ({referral_url}) ausente no conteúdo")
-        if official_url not in content:
+        if not self._url_appears_in_markdown(official_url, content):
             errors.append(f"link oficial ({official_url}) ausente no bloco de disclosure")
-        normalized = content.lower().replace("ã", "a").replace("ç", "c")
+        normalized = self._strip_accents(content)
         if "nao constitui recomendacao" not in normalized:
             errors.append("frase 'não constitui recomendação' ausente no disclosure")
         return errors

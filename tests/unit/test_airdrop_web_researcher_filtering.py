@@ -87,3 +87,32 @@ def test_blocked_and_preferred_domains_sets_exist():
     assert "youtube.com" in BLOCKED_DOMAINS
     assert "coindesk.com" in PREFERRED_DOMAINS
     assert "coingecko.com" in PREFERRED_DOMAINS
+
+
+def test_domain_of_strips_www_prefix_not_substring():
+    """`.lstrip('www.')` é bug clássico; deve usar removeprefix."""
+    r = WebResearcher()
+    assert r._domain_of("https://www.example.com/path") == "example.com"
+    # Não deve quebrar nomes que começam com 'w' mas não têm prefixo www.
+    assert r._domain_of("https://wax.com/post") == "wax.com"
+    assert r._domain_of("https://www2.example.com/x") == "www2.example.com"
+
+
+def test_normalize_url_handles_trailing_slash_case_and_fragment():
+    r = WebResearcher()
+    assert r._normalize_url("https://EXAMPLE.com/path/") == "https://example.com/path"
+    assert r._normalize_url("https://example.com/path") == "https://example.com/path"
+    assert r._normalize_url("https://example.com#section") == "https://example.com"
+    # Mantém query string
+    assert r._normalize_url("https://example.com/?utm=x") == "https://example.com?utm=x"
+
+
+def test_select_top_dedupes_official_with_trailing_slash_variant():
+    r = WebResearcher()
+    ranked = [
+        ("https://layerzero.network/", 1),  # ranked com trailing slash
+        ("https://coindesk.com/a", 2),
+    ]
+    selected = r._select_top(ranked, "https://layerzero.network", top_n=5)
+    # Não deve aparecer 2x apesar do trailing slash divergente
+    assert sum(1 for u in selected if "layerzero.network" in u) == 1

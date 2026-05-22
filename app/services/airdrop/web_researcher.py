@@ -64,9 +64,27 @@ class WebResearcher:
 
     def _domain_of(self, url: str) -> str:
         try:
-            return urlparse(url).netloc.lower().lstrip("www.")
+            netloc = urlparse(url).netloc.lower()
+            # Bug histórico: .lstrip("www.") remove qualquer um desses chars
+            # à esquerda (ex: "wax.com" virava "x.com"). Usa removeprefix.
+            return netloc.removeprefix("www.")
         except Exception:
             return ""
+
+    def _normalize_url(self, url: str) -> str:
+        """
+        Normaliza URL pra comparação estável: lowercase scheme+host,
+        remove trailing slash do path, descarta fragment.
+        """
+        try:
+            p = urlparse(url)
+            path = (p.path or "").rstrip("/")
+            netloc = p.netloc.lower()
+            scheme = p.scheme.lower() or "https"
+            query = f"?{p.query}" if p.query else ""
+            return f"{scheme}://{netloc}{path}{query}"
+        except Exception:
+            return url
 
     def _dedup_by_domain(
         self, candidates: List[Tuple[str, int]]
@@ -124,12 +142,15 @@ class WebResearcher:
     ) -> List[str]:
         """
         Seleciona as top-N URLs. Sempre inclui a official_url (sem duplicar).
+        Comparação de duplicata é feita por URL normalizada (trailing slash,
+        case do host) pra não duplicar variantes equivalentes.
         """
-        urls = [u for u, _ in ranked]
-        # Garante que official_url está incluída como primeira (mas sem duplicar)
-        if official_url in urls:
-            urls.remove(official_url)
-        selected = [official_url] + urls[: max(0, top_n - 1)]
+        official_norm = self._normalize_url(official_url)
+        deduped: List[str] = []
+        for url, _ in ranked:
+            if self._normalize_url(url) != official_norm:
+                deduped.append(url)
+        selected = [official_url] + deduped[: max(0, top_n - 1)]
         return selected[:top_n]
 
     def _extract_text(self, html: str) -> str:
@@ -147,6 +168,16 @@ class WebResearcher:
         text = " ".join(text.split())
         return text[:SOURCE_TRUNCATE_CHARS]
 
+    # User-Agent realista — muitos sites bloqueiam default httpx
+    FETCH_HEADERS = {
+        "User-Agent": (
+            "Mozilla/5.0 (compatible; VivaCriptoBot/1.0; "
+            "+https://vivacripto.com.br/about)"
+        ),
+        "Accept": "text/html,application/xhtml+xml",
+    }
+    FETCH_TIMEOUT_SECONDS = 10.0
+
     async def _fetch_url(
         self, client: httpx.AsyncClient, url: str
     ) -> Optional[str]:
@@ -156,7 +187,12 @@ class WebResearcher:
         - Content-Type não é HTML
         """
         try:
-            response = await client.get(url, timeout=10.0, follow_redirects=True)
+            response = await client.get(
+                url,
+                timeout=self.FETCH_TIMEOUT_SECONDS,
+                follow_redirects=True,
+                headers=self.FETCH_HEADERS,
+            )
             if response.status_code != 200:
                 logger.warning(f"WebResearcher: status {response.status_code} para {url}")
                 return None
@@ -204,6 +240,10 @@ class WebResearcher:
             logger.warning(f"WebResearcher: erro ao iniciar DDGS: {e}")
         return candidates
 
+    # Teto pra evitar request travado infinito (DDG + fetch paralelo)
+    OVERALL_TIMEOUT_SECONDS = 45.0
+    DDG_TIMEOUT_SECONDS = 15.0
+
     async def gather_context(
         self,
         project_name: str,
@@ -214,10 +254,36 @@ class WebResearcher:
 
         Raises:
             ResearchFailedError: se a página oficial não pôde ser baixada
-                e nenhuma fonte secundária foi obtida.
+                e nenhuma fonte secundária foi obtida, ou se o tempo total
+                excedeu OVERALL_TIMEOUT_SECONDS.
         """
+        try:
+            return await asyncio.wait_for(
+                self._gather_context_inner(project_name, official_url),
+                timeout=self.OVERALL_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            raise ResearchFailedError(
+                f"Pesquisa excedeu {self.OVERALL_TIMEOUT_SECONDS}s para '{project_name}'"
+            )
+
+    async def _gather_context_inner(
+        self,
+        project_name: str,
+        official_url: str,
+    ) -> ResearchResult:
         # 1) busca DDG (síncrono — rodar em thread pra não bloquear loop)
-        raw_candidates = await asyncio.to_thread(self._search_ddg, project_name)
+        try:
+            raw_candidates = await asyncio.wait_for(
+                asyncio.to_thread(self._search_ddg, project_name),
+                timeout=self.DDG_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                f"WebResearcher: DDG excedeu {self.DDG_TIMEOUT_SECONDS}s — "
+                "seguindo só com URL oficial"
+            )
+            raw_candidates = []
 
         # 2) filtragem
         candidates = self._apply_blocklist(raw_candidates)
@@ -234,12 +300,13 @@ class WebResearcher:
             texts = await asyncio.gather(*fetch_tasks, return_exceptions=False)
 
         # 5) emparelhar urls x textos, descartar falhas
+        official_norm = self._normalize_url(official_url)
         official_text: Optional[str] = None
         secondary_blocks: List[Tuple[str, str]] = []
         for url, text in zip(selected_urls, texts):
             if not text:
                 continue
-            if url == official_url:
+            if self._normalize_url(url) == official_norm:
                 official_text = text
             else:
                 secondary_blocks.append((url, text))
