@@ -218,13 +218,20 @@ NUNCA:
         else:
             logger.info("ContentGenerator v4.0: Usando OpenAI (Gemini não disponível)")
     
-    async def generate_article(self, source_news: Dict, category: str = "default") -> Optional[Dict]:
+    async def generate_article(
+        self,
+        source_news: Dict,
+        category: str = "default",
+        correction_hint: Optional[str] = None,
+    ) -> Optional[Dict]:
         """
         Gera um artigo completo a partir de uma notícia fonte (v3.0)
 
         Args:
             source_news: Notícia coletada das fontes
             category: Categoria do artigo para ajuste de tom (bitcoin, ethereum, defi, etc.)
+            correction_hint: Hint opcional em retry — descreve falhas da geração
+                anterior (ex.: word count baixo) para o LLM corrigir.
 
         Returns:
             Artigo gerado com título, conteúdo, excerpt e meta tags
@@ -237,7 +244,9 @@ NUNCA:
             logger.info(f"Gerando artigo v3.0 para: {title[:50]}... (categoria: {category})")
 
             # Gerar conteúdo principal com categoria para ajuste de tom
-            content = await self._generate_content(title, description, source, category)
+            content = await self._generate_content(
+                title, description, source, category, correction_hint
+            )
 
             if not content:
                 logger.warning("Falha ao gerar conteúdo")
@@ -288,7 +297,8 @@ NUNCA:
         title: str,
         description: str,
         source: str,
-        category: str = "default"
+        category: str = "default",
+        correction_hint: Optional[str] = None,
     ) -> Optional[str]:
         """Gera o conteúdo principal do artigo com estrutura otimizada v3.0"""
 
@@ -440,6 +450,19 @@ Indique o que observar a seguir: próximas datas, votações, releases, eventos.
 Escreva APENAS o artigo final em Markdown, começando diretamente pelo H2.
 Nenhum texto adicional, prefixo ou metadado.
 </output>"""
+
+        # Em retry pós-reprovação: anexar instrução de correção antes do envio
+        if correction_hint:
+            user_prompt += (
+                "\n\n<correcao_obrigatoria>\n"
+                "A geração anterior foi REPROVADA na validação editorial com estes problemas:\n"
+                f"{correction_hint}\n\n"
+                "Corrija TODOS esses problemas na nova geração. Se o problema foi "
+                "word count abaixo do mínimo, EXPANDA as seções com mais contexto "
+                "VERIFICÁVEL (regulação BR, dados on-chain, comparação histórica) — "
+                "nunca com enchimento ou frases robóticas.\n"
+                "</correcao_obrigatoria>"
+            )
 
         # Combinar system prompt com user prompt para Gemini (não tem system message separado)
         full_prompt = f"{self.SYSTEM_PROMPT}\n\n{user_prompt}"

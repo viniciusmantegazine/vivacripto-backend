@@ -148,12 +148,31 @@ class NewsPipeline:
                         report["failed"] += 1
                         continue
 
-                    # Validar qualidade (com métricas)
+                    # Validar qualidade
                     is_valid, errors = self.validator.validate_article(article)
+
+                    # Regenera UMA vez se reprovado (mesmo padrão do AirdropPostGenerator).
+                    # Custa ~1 round-trip extra mas evita perder a notícia por falhas
+                    # corrigíveis pelo LLM (ex.: word count abaixo do mínimo).
+                    if not is_valid:
+                        hint = "; ".join(errors)
+                        logger.warning(f"Artigo reprovado, regenerando uma vez: {errors}")
+                        with metrics.measure("content_generation", title=f"[retry] {title[:40]}"):
+                            article = await self.content_generator.generate_article(
+                                source_news, category=category, correction_hint=hint
+                            )
+                        if not article:
+                            logger.warning("Falha ao regenerar artigo")
+                            metrics.record_validation(False)
+                            metrics.record_failure()
+                            report["failed"] += 1
+                            continue
+                        is_valid, errors = self.validator.validate_article(article)
+
                     metrics.record_validation(is_valid)
 
                     if not is_valid:
-                        logger.warning(f"Artigo reprovado: {', '.join(errors)}")
+                        logger.warning(f"Artigo reprovado após retry: {', '.join(errors)}")
                         metrics.record_failure()
                         report["failed"] += 1
                         report["errors"].extend(errors)
