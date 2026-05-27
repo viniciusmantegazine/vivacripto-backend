@@ -625,10 +625,12 @@ Nenhum texto adicional, prefixo ou metadado.
                 if site_name in result:
                     result = result.replace(site_name, "")
 
-        # Limpar artefatos de remoção (espaços duplos, vírgulas órfãs)
-        result = re.sub(r'\s{2,}', ' ', result)
-        result = re.sub(r'\s+([,.;:])', r'\1', result)
-        result = re.sub(r'([,.;:])\s*\1+', r'\1', result)
+        # Limpar artefatos de remoção (espaços duplos, vírgulas órfãs).
+        # Restrito a [ \t] para NÃO colapsar \n\n — o validador exige quebras
+        # duplas entre parágrafos (quality_validator._validate_content_structure).
+        result = re.sub(r'[ \t]{2,}', ' ', result)
+        result = re.sub(r'[ \t]+([,.;:])', r'\1', result)
+        result = re.sub(r'([,.;:])[ \t]*\1+', r'\1', result)
 
         return result.strip()
     
