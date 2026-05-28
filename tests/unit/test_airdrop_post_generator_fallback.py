@@ -17,13 +17,15 @@ async def test_falls_back_to_gemini_when_claude_unavailable():
     generator.claude_available = False
     generator.claude_client = None
 
+    # Padding pra atingir faixa 500-750 palavras exigida por _post_validate.
+    _filler = (" palavra" * 600).strip()
     article_payload = {
         "title": "LayerZero airdrop: como participar pelo site oficial em 2026",
         "slug": "layerzero-airdrop-como-participar",
         "excerpt": "Conheca o LayerZero, protocolo de interoperabilidade entre blockchains, e como participar.",
         "content_markdown": (
             "Introducao.\n\n"
-            "## Sobre\n\nTexto sobre crypto e blockchain.\n\n"
+            f"## Sobre\n\nTexto sobre crypto e blockchain. {_filler}\n\n"
             "## O programa de airdrop\n\nTexto.\n\n"
             "## Como participar\n\nAcesse [aqui](https://ref.example/abc).\n\n"
             "## Informacoes importantes\n\n[https://layerzero.network](https://layerzero.network). "

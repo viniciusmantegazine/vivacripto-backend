@@ -12,6 +12,7 @@ import unicodedata
 from datetime import datetime
 from typing import Dict, Optional
 
+import json_repair
 from loguru import logger
 from slugify import slugify
 
@@ -37,6 +38,10 @@ class AirdropPostGenerator:
     CLAUDE_MODEL = "claude-sonnet-4-6"
     MAX_TOKENS = 3000
     TEMPERATURE = 0.5
+    # Faixa de palavras alvo — espelha a instrução do prompt (500-750).
+    # Sai de _post_validate como erro, dispara regenerate-once com hint.
+    MIN_WORDS = 500
+    MAX_WORDS = 750
 
     def __init__(self):
         self.web_researcher = WebResearcher()
@@ -233,6 +238,9 @@ class AirdropPostGenerator:
         - referral_url presente na seção "Como participar" (não só "em algum lugar")
         - official_url presente no markdown (qualquer seção)
         - frase-chave do disclosure presente (Unicode-normalized)
+        - word count dentro da faixa MIN_WORDS-MAX_WORDS (LLM tende a ultrapassar
+          o limite superior; checar aqui dispara regenerate-once com hint específico
+          em vez de devolver 422 sem retry no endpoint)
         Retorna lista de erros (vazia se ok).
         """
         errors = []
@@ -251,6 +259,16 @@ class AirdropPostGenerator:
         normalized = self._strip_accents(content)
         if "nao constitui recomendacao" not in normalized:
             errors.append("frase 'não constitui recomendação' ausente no disclosure")
+
+        word_count = len(content.split())
+        if word_count < self.MIN_WORDS:
+            errors.append(
+                f"conteúdo muito curto ({word_count} palavras, mínimo {self.MIN_WORDS})"
+            )
+        elif word_count > self.MAX_WORDS:
+            errors.append(
+                f"conteúdo muito longo ({word_count} palavras, máximo {self.MAX_WORDS})"
+            )
         return errors
 
     async def _generate_with_claude(self, user_prompt: str) -> Optional[Dict]:
@@ -312,7 +330,12 @@ class AirdropPostGenerator:
             return None
 
     def _parse_json(self, text: str) -> Optional[Dict]:
-        """Tenta parsear JSON, removendo cercas ``` se presentes."""
+        """
+        Tenta parsear JSON, removendo cercas ``` se presentes. Quando json.loads
+        falha (caso comum: LLM não escapa aspas/newlines dentro de content_markdown
+        longo), faz uma segunda tentativa com json_repair, que conserta esses
+        casos sem desfigurar conteúdo válido.
+        """
         cleaned = text.strip()
         if cleaned.startswith("```"):
             # remove cercas estilo ```json ... ```
@@ -320,16 +343,30 @@ class AirdropPostGenerator:
             if cleaned.startswith("json"):
                 cleaned = cleaned[4:]
             cleaned = cleaned.rsplit("```", 1)[0]
+        cleaned = cleaned.strip()
+
         try:
-            data = json.loads(cleaned.strip())
-            required = {"title", "content_markdown"}
-            if not required.issubset(data.keys()):
-                logger.error(f"AirdropPostGenerator: JSON sem campos obrigatórios: {data.keys()}")
-                return None
-            return data
+            data = json.loads(cleaned)
         except json.JSONDecodeError as e:
-            logger.error(f"AirdropPostGenerator: JSON inválido: {e}")
+            logger.warning(
+                f"AirdropPostGenerator: JSON inválido ({e}), tentando reparo"
+            )
+            try:
+                data = json_repair.loads(cleaned)
+            except Exception as e2:
+                logger.error(f"AirdropPostGenerator: reparo de JSON falhou: {e2}")
+                return None
+            if not isinstance(data, dict) or not data:
+                logger.error("AirdropPostGenerator: reparo retornou estrutura vazia")
+                return None
+
+        required = {"title", "content_markdown"}
+        if not required.issubset(data.keys()):
+            logger.error(
+                f"AirdropPostGenerator: JSON sem campos obrigatórios: {list(data.keys())}"
+            )
             return None
+        return data
 
     async def _generate_image(self, article: Dict) -> Optional[str]:
         """Gera imagem, retorna None em falha (não bloqueia)."""

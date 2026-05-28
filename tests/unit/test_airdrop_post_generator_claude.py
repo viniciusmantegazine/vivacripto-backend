@@ -26,13 +26,15 @@ async def test_generate_returns_article_dict_on_success():
     generator.claude_available = True
     generator.claude_client = MagicMock()
 
+    # Padding pra atingir faixa 500-750 palavras exigida por _post_validate.
+    _filler = (" palavra" * 600).strip()
     article_payload = {
         "title": "LayerZero: o protocolo cross-chain e seu programa de airdrop",
         "slug": "layerzero-protocolo-cross-chain-airdrop",
         "excerpt": "Conheca o LayerZero, protocolo de interoperabilidade entre blockchains.",
         "content_markdown": (
             "Introducao curta sobre o projeto.\n\n"
-            "## Sobre o projeto LayerZero\n\nTexto.\n\n"
+            f"## Sobre o projeto LayerZero\n\nTexto. {_filler}\n\n"
             "## O programa de airdrop\n\nTexto.\n\n"
             "## Como participar\n\nAcesse [aqui](https://ref.example/abc) para se cadastrar.\n\n"
             "## Informações importantes\n\nSite oficial: [https://layerzero.network](https://layerzero.network). "

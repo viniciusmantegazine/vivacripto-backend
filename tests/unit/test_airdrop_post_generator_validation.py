@@ -9,6 +9,12 @@ from app.services.airdrop.airdrop_post_generator import AirdropPostGenerator
 from app.services.airdrop.web_researcher import ResearchResult
 
 
+# Filler pra empurrar content_markdown pra dentro da faixa 500-750 exigida
+# pelo _post_validate. Inserido entre o H2 "Sobre" e o resto pra não afetar
+# checks de seção/URL.
+_FILLER = (" palavra" * 600).strip()
+
+
 def _article(content: str) -> dict:
     return {
         "title": "LayerZero airdrop: o que e e como participar do programa em 2026",
@@ -30,13 +36,13 @@ async def test_regenerates_when_referral_url_missing():
     generator.claude_client = MagicMock()
 
     bad = _article(
-        "Intro.\n\n## Sobre\n\nTexto.\n\n"
+        f"Intro.\n\n## Sobre\n\nTexto. {_FILLER}\n\n"
         "## Como participar\n\nAcesse o site oficial.\n\n"
         "## Informações importantes\n\n[https://layerzero.network](https://layerzero.network). "
         "Nao constitui recomendacao."
     )
     good = _article(
-        "Intro.\n\n## Sobre\n\nTexto.\n\n"
+        f"Intro.\n\n## Sobre\n\nTexto. {_FILLER}\n\n"
         "## Como participar\n\nAcesse [aqui](https://ref.example/abc).\n\n"
         "## Informações importantes\n\n[https://layerzero.network](https://layerzero.network). "
         "Nao constitui recomendacao."
@@ -95,7 +101,7 @@ async def test_accepts_article_with_referral_official_and_disclosure_string():
     generator.claude_client = MagicMock()
 
     good = _article(
-        "Intro.\n\n## Sobre\n\nTexto.\n\n## O programa de airdrop\n\nTexto.\n\n"
+        f"Intro.\n\n## Sobre\n\nTexto. {_FILLER}\n\n## O programa de airdrop\n\nTexto.\n\n"
         "## Como participar\n\nAcesse [aqui](https://ref.example/abc).\n\n"
         "## Informações importantes\n\nSite oficial: [https://x.com](https://x.com). "
         "Este conteudo não constitui recomendação de investimento."
