@@ -16,7 +16,11 @@ python-multipart==0.0.6
 
 # HTTP & Async
 httpx>=0.28.1  # Compatível com google-genai
-aiohttp==3.9.1
+# aiohttp>=3.10: o SDK google-genai usa aiohttp.ClientConnectorDNSError no
+# tratamento de erro do cliente async (atributo adicionado só no 3.10). No 3.9.1
+# isso estoura AttributeError, mascara o erro real e mata o retry do SDK —
+# quebrando ContextualAnalyzer e geração de imagem via Gemini.
+aiohttp==3.10.11
 
 # Data Validation
 pydantic==2.5.3

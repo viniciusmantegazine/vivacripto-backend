@@ -101,10 +101,13 @@ class ImageGenerator:
     GEMINI_IMAGE_MODEL = "gemini-3-pro-image-preview"
     GEMINI_ASPECT_RATIO = "16:9"
 
-    # Configurações de geração - DALL-E (fallback)
-    DALLE_MODEL = "dall-e-3"
-    DALLE_SIZE = "1792x1024"  # Widescreen 16:9 para header de artigo
-    DALLE_QUALITY = "hd"
+    # Configurações de geração - OpenAI gpt-image-1 (fallback)
+    # gpt-image-1 substitui o dall-e-3 (sem acesso na conta). Diferenças:
+    # sempre retorna base64 (b64_json), nunca URL; não aceita size 1792x1024
+    # nem quality "hd" — usa landscape 1536x1024 e quality "high".
+    DALLE_MODEL = "gpt-image-1"
+    DALLE_SIZE = "1536x1024"  # Landscape (~3:2) para header de artigo
+    DALLE_QUALITY = "high"
 
     # Transformações do Cloudinary para otimização
     CLOUDINARY_TRANSFORMATIONS = [
@@ -257,19 +260,19 @@ class ImageGenerator:
             else:
                 use_dalle_fallback = True
 
-            # 3. Fallback para DALL-E se Gemini falhou ou upload falhou
+            # 3. Fallback para OpenAI gpt-image-1 se Gemini falhou ou upload falhou
             if use_dalle_fallback or gemini_result is None:
                 try:
-                    logger.info(f"[ImageGen v10.0] Chamando DALL-E ({self.DALLE_MODEL})...")
-                    image_url = await self._generate_with_dalle(prompt)
-                    if image_url:
-                        logger.info(f"[ImageGen v10.0] Imagem gerada via DALL-E: {image_url[:80]}...")
-                        # Upload URL diretamente para Cloudinary
-                        cloudinary_url = await self._upload_to_cloudinary(image_url)
+                    logger.info(f"[ImageGen v10.0] Chamando OpenAI ({self.DALLE_MODEL})...")
+                    image_bytes = await self._generate_with_dalle(prompt)
+                    if image_bytes:
+                        logger.info(f"[ImageGen v10.0] Imagem gerada via {self.DALLE_MODEL} ({len(image_bytes)} bytes)")
+                        # gpt-image-1 retorna bytes (base64) — sobe pelo path de bytes
+                        cloudinary_url = await self._upload_bytes_to_cloudinary(image_bytes, "image/png")
                         logger.info(f"[ImageGen v10.0] Processo completo. URL final: {cloudinary_url[:80]}...")
                         return cloudinary_url
                 except Exception as e:
-                    logger.error(f"[ImageGen v10.0] Falha no DALL-E: {e}")
+                    logger.error(f"[ImageGen v10.0] Falha no fallback de imagem (gpt-image-1): {e}")
                     return ""
 
             return ""
@@ -449,15 +452,19 @@ class ImageGenerator:
 
         return None
 
-    async def _generate_with_dalle(self, prompt: str) -> Optional[str]:
+    async def _generate_with_dalle(self, prompt: str) -> Optional[bytes]:
         """
-        Gera imagem usando DALL-E
+        Gera imagem usando OpenAI gpt-image-1 (fallback).
+
+        gpt-image-1 SEMPRE retorna a imagem em base64 (b64_json), nunca URL —
+        diferente do dall-e-3. Por isso devolvemos os bytes já decodificados,
+        que sobem via _upload_bytes_to_cloudinary (mesmo path do Gemini).
 
         Args:
             prompt: Prompt para geração da imagem
 
         Returns:
-            URL da imagem gerada ou None em caso de erro
+            Bytes da imagem gerada ou None em caso de erro
         """
         response = await self.openai_client.images.generate(
             model=self.DALLE_MODEL,
@@ -467,7 +474,12 @@ class ImageGenerator:
             n=1
         )
 
-        return response.data[0].url
+        b64 = response.data[0].b64_json
+        if not b64:
+            logger.error("[ImageGen v10.0] gpt-image-1 não retornou b64_json")
+            return None
+
+        return base64.b64decode(b64)
 
     async def _upload_bytes_to_cloudinary(self, image_bytes: bytes, mime_type: str = "image/png") -> str:
         """
