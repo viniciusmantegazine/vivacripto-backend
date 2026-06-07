@@ -50,7 +50,10 @@ class NewsPipeline:
         self.aggregator = NewsAggregator()
         self.content_generator = ContentGenerator()
         self.image_generator = ImageGenerator()
-        self.validator = QualityValidator()
+        self.validator = QualityValidator(
+            min_words=settings.NEWS_MIN_WORD_COUNT,
+            max_words=settings.NEWS_MAX_WORD_COUNT,
+        )
         self.publisher = ArticlePublisher(self.image_generator)
         self.category_classifier = CategoryClassifier()
     

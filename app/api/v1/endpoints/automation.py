@@ -120,8 +120,12 @@ async def test_content_generation(
                 "error": "Falha ao gerar artigo"
             }
 
-        # Validar qualidade
-        validator = QualityValidator()
+        # Validar qualidade (mesmos limites do pipeline de notícias normais)
+        from app.core.config import settings
+        validator = QualityValidator(
+            min_words=settings.NEWS_MIN_WORD_COUNT,
+            max_words=settings.NEWS_MAX_WORD_COUNT,
+        )
         is_valid, errors = validator.validate_article(article)
 
         return {

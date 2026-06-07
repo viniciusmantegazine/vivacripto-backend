@@ -184,7 +184,7 @@ NUNCA:
 
 <formato_de_saida>
 - Markdown puro (renderização direta no frontend)
-- H2 (##) para subtítulo interno único da matéria
+- H2 (##) para CADA subtítulo de seção — o artigo tem MÚLTIPLOS H2 (ver estrutura), nunca um só
 - **Negrito** para conceitos-chave e dados importantes
 - Listas com hífen (-) quando houver 3+ itens relacionados
 - Quebras de linha duplas (\\n\\n) entre TODOS os parágrafos
@@ -195,7 +195,7 @@ NUNCA:
 <requisitos_criticos>
 ⚠️ REQUISITOS DE VALIDAÇÃO AUTOMÁTICA - O artigo será REJEITADO se não cumprir:
 
-1. MÍNIMO 250 PALAVRAS: Artigos curtos demais são rejeitados. Desenvolva bem cada parágrafo.
+1. MÍNIMO 700 PALAVRAS (IDEAL 900-1200): Artigos abaixo de 700 palavras são REJEITADOS e não rankeiam em nicho competitivo. Desenvolva cada seção com profundidade real (contexto, dados verificáveis, ângulo brasileiro), nunca com enchimento.
 2. KEYWORDS OBRIGATÓRIAS: O texto DEVE conter termos como "criptomoeda", "cripto", "Bitcoin", "Ethereum", "blockchain", "token" ou "DeFi".
 3. ESTRUTURA H2: O artigo DEVE começar com ## (heading de nível 2).
 </requisitos_criticos>"""
@@ -346,13 +346,13 @@ O artigo deve ter ESTRUTURA HIERÁRQUICA com múltiplos subtítulos H2 — cada 
 ## [Manchete Interna H2 — ângulo principal da matéria]
 Subtítulo informativo, sem clickbait, que abra um ângulo específico (não repetir o título).
 
-**Lead jornalístico (1 parágrafo):**
-Responda Quem? O quê? Quando? Onde? Por quê? em 3-5 frases.
+**Lead jornalístico (1-2 parágrafos, ~120 palavras):**
+Responda Quem? O quê? Quando? Onde? Por quê? em 4-6 frases.
 Use pirâmide invertida — o essencial vem primeiro.
-O leitor deve entender a notícia completa apenas lendo este parágrafo.
+O leitor deve entender a notícia completa apenas lendo este trecho.
 
 ## [H2 — Contexto e detalhes]
-**2-3 parágrafos** desenvolvendo a notícia com dados PRESENTES NA FONTE.
+**3-4 parágrafos (~280-350 palavras)** desenvolvendo a notícia com dados PRESENTES NA FONTE.
 
 Se a fonte mencionar termos técnicos, explique-os naturalmente (sem parecer didático):
 - ETF: Fundo negociado em bolsa que replica o desempenho de um ativo
@@ -366,7 +366,7 @@ Adicione contexto histórico ou de mercado quando RELEVANTE e VERIFICÁVEL na fo
 ⚠️ Use APENAS dados que estão explicitamente na fonte. NÃO invente números, datas, percentuais.
 
 ## [H2 — Impacto no Brasil] (OBRIGATÓRIO)
-**1-2 parágrafos** com ângulo brasileiro específico. Esta seção é o diferencial editorial — sem ela, o artigo é apenas tradução de conteúdo gringo (Google penaliza).
+**2-3 parágrafos (~220-280 palavras)** com ângulo brasileiro específico. Esta seção é o diferencial editorial — sem ela, o artigo é apenas tradução de conteúdo gringo (Google penaliza).
 
 Aborde pelo menos UM destes ângulos (o que fizer mais sentido pra notícia):
 - Regulação: como CVM, BCB, Lei 14.478/2022 (marco cripto BR), Receita Federal afetam ou são afetados.
@@ -377,7 +377,7 @@ Aborde pelo menos UM destes ângulos (o que fizer mais sentido pra notícia):
 Se nenhum ângulo BR for aplicável, mencione brevemente por que e como o leitor brasileiro pode acompanhar o desenrolar.
 
 ## [H2 — Próximos passos / O que observar]
-**1 parágrafo** de fechamento analítico (NÃO conclusivo robótico).
+**1-2 parágrafos (~120-160 palavras)** de fechamento analítico (NÃO conclusivo robótico).
 
 Indique o que observar a seguir: próximas datas, votações, releases, eventos. Conecte ao contexto maior do mercado cripto.
 
@@ -476,6 +476,15 @@ Nenhum texto adicional, prefixo ou metadado.
                 response = await self.gemini_client.aio.models.generate_content(
                     model=self.GEMINI_MODEL,
                     contents=full_prompt,
+                    # temperatura baixa (alinhada ao path OpenAI) = mais aderência
+                    # à estrutura e à contagem de palavras.
+                    # NÃO definir max_output_tokens: gemini-2.5-flash gasta tokens
+                    # de "thinking" que contam no teto de saída — um teto baixo
+                    # truncaria o artigo de 900-1200 palavras. O default do modelo
+                    # (alto) já cobre o tamanho necessário sem risco de corte.
+                    config=genai.types.GenerateContentConfig(
+                        temperature=0.4,
+                    ),
                 )
                 content = response.text.strip()
                 logger.info("[Gemini] Conteúdo gerado com sucesso")

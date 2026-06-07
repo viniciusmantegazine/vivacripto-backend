@@ -159,6 +159,13 @@ class Settings(BaseSettings):
     AUTOMATION_INTERVAL_MINUTES: int = 30
     POSTS_PER_EXECUTION: int = 1
 
+    # Limites de palavras do pipeline de notícias normais (RSS).
+    # Segregados dos limites de airdrop (que usa override próprio de 500-750).
+    # Piso em 700 para SEO competitivo — o ContentGenerator mira 900-1200 e o
+    # pipeline regenera 1x em caso de reprovação. Ajustável via .env se preciso.
+    NEWS_MIN_WORD_COUNT: int = 700
+    NEWS_MAX_WORD_COUNT: int = 1500
+
     # Deduplication
     DEDUPLICATION_THRESHOLD: float = 0.80
     DEDUPLICATION_ENGINE: str = "embedding"  # Options: levenshtein, tfidf, embedding, hybrid
