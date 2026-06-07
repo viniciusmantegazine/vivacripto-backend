@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Table, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from app.db.base_class import Base
 
 
@@ -148,7 +148,14 @@ class SocialPost(Base):
     created_at = Column(DateTime, default=utc_now, nullable=False)
 
     # Relationships
-    post = relationship("Post", backref="social_posts")
+    # passive_deletes=True: confia no ON DELETE CASCADE da FK (migration 004) ao
+    # deletar o Post. Sem isso, o ORM tenta anular social_posts.post_id (NOT NULL)
+    # antes do cascade do banco, causando IntegrityError (500) ao deletar um post
+    # que teve tentativa de publicação social.
+    post = relationship(
+        "Post",
+        backref=backref("social_posts", passive_deletes=True),
+    )
 
     # Constraints
     __table_args__ = (
