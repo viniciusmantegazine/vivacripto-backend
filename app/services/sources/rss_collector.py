@@ -6,7 +6,7 @@ import feedparser
 import httpx
 import asyncio
 from typing import List, Dict, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from loguru import logger
 
 
@@ -55,7 +55,8 @@ class RSSCollector:
             Lista de notícias coletadas
         """
         all_news = []
-        cutoff_time = datetime.now() - timedelta(hours=hours_back)
+        # UTC-aware para alinhar com as datas de published_parsed (que são GMT).
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours_back)
         
         # Coletar de todos os feeds em paralelo
         tasks = [
@@ -96,9 +97,15 @@ class RSSCollector:
                 try:
                     # Parse publication date
                     pub_date = self._parse_date(entry)
-                    
-                    # Filtrar por data
-                    if pub_date and pub_date < cutoff_time:
+
+                    # Filtrar por data. Entradas SEM data parseável são descartadas
+                    # (não publicamos notícia de idade desconhecida — era assim que
+                    # notícias antigas vazavam pelo filtro de recência).
+                    if pub_date is None or pub_date < cutoff_time:
+                        logger.debug(
+                            f"Entrada descartada por data ({pub_date}): "
+                            f"{entry.get('title', '')[:60]}"
+                        )
                         continue
                     
                     # Extrair informações
@@ -167,10 +174,12 @@ class RSSCollector:
         """Parseia a data de publicação de uma entrada"""
         try:
             # Tentar diferentes campos de data
+            # published_parsed/updated_parsed do feedparser são GMT; marcamos
+            # como UTC-aware para comparar com o cutoff (também UTC-aware).
             if hasattr(entry, "published_parsed") and entry.published_parsed:
-                return datetime(*entry.published_parsed[:6])
+                return datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
             elif hasattr(entry, "updated_parsed") and entry.updated_parsed:
-                return datetime(*entry.updated_parsed[:6])
+                return datetime(*entry.updated_parsed[:6], tzinfo=timezone.utc)
             else:
                 return None
         except Exception:
