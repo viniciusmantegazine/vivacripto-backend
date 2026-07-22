@@ -550,7 +550,7 @@ class ImageGenerator:
             _cloudinary_executor,
             lambda: cloudinary.uploader.upload(
                 data_uri,
-                folder="vivacripto/articles",
+                folder="verticecripto/articles",
                 format=upload_format,
                 transformation=self.CLOUDINARY_TRANSFORMATIONS
             )
@@ -577,7 +577,7 @@ class ImageGenerator:
             _cloudinary_executor,
             lambda: cloudinary.uploader.upload(
                 image_url,
-                folder="vivacripto/articles",
+                folder="verticecripto/articles",
                 transformation=self.CLOUDINARY_TRANSFORMATIONS
             )
         )

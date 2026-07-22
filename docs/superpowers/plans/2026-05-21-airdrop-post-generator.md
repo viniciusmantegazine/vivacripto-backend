@@ -16,7 +16,7 @@
 
 - All Python source code uses 4-space indent, Portuguese comments (matches existing codebase).
 - All commits follow `feat:`, `test:`, `refactor:`, `chore:`, `docs:` prefix style (matches `git log`).
-- All commands run from repo root `/Users/viniciusmantegazine/git/vivacripto-backend/`.
+- All commands run from repo root `/Users/viniciusmantegazine/git/verticecripto-backend/`.
 - Run tests with: `pytest tests/path/to/test_file.py::test_name -v`
 - For tests needing the full DB schema: SQLite in-memory is configured in `tests/conftest.py` via `async_db_engine` fixture.
 
@@ -1357,7 +1357,7 @@ Compliance: NFA (Not Financial Advice) — não recomendar investimento.
 """
 
 AIRDROP_SYSTEM_PROMPT = """
-Você é um redator do portal VivaCripto especializado em conteúdo educacional
+Você é um redator do portal VerticeCripto especializado em conteúdo educacional
 sobre criptomoedas. Sua tarefa é escrever um artigo informativo sobre um
 projeto cripto e seu programa de airdrop.
 

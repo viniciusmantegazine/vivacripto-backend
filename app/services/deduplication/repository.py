@@ -1,5 +1,5 @@
 """
-Implementação concreta do PostRepository para o VivaCripto Backend
+Implementação concreta do PostRepository para o VerticeCripto Backend
 """
 
 from datetime import datetime, timedelta, timezone
@@ -8,7 +8,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Importações do projeto VivaCripto
+# Importações do projeto VerticeCripto
 from app.crud.crud_post import crud_post
 from app.db.models import Post as PostModel
 from app.schemas.post import PostCreate, PostUpdate

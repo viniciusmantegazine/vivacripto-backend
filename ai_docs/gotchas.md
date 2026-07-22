@@ -407,7 +407,7 @@ setup_rate_limiting(app)
 ```bash
 # 1. Clone e configure
 git clone <repo>
-cd vivacripto-backend
+cd verticecripto-backend
 cp .env.example .env
 
 # 2. Edite .env com chaves de API reais

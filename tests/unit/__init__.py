@@ -1,3 +1,3 @@
 """
-Unit tests for VivaCripto Backend
+Unit tests for VerticeCripto Backend
 """

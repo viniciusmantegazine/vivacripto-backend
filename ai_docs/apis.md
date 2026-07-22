@@ -75,7 +75,7 @@ GET /api/v1/posts
       "content": "# Bitcoin atinge nova máxima...",
       "content_html": "<h1>Bitcoin atinge nova máxima...</h1>",
       "image_url": "https://res.cloudinary.com/xxx/image.jpg",
-      "meta_title": "Bitcoin atinge nova máxima histórica | VivaCripto",
+      "meta_title": "Bitcoin atinge nova máxima histórica | VerticeCripto",
       "meta_description": "A principal criptomoeda do mercado atingiu...",
       "status": "published",
       "published_at": "2024-01-15T10:30:00Z",
@@ -88,7 +88,7 @@ GET /api/v1/posts
       },
       "author": {
         "id": "uuid",
-        "name": "VivaCripto AI",
+        "name": "VerticeCripto AI",
         "bio": "..."
       },
       "tags": [
@@ -677,19 +677,19 @@ class AirdropPostResponse(BaseModel):
 ### Listar Posts Publicados
 
 ```bash
-curl -X GET "https://api.vivacripto.com.br/api/v1/posts?status=published&page_size=5"
+curl -X GET "https://api.verticecripto.com.br/api/v1/posts?status=published&page_size=5"
 ```
 
 ### Buscar Posts
 
 ```bash
-curl -X GET "https://api.vivacripto.com.br/api/v1/posts/search?q=bitcoin"
+curl -X GET "https://api.verticecripto.com.br/api/v1/posts/search?q=bitcoin"
 ```
 
 ### Criar Post (Autenticado)
 
 ```bash
-curl -X POST "https://api.vivacripto.com.br/api/v1/posts" \
+curl -X POST "https://api.verticecripto.com.br/api/v1/posts" \
   -H "Authorization: Bearer $AUTOMATION_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -702,14 +702,14 @@ curl -X POST "https://api.vivacripto.com.br/api/v1/posts" \
 ### Executar Pipeline
 
 ```bash
-curl -X POST "https://api.vivacripto.com.br/api/v1/automation/trigger" \
+curl -X POST "https://api.verticecripto.com.br/api/v1/automation/trigger" \
   -H "Authorization: Bearer $AUTOMATION_TOKEN"
 ```
 
 ### Inscrever Newsletter
 
 ```bash
-curl -X POST "https://api.vivacripto.com.br/api/v1/newsletter/subscribe" \
+curl -X POST "https://api.verticecripto.com.br/api/v1/newsletter/subscribe" \
   -H "Content-Type: application/json" \
   -d '{"email": "usuario@exemplo.com"}'
 ```
@@ -720,11 +720,11 @@ curl -X POST "https://api.vivacripto.com.br/api/v1/newsletter/subscribe" \
 
 A documentação interativa está disponível em:
 
-- **Swagger UI**: `https://api.vivacripto.com.br/api/v1/docs`
-- **ReDoc**: `https://api.vivacripto.com.br/api/v1/redoc`
+- **Swagger UI**: `https://api.verticecripto.com.br/api/v1/docs`
+- **ReDoc**: `https://api.verticecripto.com.br/api/v1/redoc`
 
 Para baixar o schema OpenAPI:
 
 ```bash
-curl "https://api.vivacripto.com.br/api/v1/openapi.json" > openapi.json
+curl "https://api.verticecripto.com.br/api/v1/openapi.json" > openapi.json
 ```

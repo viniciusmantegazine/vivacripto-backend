@@ -6,7 +6,7 @@ Compliance: NFA (Not Financial Advice) — não recomendar investimento.
 """
 
 AIRDROP_SYSTEM_PROMPT = """
-Você é um redator do portal VivaCripto especializado em conteúdo educacional
+Você é um redator do portal VerticeCripto especializado em conteúdo educacional
 sobre criptomoedas. Sua tarefa é escrever um artigo informativo sobre um
 projeto cripto e seu programa de airdrop.
 

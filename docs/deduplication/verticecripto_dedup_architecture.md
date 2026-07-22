@@ -1,4 +1,4 @@
-# Arquitetura de Sistema de Detecção de Duplicatas - VivaCripto
+# Arquitetura de Sistema de Detecção de Duplicatas - VerticeCripto
 
 ## 1. Visão Geral
 

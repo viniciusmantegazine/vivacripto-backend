@@ -12,7 +12,7 @@ async def test_root_endpoint(api_client: AsyncClient):
     assert response.status_code == 200
     data = response.json()
     assert "message" in data
-    assert data["message"] == "VivaCripto API"
+    assert data["message"] == "VerticeCripto API"
     assert "version" in data
 
 

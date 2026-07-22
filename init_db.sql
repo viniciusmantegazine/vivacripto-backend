@@ -1,4 +1,4 @@
--- Script de inicialização do banco de dados VivaCripto
+-- Script de inicialização do banco de dados VerticeCripto
 -- Execute este script após criar o banco de dados
 
 -- Habilitar extensões necessárias
@@ -26,11 +26,11 @@ $$;
 INSERT INTO authors (id, name, bio, avatar_url)
 SELECT
     uuid_generate_v4(),
-    'VivaCripto',
+    'VerticeCripto',
     'Portal de notícias sobre criptomoedas',
     NULL
 WHERE NOT EXISTS (
-    SELECT 1 FROM authors WHERE name = 'VivaCripto'
+    SELECT 1 FROM authors WHERE name = 'VerticeCripto'
 );
 
 -- Criar categorias padrão

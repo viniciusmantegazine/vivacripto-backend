@@ -1,5 +1,5 @@
 """
-VivaCripto API - FastAPI Backend
+VerticeCripto API - FastAPI Backend
 Main application entry point
 """
 import uuid
@@ -36,18 +36,18 @@ if settings.SENTRY_DSN:
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
-    logger.info("Iniciando VivaCripto API...")
+    logger.info("Iniciando VerticeCripto API...")
     await init_cache()
     yield
     # Shutdown
-    logger.info("Encerrando VivaCripto API...")
+    logger.info("Encerrando VerticeCripto API...")
     await close_cache()
 
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="API para o portal de notícias VivaCripto",
+    description="API para o portal de notícias VerticeCripto",
     # Docs/OpenAPI só ficam expostos em DEBUG; em produção retornam 404.
     openapi_url=f"{settings.API_V1_STR}/openapi.json" if settings.DEBUG else None,
     docs_url=f"{settings.API_V1_STR}/docs" if settings.DEBUG else None,
@@ -162,7 +162,7 @@ async def root():
     """Root endpoint"""
     return JSONResponse(
         content={
-            "message": "VivaCripto API",
+            "message": "VerticeCripto API",
             "version": settings.VERSION,
             "docs": f"{settings.API_V1_STR}/docs",
         }

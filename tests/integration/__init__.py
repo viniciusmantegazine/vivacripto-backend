@@ -1,3 +1,3 @@
 """
-Integration tests for VivaCripto Backend
+Integration tests for VerticeCripto Backend
 """

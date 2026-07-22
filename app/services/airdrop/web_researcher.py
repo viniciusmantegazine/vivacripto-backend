@@ -173,8 +173,8 @@ class WebResearcher:
     # User-Agent realista — muitos sites bloqueiam default httpx
     FETCH_HEADERS = {
         "User-Agent": (
-            "Mozilla/5.0 (compatible; VivaCriptoBot/1.0; "
-            "+https://vivacripto.com.br/about)"
+            "Mozilla/5.0 (compatible; VerticeCriptoBot/1.0; "
+            "+https://verticecripto.com.br/about)"
         ),
         "Accept": "text/html,application/xhtml+xml",
     }

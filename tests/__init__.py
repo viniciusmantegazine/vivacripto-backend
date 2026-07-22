@@ -1,3 +1,3 @@
 """
-VivaCripto Backend Test Suite
+VerticeCripto Backend Test Suite
 """

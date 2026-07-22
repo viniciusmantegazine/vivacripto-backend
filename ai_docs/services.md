@@ -2,7 +2,7 @@
 
 ## Visão Geral da Arquitetura de Serviços
 
-O VivaCripto Backend organiza sua lógica de negócio em serviços especializados, cada um com responsabilidade bem definida.
+O VerticeCripto Backend organiza sua lógica de negócio em serviços especializados, cada um com responsabilidade bem definida.
 
 ```
 app/services/

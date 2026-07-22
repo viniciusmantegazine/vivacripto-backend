@@ -1,6 +1,6 @@
-# VivaCripto Backend API
+# VerticeCripto Backend API
 
-Backend FastAPI para o portal de notícias VivaCripto.
+Backend FastAPI para o portal de notícias VerticeCripto.
 
 ## 🚀 Stack Técnico
 
@@ -48,8 +48,8 @@ app/
 
 1. Clone o repositório:
 ```bash
-git clone https://github.com/viniciusmantegazine/vivacripto-backend.git
-cd vivacripto-backend
+git clone https://github.com/viniciusmantegazine/verticecripto-backend.git
+cd verticecripto-backend
 ```
 
 2. Crie um ambiente virtual:
@@ -113,8 +113,8 @@ A API estará disponível em `http://localhost:8000`
 ### Docker
 
 ```bash
-docker build -t vivacripto-api .
-docker run -p 8000:8000 --env-file .env vivacripto-api
+docker build -t verticecripto-api .
+docker run -p 8000:8000 --env-file .env verticecripto-api
 ```
 
 ### Railway/Render

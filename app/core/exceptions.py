@@ -1,5 +1,5 @@
 """
-Custom exceptions for the VivaCripto API.
+Custom exceptions for the VerticeCripto API.
 Provides standardized error handling across the application.
 """
 from typing import Any, Dict, Optional

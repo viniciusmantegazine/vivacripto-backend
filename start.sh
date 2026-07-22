@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Iniciando VivaCripto Backend..."
+echo "🚀 Iniciando VerticeCripto Backend..."
 
 # Migrações: usam DATABASE_PUBLIC_URL se disponível (Railway às vezes só expõe
 # a URL pública durante o build/deploy). A URL é passada inline SÓ para o

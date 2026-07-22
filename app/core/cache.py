@@ -1,5 +1,5 @@
 """
-Caching utilities for VivaCripto API.
+Caching utilities for VerticeCripto API.
 Provides Redis-based caching with TTL support for expensive operations.
 """
 import hashlib
@@ -29,7 +29,7 @@ class CacheManager:
         await cache.disconnect()
     """
 
-    def __init__(self, prefix: str = "vivacripto"):
+    def __init__(self, prefix: str = "verticecripto"):
         self.prefix = prefix
         self._client: Optional[redis.Redis] = None
 

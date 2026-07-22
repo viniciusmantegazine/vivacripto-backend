@@ -2,7 +2,7 @@
 
 ## Repositórios e Serviços Relacionados
 
-### Frontend Next.js (vivacripto-frontend)
+### Frontend Next.js (verticecripto-frontend)
 
 **Tipo**: Aplicação web consumidora
 **Protocolo**: REST API + Webhook ISR
@@ -27,7 +27,7 @@
 
 **Configuração**:
 ```bash
-FRONTEND_URL=https://vivacripto.com.br
+FRONTEND_URL=https://verticecripto.com.br
 REVALIDATE_SECRET=<secret-compartilhado-32-chars>
 ```
 
@@ -216,7 +216,7 @@ transformation = {
 
 **Configuração**:
 ```bash
-DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/vivacripto
+DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/verticecripto
 ```
 
 **Pool de Conexões**:
@@ -423,7 +423,7 @@ Gemini API
                                            │
                                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                     VivaCripto Backend                          │
+│                     VerticeCripto Backend                          │
 │                        (FastAPI)                                │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │                    Services Layer                         │  │
@@ -456,7 +456,7 @@ Gemini API
             ┌──────────────┐
             │   Frontend   │
             │  (Next.js)   │
-            │ vivacripto-  │
+            │ verticecripto-  │
             │   frontend   │
             └──────────────┘
 ```

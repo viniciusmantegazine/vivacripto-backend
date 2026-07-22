@@ -40,7 +40,7 @@ def mock_content_generator():
             "content_markdown": "# Bitcoin\n\nConteúdo do artigo aqui.",
             "content_html": "<h1>Bitcoin</h1><p>Conteúdo do artigo aqui.</p>",
             "excerpt": "Bitcoin atinge marco histórico.",
-            "meta_title": "Bitcoin US$100k - VivaCripto",
+            "meta_title": "Bitcoin US$100k - VerticeCripto",
             "meta_description": "Bitcoin ultrapassa US$100 mil.",
         })
         mock.return_value = generator

@@ -6,7 +6,7 @@
 
 ## 1. Introdução
 
-Este documento descreve a arquitetura e implementação de um sistema de detecção de duplicatas para o pipeline de geração de notícias do VivaCripto. O objetivo principal é evitar a publicação de conteúdo redundante sobre o mesmo evento, melhorando a qualidade do conteúdo e a otimização para motores de busca (SEO).
+Este documento descreve a arquitetura e implementação de um sistema de detecção de duplicatas para o pipeline de geração de notícias do VerticeCripto. O objetivo principal é evitar a publicação de conteúdo redundante sobre o mesmo evento, melhorando a qualidade do conteúdo e a otimização para motores de busca (SEO).
 
 O sistema introduz uma etapa de verificação de **similaridade semântica** que analisa novas pautas de notícias contra posts publicados nas últimas 24 horas. Com base em um limiar de similaridade configurável, o sistema decide entre criar um novo post ou atualizar um existente com as novas informações.
 
@@ -59,7 +59,7 @@ A solução é composta por três arquivos Python principais e um arquivo de tes
 ├── similarity_engine.py       # Contém as lógicas de cálculo de similaridade
 ├── duplicate_detector.py      # Contém a orquestração e a lógica de decisão
 ├── test_duplicate_detector.py # Testes unitários e de integração
-└── vivacripto_documentacao_tecnica.md # Este documento
+└── verticecripto_documentacao_tecnica.md # Este documento
 ```
 
 ### 3.2. `similarity_engine.py`
@@ -86,9 +86,9 @@ Este é o coração do sistema. As classes principais são:
 *   `DuplicateDetector`: Classe principal que implementa a lógica de verificação.
 *   `PipelineOrchestrator`: Gerencia o processamento de múltiplas pautas.
 
-**Para integrar ao pipeline do VivaCripto:**
+**Para integrar ao pipeline do VerticeCripto:**
 
-1.  **Implemente `PostRepository`**: Crie uma classe que herde de `PostRepository` e implemente os métodos `get_posts_last_24h`, `save_post`, e `update_post` para interagir com o banco de dados real do VivaCripto.
+1.  **Implemente `PostRepository`**: Crie uma classe que herde de `PostRepository` e implemente os métodos `get_posts_last_24h`, `save_post`, e `update_post` para interagir com o banco de dados real do VerticeCripto.
 2.  **Instancie o Orquestrador**: No seu pipeline de ingestão de notícias, antes de criar um novo post, instancie e utilize o `PipelineOrchestrator`.
 
 **Exemplo de uso:**
@@ -140,4 +140,4 @@ python3.11 test_duplicate_detector.py
 
 ## 4. Conclusão
 
-Esta solução fornece uma base robusta e extensível para resolver o problema de conteúdo duplicado no VivaCripto. A arquitetura modular permite futuras melhorias, como a integração de modelos de Machine Learning para ajuste dinâmico do threshold de similaridade ou a expansão para outros tipos de conteúdo. A implementação do motor de similaridade com embeddings é crucial para alcançar a precisão desejada em um ambiente de produção.
+Esta solução fornece uma base robusta e extensível para resolver o problema de conteúdo duplicado no VerticeCripto. A arquitetura modular permite futuras melhorias, como a integração de modelos de Machine Learning para ajuste dinâmico do threshold de similaridade ou a expansão para outros tipos de conteúdo. A implementação do motor de similaridade com embeddings é crucial para alcançar a precisão desejada em um ambiente de produção.

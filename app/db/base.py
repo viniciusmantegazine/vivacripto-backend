@@ -20,7 +20,7 @@ if not _url.startswith("sqlite"):
     _engine_kwargs["pool_timeout"] = settings.DB_POOL_TIMEOUT
     _engine_kwargs["pool_recycle"] = settings.DB_POOL_RECYCLE
     _engine_kwargs["connect_args"] = {
-        "server_settings": {"application_name": "vivacripto-api"},
+        "server_settings": {"application_name": "verticecripto-api"},
         "timeout": 10,
         # Prepared statements for better performance
         "prepared_statement_cache_size": 256,

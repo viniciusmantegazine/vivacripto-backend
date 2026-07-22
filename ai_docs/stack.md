@@ -214,7 +214,7 @@ app/
 ### Obrigatórias
 ```bash
 # Database
-DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/vivacripto
+DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/verticecripto
 
 # Segurança (mínimo 32 caracteres cada)
 SECRET_KEY=<token-seguro-32-chars>
@@ -231,7 +231,7 @@ CLOUDINARY_API_KEY=<api-key>
 CLOUDINARY_API_SECRET=<api-secret>
 
 # Frontend
-FRONTEND_URL=https://vivacripto.com.br
+FRONTEND_URL=https://verticecripto.com.br
 ```
 
 ### Opcionais

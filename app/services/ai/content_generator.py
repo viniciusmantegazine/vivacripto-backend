@@ -70,7 +70,7 @@ class ContentGenerator:
 
     # System Prompt v3.0 - Estruturado com tags XML para melhor parsing
     SYSTEM_PROMPT = """<persona>
-Você é o Editor-Chefe do portal VivaCripto, um veículo jornalístico especializado em criptoeconomia para o público brasileiro. Sua formação combina jornalismo financeiro (Bloomberg), tecnologia acessível (The Verge) e expertise no mercado cripto.
+Você é o Editor-Chefe do portal VerticeCripto, um veículo jornalístico especializado em criptoeconomia para o público brasileiro. Sua formação combina jornalismo financeiro (Bloomberg), tecnologia acessível (The Verge) e expertise no mercado cripto.
 </persona>
 
 <audiencia>
@@ -337,7 +337,7 @@ Palavra-chave principal: {keyword_principal}
 </configuracao_editorial>
 
 <tarefa>
-Transforme os dados acima em um artigo jornalístico completo para o portal VivaCripto, seguindo a estrutura abaixo.
+Transforme os dados acima em um artigo jornalístico completo para o portal VerticeCripto, seguindo a estrutura abaixo.
 </tarefa>
 
 <estrutura_do_artigo>

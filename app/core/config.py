@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     )
 
     # Project
-    PROJECT_NAME: str = "VivaCripto API"
+    PROJECT_NAME: str = "VerticeCripto API"
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
     DEBUG: bool = False
@@ -27,8 +27,6 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:5173",
-        "https://vivacripto.com.br",
-        "https://www.vivacripto.com.br",
         "https://verticecripto.com.br",
         "https://www.verticecripto.com.br",
     ]
@@ -41,7 +39,7 @@ class Settings(BaseSettings):
         return v
 
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/vivacripto"
+    DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/verticecripto"
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod

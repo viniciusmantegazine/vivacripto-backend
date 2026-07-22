@@ -166,6 +166,6 @@ Aumente o threshold ou use o engine "embedding" em vez de "hybrid".
 
 1. Implementar `PostRepository` para seu banco de dados
 2. Configurar logging e monitoramento
-3. Testar com dados reais do VivaCripto
+3. Testar com dados reais do VerticeCripto
 4. Ajustar thresholds com base em resultados
 5. Considerar integração com ML para ajuste dinâmico

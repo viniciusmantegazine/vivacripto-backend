@@ -1,8 +1,8 @@
-# Documentação do VivaCripto Backend
+# Documentação do VerticeCripto Backend
 
 ## Visão Geral
 
-O **VivaCripto Backend** é uma API de automação de conteúdo para o portal de notícias sobre criptomoedas VivaCripto. O sistema agrega notícias de múltiplas fontes, gera conteúdo em português usando IA (Google Gemini/OpenAI), cria imagens automaticamente, detecta duplicatas e publica artigos de forma totalmente automatizada.
+O **VerticeCripto Backend** é uma API de automação de conteúdo para o portal de notícias sobre criptomoedas VerticeCripto. O sistema agrega notícias de múltiplas fontes, gera conteúdo em português usando IA (Google Gemini/OpenAI), cria imagens automaticamente, detecta duplicatas e publica artigos de forma totalmente automatizada.
 
 **Tipo de Repositório**: Backend API / Microserviço de Automação de Conteúdo
 **Linguagem Principal**: Python 3.11+
@@ -31,8 +31,8 @@ O **VivaCripto Backend** é uma API de automação de conteúdo para o portal de
 
 | Recurso | Link/Comando |
 |---------|--------------|
-| Repositório Backend | `vivacripto-backend` |
-| Repositório Frontend | `vivacripto-frontend` |
+| Repositório Backend | `verticecripto-backend` |
+| Repositório Frontend | `verticecripto-frontend` |
 | Deploy | Railway (via git push) |
 | Ambiente Local | `uvicorn app.main:app --reload` |
 | Testes | `pytest` |
@@ -42,7 +42,7 @@ O **VivaCripto Backend** é uma API de automação de conteúdo para o portal de
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     VivaCripto Backend                          │
+│                     VerticeCripto Backend                          │
 │                        (FastAPI)                                │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -60,7 +60,7 @@ O **VivaCripto Backend** é uma API de automação de conteúdo para o portal de
     │ • CoinDesk      │      │ Primary:     │       │ Next.js   │
     │ • Cointelegraph │      │ Google       │       │ (ISR)     │
     │ • Bitcoin Mag   │      │ Gemini       │       │           │
-    │ • CryptoSlate   │      │              │       │ vivacripto│
+    │ • CryptoSlate   │      │              │       │ verticecripto│
     │ • CoinPaper     │      │ Fallback:    │       │ -frontend │
     └─────────────────┘      │ OpenAI       │       └───────────┘
                              └──────────────┘
@@ -97,7 +97,7 @@ O **VivaCripto Backend** é uma API de automação de conteúdo para o portal de
 ```bash
 # Clonar e configurar
 git clone <repo-url>
-cd vivacripto-backend
+cd verticecripto-backend
 cp .env.example .env
 
 # Instalar dependências

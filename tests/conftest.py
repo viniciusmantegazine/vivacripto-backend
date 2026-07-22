@@ -1,5 +1,5 @@
 """
-Pytest configuration and shared fixtures for VivaCripto Backend tests.
+Pytest configuration and shared fixtures for VerticeCripto Backend tests.
 """
 import asyncio
 import os
@@ -307,7 +307,7 @@ def create_test_article_data() -> dict:
         "slug": "bitcoin-reaches-new-all-time-high",
         "content_markdown": "# Bitcoin ATH\n\nBitcoin has reached a new all-time high.",
         "excerpt": "Bitcoin surges to new heights.",
-        "meta_title": "Bitcoin ATH - VivaCripto",
+        "meta_title": "Bitcoin ATH - VerticeCripto",
         "meta_description": "Breaking: Bitcoin reaches new all-time high.",
     }
 

@@ -6,7 +6,7 @@
 
 ## Contexto e Objetivo
 
-Hoje a categoria "Airdrop" (id 6) do VivaCripto não é populada — todas as notícias vêm do pipeline RSS, que raramente cobre airdrops específicos. O objetivo é criar um **endpoint manual** que recebe os dados básicos de um projeto cripto com expectativa de airdrop e gera/publica um artigo educacional sobre ele, embutindo o link de referência do operador do portal.
+Hoje a categoria "Airdrop" (id 6) do VerticeCripto não é populada — todas as notícias vêm do pipeline RSS, que raramente cobre airdrops específicos. O objetivo é criar um **endpoint manual** que recebe os dados básicos de um projeto cripto com expectativa de airdrop e gera/publica um artigo educacional sobre ele, embutindo o link de referência do operador do portal.
 
 **Premissas de produto:**
 
@@ -230,7 +230,7 @@ class AirdropPostGenerator:
 
 System prompt detalhado com:
 
-- **Papel:** redator do VivaCripto, conteúdo educacional sobre cripto
+- **Papel:** redator do VerticeCripto, conteúdo educacional sobre cripto
 - **Tom:** neutro, jornalístico, sem indução a investimento
 - **Regras de fato:** usar apenas o que está nas fontes, atribuir afirmações, não inventar números/datas
 - **Estrutura obrigatória (500-750 palavras):**
