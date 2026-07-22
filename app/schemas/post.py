@@ -98,6 +98,7 @@ class PostRead(PostBase):
     published_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
+    reading_time: int = 0
     author: Optional[AuthorRead] = None
     category: Optional[CategoryRead] = None
     tags: List[TagRead] = []
@@ -123,6 +124,7 @@ class PostListItem(BaseModel):
     published_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
+    reading_time: int = 0
     author: Optional[AuthorRead] = None
     category: Optional[CategoryRead] = None
     tags: List[TagRead] = []

@@ -2,6 +2,7 @@
 SQLAlchemy database models
 """
 import uuid
+from math import ceil
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Table, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
@@ -103,7 +104,19 @@ class Post(Base):
     author = relationship("Author", back_populates="posts")
     category = relationship("Category", back_populates="posts")
     tags = relationship("Tag", secondary=post_tags, back_populates="posts")
-    
+
+    @property
+    def reading_time(self) -> int:
+        """Tempo de leitura estimado em minutos (~200 palavras/min).
+
+        Calculado a partir do conteúdo (que o ORM já carrega), mas exposto
+        também no PostListItem — que NÃO serializa o conteúdo — para o frontend
+        exibir o tempo de leitura sem baixar o texto inteiro na listagem.
+        """
+        content = self.content_markdown or ""
+        words = len(content.split())
+        return max(1, ceil(words / 200)) if words else 0
+
     # Constraints
     __table_args__ = (
         CheckConstraint("status IN ('draft', 'published', 'archived')", name='check_status'),
