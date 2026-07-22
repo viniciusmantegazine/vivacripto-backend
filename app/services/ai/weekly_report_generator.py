@@ -86,9 +86,13 @@ class WeeklyReportGenerator:
             self._image_generator = ImageGenerator()
         return self._image_generator
 
-    async def generate_report(self) -> Optional[Dict]:
+    async def generate_report(self, generate_image: bool = True) -> Optional[Dict]:
         """
         Gera um relatório semanal completo de análise macro + Bitcoin
+
+        Args:
+            generate_image: Se False, pula a geração de imagem (usado no preview,
+                            onde a imagem seria descartada — evita custo à toa).
 
         Returns:
             Dict com:
@@ -128,8 +132,10 @@ class WeeklyReportGenerator:
             # 5. Gerar slug
             slug = slugify(title)
 
-            # 6. Gerar imagem
-            image_url = await self._generate_image(title, content)
+            # 6. Gerar imagem (pulada no preview para não gastar sem necessidade)
+            image_url = None
+            if generate_image:
+                image_url = await self._generate_image(title, content)
 
             # 7. Calcular word count
             word_count = len(content.split())

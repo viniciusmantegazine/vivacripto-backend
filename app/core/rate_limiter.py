@@ -14,20 +14,22 @@ from app.core.config import settings
 
 def get_client_ip(request: Request) -> str:
     """
-    Extrai o IP real do cliente, considerando proxies reversos.
-    Verifica headers comuns de proxies antes de usar o IP direto.
+    Extrai o IP do cliente para o rate limiter, resistente a spoofing.
+
+    O X-Forwarded-For tem a forma "client, proxy1, proxy2". A PRIMEIRA entrada é
+    controlada pelo cliente (spoofável: bastaria mandar um XFF falso para burlar
+    o limite). A ÚLTIMA entrada é a que foi acrescentada pelo proxy de borda do
+    Railway (confiável), correspondendo ao peer real. Por isso usamos a última.
+
+    Se não houver XFF, cai no IP direto da conexão (get_remote_address).
     """
-    # Verifica headers de proxy (em ordem de preferência)
     forwarded_for = request.headers.get("X-Forwarded-For")
     if forwarded_for:
-        # X-Forwarded-For pode conter múltiplos IPs: "client, proxy1, proxy2"
-        return forwarded_for.split(",")[0].strip()
+        parts = [ip.strip() for ip in forwarded_for.split(",") if ip.strip()]
+        if parts:
+            return parts[-1]
 
-    real_ip = request.headers.get("X-Real-IP")
-    if real_ip:
-        return real_ip.strip()
-
-    # Fallback para o IP direto da conexão
+    # Fallback para o IP direto da conexão (peer real)
     return get_remote_address(request)
 
 

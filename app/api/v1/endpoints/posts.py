@@ -26,10 +26,14 @@ async def list_posts(
     page_size: int = Query(10, ge=1, le=100),
     status: Optional[str] = Query(None),
     category_id: Optional[UUID] = Query(None),
+    category: Optional[str] = Query(None, description="Slug da categoria para filtrar"),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    List posts with pagination and filters
+    List posts with pagination and filters.
+
+    Aceita filtro por category_id (UUID) ou category (slug). O filtro por slug
+    faz a paginação real no banco, evitando puxar tudo e filtrar no frontend.
     """
     skip = (page - 1) * page_size
     posts, total = await crud_post.get_posts(
@@ -38,6 +42,7 @@ async def list_posts(
         limit=page_size,
         status=status,
         category_id=category_id,
+        category_slug=category,
     )
 
     total_pages = ceil(total / page_size) if total > 0 else 0

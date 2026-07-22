@@ -10,7 +10,7 @@ from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.models import Post, Tag
+from app.db.models import Category, Post, Tag
 from app.schemas.post import PostCreate, PostUpdate
 
 
@@ -88,39 +88,50 @@ async def get_posts(
     limit: int = 10,
     status: Optional[str] = None,
     category_id: Optional[UUID] = None,
+    category_slug: Optional[str] = None,
 ) -> tuple[List[Post], int]:
-    """Get posts with pagination and filters"""
+    """
+    Get posts with pagination and filters.
+
+    Suporta filtro por category_id (UUID) ou category_slug (str). O filtro por
+    slug faz join em Category e permite paginação real no banco (antes o
+    frontend puxava 50 e filtrava em memória).
+    """
     query = select(Post).options(
         selectinload(Post.author),
         selectinload(Post.category),
         selectinload(Post.tags)
     )
-    
+    count_query = select(func.count()).select_from(Post)
+
+    # Join em Category apenas quando filtramos por slug
+    if category_slug:
+        query = query.join(Category, Post.category_id == Category.id)
+        count_query = count_query.join(Category, Post.category_id == Category.id)
+
     # Apply filters
     if status:
         query = query.where(Post.status == status)
-    if category_id:
-        query = query.where(Post.category_id == category_id)
-    
-    # Order by published_at desc
-    query = query.order_by(Post.published_at.desc())
-    
-    # Get total count
-    count_query = select(func.count()).select_from(Post)
-    if status:
         count_query = count_query.where(Post.status == status)
     if category_id:
+        query = query.where(Post.category_id == category_id)
         count_query = count_query.where(Post.category_id == category_id)
-    
+    if category_slug:
+        query = query.where(Category.slug == category_slug)
+        count_query = count_query.where(Category.slug == category_slug)
+
+    # Order by published_at desc
+    query = query.order_by(Post.published_at.desc())
+
     total_result = await db.execute(count_query)
     total = total_result.scalar()
-    
+
     # Apply pagination
     query = query.offset(skip).limit(limit)
-    
+
     result = await db.execute(query)
     posts = result.scalars().all()
-    
+
     return posts, total
 
 
@@ -253,8 +264,9 @@ class CRUDPost:
         limit: int = 10,
         status: Optional[str] = None,
         category_id: Optional[UUID] = None,
+        category_slug: Optional[str] = None,
     ) -> tuple[List[Post], int]:
-        return await get_posts(db, skip, limit, status, category_id)
+        return await get_posts(db, skip, limit, status, category_id, category_slug)
     
     async def create_post(
         self, db: AsyncSession, post_in: PostCreate, auto_commit: bool = True

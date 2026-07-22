@@ -168,7 +168,10 @@ class Settings(BaseSettings):
 
     # Deduplication
     DEDUPLICATION_THRESHOLD: float = 0.80
-    DEDUPLICATION_ENGINE: str = "embedding"  # Options: levenshtein, tfidf, embedding, hybrid
+    # Padrão tfidf (implementação própria, sem modelo pesado). O engine
+    # "embedding" carrega ~500MB de sentence-transformers no processo web e
+    # não está mais instalado — use apenas se reinstalar a dependência.
+    DEDUPLICATION_ENGINE: str = "tfidf"  # Options: levenshtein, tfidf, embedding, hybrid
 
     # External APIs
     CRYPTOPANIC_API_KEY: str = ""

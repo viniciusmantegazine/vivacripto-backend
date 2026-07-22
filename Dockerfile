@@ -14,18 +14,21 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application
+# Copy application (inclui start.sh e migrate.sh)
 COPY . .
 
-# Create logs directory
-RUN mkdir -p logs
+# Scripts executáveis
+RUN chmod +x start.sh migrate.sh
+
+# Criar usuário não-root e garantir que logs/ seja gravável por ele
+RUN useradd --create-home --shell /bin/bash appuser \
+    && mkdir -p logs \
+    && chown -R appuser:appuser /app
+
+USER appuser
 
 # Expose port
 EXPOSE 8000
-
-# Copy and set scripts
-COPY start.sh migrate.sh ./
-RUN chmod +x start.sh migrate.sh
 
 # Run application
 CMD ["./start.sh"]

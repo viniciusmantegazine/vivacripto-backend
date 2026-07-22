@@ -12,6 +12,8 @@ e trunca conteúdo extraído por fonte.
 from __future__ import annotations
 
 import asyncio
+import ipaddress
+import socket
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 from urllib.parse import urlparse
@@ -178,6 +180,53 @@ class WebResearcher:
     }
     FETCH_TIMEOUT_SECONDS = 10.0
 
+    def _is_safe_url(self, url: str) -> bool:
+        """
+        Proteção anti-SSRF: aceita só http/https e recusa hosts que resolvam
+        para IPs privados/loopback/link-local/reservados. Como a official_url
+        vem do usuário (e as URLs do DDG são externas), evita que o backend seja
+        usado para acessar serviços internos da rede (ex.: metadata do cloud).
+        """
+        try:
+            parsed = urlparse(url)
+            if parsed.scheme not in ("http", "https"):
+                return False
+            host = parsed.hostname
+            if not host:
+                return False
+            # Resolve todos os endereços do host; se QUALQUER um for privado,
+            # bloqueia (evita DNS rebinding para faixas internas).
+            infos = socket.getaddrinfo(host, None)
+            for info in infos:
+                ip = ipaddress.ip_address(info[4][0])
+                if (
+                    ip.is_private
+                    or ip.is_loopback
+                    or ip.is_link_local
+                    or ip.is_reserved
+                    or ip.is_multicast
+                    or ip.is_unspecified
+                ):
+                    return False
+            return True
+        except Exception as e:
+            logger.warning(f"WebResearcher: validação SSRF falhou para {url}: {e}")
+            return False
+
+    async def _filter_safe_urls(self, urls: List[str]) -> List[str]:
+        """
+        Remove URLs inseguras (anti-SSRF) preservando a ordem. Roda antes do
+        fetch para não reordenar as requisições concorrentes. getaddrinfo
+        bloqueia, então cada checagem vai para uma thread.
+        """
+        safe: List[str] = []
+        for url in urls:
+            if await asyncio.to_thread(self._is_safe_url, url):
+                safe.append(url)
+            else:
+                logger.warning(f"WebResearcher: URL bloqueada por SSRF/validação: {url}")
+        return safe
+
     async def _fetch_url(
         self, client: httpx.AsyncClient, url: str
     ) -> Optional[str]:
@@ -185,6 +234,8 @@ class WebResearcher:
         Fetch HTTP de uma URL. Retorna texto extraído ou None se:
         - Erro HTTP (timeout, 4xx, 5xx, conexão)
         - Content-Type não é HTML
+
+        Obs.: a validação anti-SSRF é feita antes, em _filter_safe_urls.
         """
         try:
             response = await client.get(
@@ -292,6 +343,10 @@ class WebResearcher:
 
         # 3) seleção (oficial sempre incluída como FONTE 1)
         selected_urls = self._select_top(candidates, official_url, top_n=TOP_N_URLS)
+
+        # 3.5) filtro anti-SSRF (feito antes do fetch para não reordenar as
+        # requisições concorrentes e não bloquear o event loop com DNS).
+        selected_urls = await self._filter_safe_urls(selected_urls)
         logger.info(f"WebResearcher: vai fetch {len(selected_urls)} URLs para '{project_name}'")
 
         # 4) fetch paralelo

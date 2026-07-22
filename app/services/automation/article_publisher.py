@@ -183,6 +183,13 @@ class ArticlePublisher:
         Returns:
             URL da imagem ou None se falhar
         """
+        # Se o artigo já vem com imagem pronta (ex.: relatório semanal, que gera
+        # a imagem no próprio generator), reutiliza em vez de gerar de novo.
+        existing_image = article.get("image_url") or article.get("featured_image_url")
+        if existing_image:
+            logger.info("Imagem já presente no artigo; reutilizando (sem nova geração)")
+            return existing_image
+
         try:
             return await self.image_generator.generate_and_upload_image(
                 article["title"],

@@ -3,25 +3,15 @@ set -e
 
 echo "🚀 Iniciando VivaCripto Backend..."
 
-# Usar DATABASE_PUBLIC_URL se disponível
+# Migrações: usam DATABASE_PUBLIC_URL se disponível (Railway às vezes só expõe
+# a URL pública durante o build/deploy). A URL é passada inline SÓ para o
+# alembic — o processo web (uvicorn) continua usando a DATABASE_URL interna.
+echo "📦 Executando migrações do banco de dados..."
 if [ -n "$DATABASE_PUBLIC_URL" ]; then
-    echo "📡 Usando DATABASE_PUBLIC_URL..."
-    export DATABASE_URL="$DATABASE_PUBLIC_URL"
-fi
-
-# Reset do banco de dados se RESET_DATABASE=true
-if [ "$RESET_DATABASE" = "true" ]; then
-    echo "⚠️ RESET_DATABASE=true detectado. Resetando banco de dados..."
-    echo "🗑️ Executando downgrade para base..."
-    alembic downgrade base || echo "⚠️ Downgrade falhou (banco pode estar vazio)"
-    echo "📦 Executando upgrade para head..."
-    alembic upgrade head
-    echo "🌱 Inserindo dados iniciais..."
-    psql "$DATABASE_URL" -f init_db.sql || echo "⚠️ init_db.sql falhou (pode já existir)"
-    echo "✅ Reset completo!"
+    echo "📡 Usando DATABASE_PUBLIC_URL para migrações..."
+    DATABASE_URL="$DATABASE_PUBLIC_URL" alembic upgrade head
 else
-    echo "📦 Executando migrações do banco de dados..."
-    alembic upgrade head || echo "⚠️ Aviso: Falha ao executar migrações (continuando...)"
+    alembic upgrade head
 fi
 
 echo "🎯 Iniciando servidor FastAPI..."

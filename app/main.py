@@ -20,6 +20,17 @@ from app.core.rate_limiter import setup_rate_limiting
 # Setup logging
 setup_logging()
 
+# Inicializar Sentry se configurado. Envolto em try/except para não derrubar o
+# boot caso o SDK falhe. traces_sample_rate=0.0 mantém custo baixo (só erros).
+if settings.SENTRY_DSN:
+    try:
+        import sentry_sdk
+
+        sentry_sdk.init(dsn=settings.SENTRY_DSN, traces_sample_rate=0.0)
+        logger.info("Sentry inicializado")
+    except Exception as e:
+        logger.warning(f"Falha ao inicializar Sentry: {e}")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -37,9 +48,10 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     description="API para o portal de notícias VivaCripto",
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    docs_url=f"{settings.API_V1_STR}/docs",
-    redoc_url=f"{settings.API_V1_STR}/redoc",
+    # Docs/OpenAPI só ficam expostos em DEBUG; em produção retornam 404.
+    openapi_url=f"{settings.API_V1_STR}/openapi.json" if settings.DEBUG else None,
+    docs_url=f"{settings.API_V1_STR}/docs" if settings.DEBUG else None,
+    redoc_url=f"{settings.API_V1_STR}/redoc" if settings.DEBUG else None,
     lifespan=lifespan,
 )
 

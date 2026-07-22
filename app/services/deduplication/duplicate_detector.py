@@ -3,6 +3,7 @@ Sistema de Detecção e Prevenção de Duplicatas
 Orquestra o pipeline de verificação de similaridade e decisão
 """
 
+import asyncio
 from dataclasses import dataclass, field, asdict
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta, timezone
@@ -257,7 +258,11 @@ class DuplicateDetector:
             post_text = f"{post.titulo} {post.resumo} {post_content_preview}"
             
             try:
-                result = self.similarity_engine.calculate(assignment_text, post_text)
+                # calculate() é CPU-bound síncrono (TF-IDF/embeddings): roda
+                # fora do event loop para não bloquear as demais corrotinas.
+                result = await asyncio.to_thread(
+                    self.similarity_engine.calculate, assignment_text, post_text
+                )
                 similarities.append({
                     "post_id": post.id,
                     "titulo": post.titulo,

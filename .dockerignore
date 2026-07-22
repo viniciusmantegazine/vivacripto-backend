@@ -1,0 +1,22 @@
+# Não vazar histórico git nem segredos para a imagem
+.git
+.gitignore
+.env
+.env.*
+
+# Logs e artefatos de runtime
+logs/
+
+# Testes e cobertura
+tests/
+.pytest_cache
+htmlcov
+.coverage
+
+# Cache Python
+__pycache__
+*.pyc
+
+# Ambientes virtuais
+venv
+.venv

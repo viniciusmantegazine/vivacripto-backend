@@ -103,9 +103,34 @@ class PostRead(PostBase):
     tags: List[TagRead] = []
 
 
+class PostListItem(BaseModel):
+    """
+    Item enxuto para listagem de posts.
+
+    Omite content_markdown e content_html (que somam ~120KB por página) já que
+    a listagem do frontend usa apenas o excerpt. Use PostRead para detalhe.
+    """
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    slug: str
+    excerpt: str
+    featured_image_url: Optional[str] = None
+    meta_title: Optional[str] = None
+    meta_description: Optional[str] = None
+    status: str
+    published_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+    author: Optional[AuthorRead] = None
+    category: Optional[CategoryRead] = None
+    tags: List[TagRead] = []
+
+
 class PostList(BaseModel):
     """Post list response schema"""
-    items: List[PostRead]
+    items: List[PostListItem]
     total: int
     page: int
     page_size: int

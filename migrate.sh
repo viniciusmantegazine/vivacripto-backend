@@ -35,4 +35,5 @@ run_migrations() {
     done
 }
 
-run_migrations
+# Falha explícita se as migrações não completarem após todas as tentativas.
+run_migrations || exit 1

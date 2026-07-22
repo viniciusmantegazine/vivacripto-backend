@@ -2,6 +2,7 @@
 News Aggregator Service
 Agrega notícias de múltiplas fontes (RSS + APIs) com deduplicação inteligente
 """
+import asyncio
 from typing import List, Dict, Tuple
 from loguru import logger
 
@@ -71,8 +72,9 @@ class NewsAggregator:
         total_before = len(all_news)
         logger.info(f"Coleta finalizada: {total_before} notícias no total")
 
-        # Deduplificar notícias de fontes diferentes sobre o mesmo tema
-        deduplicated_news = self._deduplicate_source_news(all_news)
+        # Deduplificar notícias de fontes diferentes sobre o mesmo tema.
+        # O(n²) síncrono e CPU-bound (TF-IDF): roda fora do event loop.
+        deduplicated_news = await asyncio.to_thread(self._deduplicate_source_news, all_news)
 
         removed = total_before - len(deduplicated_news)
         if removed > 0:

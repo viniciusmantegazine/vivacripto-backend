@@ -11,8 +11,10 @@ from uuid import uuid4
 import httpx
 import sentry_sdk
 from loguru import logger
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.base import engine
 from app.core.config import settings
 from app.core.metrics import MetricsCollector
 from app.crud.crud_post import crud_post
@@ -45,6 +47,11 @@ class NewsPipeline:
     # Usar configurações de settings (com fallback para valores padrão)
     MAX_POSTS_PER_DAY = settings.DAILY_POST_LIMIT
     POSTS_PER_EXECUTION = settings.POSTS_PER_EXECUTION
+
+    # Chave fixa do advisory lock do Postgres que serializa runs do pipeline.
+    # Impede que dois runs simultâneos (ex.: dois disparos do cron) passem juntos
+    # pelo check-then-act do limite diário e publiquem além do limite.
+    ADVISORY_LOCK_KEY = 728451093
 
     def __init__(self):
         self.aggregator = NewsAggregator()
@@ -83,6 +90,41 @@ class NewsPipeline:
             "failed": 0,
             "errors": [],
         }
+
+        # Serializa runs concorrentes via advisory lock de sessão. Se outro run
+        # já detém o lock, abortamos em vez de correr o risco de furar o limite
+        # diário. pg_try_advisory_lock é não-bloqueante (retorna imediatamente).
+        #
+        # IMPORTANTE: o lock é atrelado à CONEXÃO física. A sessão `db` faz
+        # commit várias vezes durante o run (a cada publicação), e no SQLAlchemy
+        # async o commit devolve a conexão ao pool — a próxima operação pode usar
+        # outra conexão. Por isso o lock é adquirido/liberado numa conexão
+        # DEDICADA (`lock_conn`) mantida aberta por todo o run; senão o unlock
+        # rodaria em conexão diferente e o lock ficaria preso.
+        # Erro ao adquirir o lock não bloqueia o run (mitigação best-effort).
+        lock_conn = None
+        lock_acquired = False
+        another_run_active = False
+        try:
+            lock_conn = await engine.connect()
+            lock_result = await lock_conn.execute(
+                text("SELECT pg_try_advisory_lock(:k)"),
+                {"k": self.ADVISORY_LOCK_KEY},
+            )
+            if lock_result.scalar() is True:
+                lock_acquired = True
+            else:
+                another_run_active = True
+        except Exception as e:
+            logger.warning(f"Falha ao adquirir advisory lock: {e} (seguindo mesmo assim)")
+
+        if another_run_active:
+            report["status"] = "skipped"
+            report["message"] = "Outro run do pipeline já está em execução"
+            logger.warning(report["message"])
+            if lock_conn is not None:
+                await lock_conn.close()
+            return report
 
         try:
             # 1. Verificar limite diário
@@ -269,7 +311,23 @@ class NewsPipeline:
             report["error"] = str(e)
             report["metrics"] = metrics.get_metrics_dict()
             return report
-    
+
+        finally:
+            # Libera o advisory lock e fecha a conexão dedicada. Fechar a
+            # conexão já liberaria o lock de sessão, mas o unlock explícito
+            # mantém o refcount correto caso a conexão fosse reaproveitada.
+            if lock_conn is not None:
+                try:
+                    if lock_acquired:
+                        await lock_conn.execute(
+                            text("SELECT pg_advisory_unlock(:k)"),
+                            {"k": self.ADVISORY_LOCK_KEY},
+                        )
+                except Exception as e:
+                    logger.warning(f"Falha ao liberar advisory lock: {e}")
+                finally:
+                    await lock_conn.close()
+
     async def _check_daily_limit(self, db: AsyncSession) -> bool:
         """Verifica se o limite diário de posts foi atingido"""
         try:

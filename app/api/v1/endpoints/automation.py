@@ -6,6 +6,7 @@ import traceback
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.base import get_db
@@ -57,12 +58,14 @@ async def trigger_automation(
         if settings.DEBUG:
             error_response["error_detail"] = str(e)
             error_response["traceback"] = traceback.format_exc()
-        return error_response
+        # Retornar HTTP 500 (não 200) para que o cron externo detecte a falha.
+        return JSONResponse(status_code=500, content=error_response)
 
 
 @router.get("/status")
 async def get_automation_status(
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_automation_token)
 ):
     """
     Retorna o status da automação
@@ -193,8 +196,11 @@ async def generate_weekly_report(
                 errors=["Claude não configurado. Defina ANTHROPIC_API_KEY no ambiente."]
             )
 
-        # Gerar relatório
-        report = await weekly_report_generator.generate_report()
+        # Gerar relatório. No preview (publish=False) não geramos imagem, pois
+        # ela seria descartada e a geração tem custo.
+        report = await weekly_report_generator.generate_report(
+            generate_image=report_request.publish
+        )
 
         if not report:
             return WeeklyReportResponse(
@@ -218,9 +224,12 @@ async def generate_weekly_report(
                 errors=[]
             )
 
-        # Publicar relatório
+        # Publicar relatório. Forçamos a categoria "analise-semanal" (a imagem já
+        # veio no report, então o publisher a reutiliza sem gerar de novo).
         publisher = ArticlePublisher()
-        published = await publisher.publish_article(report, db)
+        published = await publisher.publish_article(
+            report, db, force_category_slug="analise-semanal"
+        )
 
         if not published:
             return WeeklyReportResponse(

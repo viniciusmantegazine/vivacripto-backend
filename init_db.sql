@@ -6,18 +6,32 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pg_trgm"; -- Para busca de texto
 
 -- Criar configuração de busca de texto em português
-CREATE TEXT SEARCH CONFIGURATION IF NOT EXISTS pt (COPY = portuguese);
+-- Postgres não suporta "IF NOT EXISTS" nesse comando; usamos um bloco DO que
+-- ignora o erro caso a configuração já exista (senão o script inteiro aborta
+-- e o índice GIN full-text abaixo nunca é criado).
+DO $$
+BEGIN
+    CREATE TEXT SEARCH CONFIGURATION pt (COPY = portuguese);
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END
+$$;
 
 -- Inserir dados iniciais
 
 -- Criar autor padrão
-INSERT INTO authors (id, name, bio, avatar_url) 
-VALUES (
+-- ON CONFLICT DO NOTHING não ajuda aqui (o id é sempre novo via uuid_generate_v4
+-- e não há unique em name), então re-execuções duplicavam o autor. Usamos
+-- WHERE NOT EXISTS para inserir só se ainda não houver esse autor.
+INSERT INTO authors (id, name, bio, avatar_url)
+SELECT
     uuid_generate_v4(),
     'VivaCripto',
     'Portal de notícias sobre criptomoedas',
     NULL
-) ON CONFLICT DO NOTHING;
+WHERE NOT EXISTS (
+    SELECT 1 FROM authors WHERE name = 'VivaCripto'
+);
 
 -- Criar categorias padrão
 INSERT INTO categories (id, name, slug) VALUES
