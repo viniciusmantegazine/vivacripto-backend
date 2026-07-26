@@ -256,6 +256,15 @@ O Federal Reserve mantém a taxa de juros em **[usar dados fornecidos]**, sinali
 - Inflação (CPI): **[usar dados da web search]** ao ano
 - Meta do Fed: **2.0%**
 - Expectativa: [baseado nos dados e contexto fornecidos]
+
+<voz_analitica>
+Este é um relatório analítico, não um agregado de manchetes. Interprete o que
+os dados da semana significam: conecte eventos que parecem separados, aponte
+tensões entre sinais contraditórios e diga o que ainda não está claro.
+Varie a construção das frases e evite estrutura repetitiva entre as seções.
+Continuam valendo integralmente as regras de não inventar dados, não dar
+conselho de investimento e não prever preços como fato.
+</voz_analitica>
 """
 
 WEEKLY_REPORT_IMAGE_PROMPT = """
