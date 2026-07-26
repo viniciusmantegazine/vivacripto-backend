@@ -635,3 +635,68 @@ descarte na mão. Lista de palavras não se escreve por suposição.
 
 A taxa esperada fica entre 3% e 10% (medido: 4 de 87 e 7 de 110). Acima de 15%
 quase certamente indica padrão largo demais na `OFF_BEAT_PATTERNS`.
+
+## Log JSON: nunca montar por format-string
+
+O formato de produção em `app/core/logging.py` já montou JSON por interpolação:
+
+    '"message":"{message}"}}'
+
+`{message}` entrava cru dentro de aspas, então qualquer mensagem com `"`, `\` ou
+quebra de linha produzia uma linha que o agregador não parseava. Título de
+notícia vai para o log, e manchete com aspas retas é comum. `logger.exception`
+era pior: emitia a linha JSON e **depois** o traceback em linhas soltas, fora do
+objeto.
+
+Na época havia 5 chamadas logando traceback completo (quebravam em 100% dos
+casos), 76 interpolando texto de exceção e 418 chamadas de log no total.
+
+Hoje o ramo de produção usa `_json_sink`, que monta um `dict` e passa por
+`json.dumps`. Três coisas nele não são estéticas:
+
+**Timestamp com `isoformat(timespec="milliseconds")`.** O formato antigo
+`{time:YYYY-MM-DDTHH:mm:ss.SSSZ}` emite o offset COM dois-pontos (`-03:00`).
+Reconstruir com `strftime("%z")` daria `-0300` — mudança silenciosa de contrato
+com o agregador. Medido byte a byte.
+
+**`line` é número, não string.** O formato antigo emitia `"line":{line}` sem
+aspas.
+
+**`filter=context_filter` continua anexado.** É ele que popula `request_id` e
+`correlation_id` no record; sem ele os dois campos somem.
+
+**Por que não `serialize=True`:** resolveria o escape, mas aninha tudo sob
+`record` e move a mensagem, quebrando qualquer query existente no agregador. O
+ganho não paga.
+
+**O sink nunca deixa exceção escapar.** Se ele levantar, o loguru escreve um
+bloco `--- Logging error in Loguru Handler ---` multi-linha em stderr — a mesma
+saída não parseável que ele existe para eliminar. Por isso o corpo inteiro fica
+em `try`/`except`, com um fallback que emite uma linha JSON mínima. Perder a
+estrutura de uma linha é aceitável; perder a linha não é.
+
+### `context_filter` sobrescreve `bind()`, e isso é de propósito
+
+`context_filter` faz atribuição incondicional, não `setdefault`:
+
+    record["extra"]["request_id"] = get_request_id() or "-"
+
+Trocar por `setdefault` parece inofensivo e é tentador — durante este trabalho a
+troca foi feita justamente para tornar um teste de fallback alcançável, já que o
+filtro sobrescreve qualquer `logger.bind(request_id=...)` antes do sink rodar.
+
+Foi revertido. O contextvar é a fonte da verdade porque quem o popula é o
+middleware de requisição; um call site capaz de sobrepô-lo via `bind` viraria
+armadilha — bastaria alguém "ajudar" ligando um ID conhecido localmente para
+mascarar o ID real da requisição. `test_context_filter_tem_precedencia_sobre_bind`
+trava esse comportamento.
+
+A lição mais geral: o teste é que estava errado. Para exercitar o fallback do
+sink, chame `_json_sink` direto com um record montado à mão, como faz
+`test_registro_nao_serializavel_ainda_produz_linha`. Não afrouxe produção para
+alcançar um caminho de teste.
+
+**Ainda em aberto:** `LogContext` e `log_operation` (mesmo arquivo) não são
+usados em lugar nenhum do projeto, e o contexto estruturado que adicionam seria
+descartado de qualquer forma — o sink só lê `request_id` e `correlation_id` de
+`extra`. Decidir entre remover ou fazer funcionar.
