@@ -84,6 +84,10 @@ def mock_crud_post():
     """Mock crud_post."""
     with patch("app.services.automation.news_pipeline.crud_post") as mock:
         mock.get_recent_posts = AsyncMock(return_value=[])
+        # O pré-filtro anti-reprocessamento do pipeline awaita este método.
+        # Sem AsyncMock explícito, o atributo vira MagicMock comum e o await
+        # estoura com "object MagicMock can't be used in 'await' expression".
+        mock.get_existing_source_urls = AsyncMock(return_value=set())
         yield mock
 
 
@@ -155,7 +159,9 @@ class TestNewsPipeline:
             report = await pipeline.run(db_session)
 
             assert report["status"] == "completed"
-            assert report["news_collected"] == 0
+            # A chave do relatório é "collected" — "news_collected" existe só
+            # dentro de metrics, não na raiz do report.
+            assert report["collected"] == 0
 
     @pytest.mark.asyncio
     async def test_pipeline_handles_content_generation_failure(

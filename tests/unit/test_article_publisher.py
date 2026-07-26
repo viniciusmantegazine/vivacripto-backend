@@ -249,6 +249,8 @@ class TestArticlePublisher:
             slug="original-title",
             content_markdown="Original content",
             content_html="<p>Original content</p>",
+            # excerpt é NOT NULL na tabela posts
+            excerpt="Original excerpt",
             status="published",
             category_id=test_category.id,
         )
