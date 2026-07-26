@@ -238,7 +238,10 @@ NUNCA:
         """
         try:
             title = source_news.get("title", "")
-            description = source_news.get("description", "")
+            # Preferir o texto completo extraído da matéria original
+            # (ArticleExtractor); o resumo do RSS é o fallback — com 1-2
+            # frases o LLM não tem material para 700+ palavras sem alucinar.
+            description = source_news.get("full_text") or source_news.get("description", "")
             source = source_news.get("source", "")
 
             logger.info(f"Gerando artigo v3.0 para: {title[:50]}... (categoria: {category})")
@@ -259,6 +262,12 @@ NUNCA:
             # Gerar título otimizado para SEO
             seo_title = await self._generate_seo_title(content, keyword)
 
+            if not seo_title:
+                # Sem título SEO não publicamos: o fallback seria o título
+                # original em INGLÊS do feed — inaceitável num portal PT-BR.
+                logger.error("Falha ao gerar título SEO — artigo descartado")
+                return None
+
             # Gerar excerpt
             excerpt = await self._generate_excerpt(content)
 
@@ -266,10 +275,10 @@ NUNCA:
             meta_description = await self._generate_meta_description(content, seo_title, keyword)
 
             # Gerar slug
-            slug = slugify(seo_title or title)
+            slug = slugify(seo_title)
 
             article = {
-                "title": seo_title or title,
+                "title": seo_title,
                 "slug": slug,
                 "content_markdown": content,
                 "excerpt": excerpt,
@@ -744,16 +753,25 @@ Retorne APENAS o título, sem aspas, prefixos ou explicações.
         return title
     
     async def _generate_excerpt(self, content: str) -> Optional[str]:
-        """Gera excerpt do artigo"""
-        # Remover markdown e pegar primeiras 2 frases
-        clean_content = content.replace('**', '').replace('##', '').replace('*', '')
-        sentences = clean_content.split('. ')[:2]
+        """
+        Gera excerpt a partir do primeiro parágrafo de TEXTO do artigo.
+        Linhas de heading são ignoradas — sem isso o texto do primeiro H2
+        vazava colado na primeira frase do excerpt.
+        """
+        paragraphs = [
+            line.strip()
+            for line in content.split('\n')
+            if line.strip() and not line.strip().startswith('#')
+        ]
+        text = ' '.join(paragraphs).replace('**', '').replace('*', '')
+
+        sentences = text.split('. ')[:2]
         excerpt = '. '.join(sentences)
-        
+
         # Limitar a 150 caracteres
         if len(excerpt) > 150:
             excerpt = excerpt[:147] + "..."
-        
+
         return excerpt
     
     async def _generate_meta_description(
