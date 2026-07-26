@@ -107,6 +107,198 @@ class ContentGenerator:
     MIN_EXCERPT_LENGTH = 80
     MAX_EXCERPT_LENGTH = 200
 
+    # Contrato de saída. As faixas têm dois níveis: a meta apertada é o ponto
+    # ideal de SEO, o limite absoluto é a fronteira em que o QualityValidator
+    # reprova. Declarar os dois evita que o modelo mire no limite e resvale.
+    JSON_CONTRACT_BLOCK = """
+<saida_json>
+Responda APENAS com um objeto JSON válido. Sem cercas de código, sem texto antes ou depois.
+
+{{
+  "content_markdown": "o artigo completo em Markdown, começando por ##",
+  "title": "título SEO",
+  "excerpt": "resumo curto do artigo",
+  "meta_description": "meta description SEO"
+}}
+
+REGRAS DE CADA CAMPO:
+
+content_markdown — o artigo conforme <estrutura_do_artigo> e <requisitos_tecnicos> acima.
+  ⚠️ Escape corretamente as quebras de linha (\\n) e as aspas (\\") dentro da string JSON.
+
+title — alvo 50 a 70 caracteres (limite absoluto: 30 a 100).
+  - Inclua "{keyword}" preferencialmente no início ou meio
+  - Atrativo, mas NUNCA clickbait sensacionalista
+  - Verbos de ação quando apropriado (Revela, Anuncia, Lança, Atinge, Supera)
+  - Português brasileiro fluente
+  BONS: "Bitcoin Atinge Máxima Histórica Após Aprovação de ETF nos EUA" /
+     "Ethereum Anuncia Data do Upgrade Dencun: O Que Muda Para Usuários" /
+     "SEC Processa Binance por Irregularidades: Entenda o Caso"
+  RUINS: "URGENTE: Bitcoin VAI EXPLODIR! Não Perca!!!" (clickbait) /
+     "Notícia importante sobre Bitcoin" (genérico) /
+     "Você não vai acreditar no que aconteceu com o Ethereum" (clickbait)
+
+excerpt — alvo 120 a 180 caracteres (limite absoluto: 80 a 200).
+  - Resuma a notícia em 1 ou 2 frases COMPLETAS
+  - Não repita o título literalmente
+  - NUNCA termine no meio de uma frase
+
+meta_description — alvo 140 a 160 caracteres (limite absoluto: 120 a 180).
+  - Inclua "{keyword}" de forma natural
+  - Resuma o VALOR do artigo para o leitor
+  - Termine com curiosidade ou CTA implícito (sem "clique aqui")
+  - Complemente o título, não repita
+  BOAS: "Entenda como a aprovação do ETF de Bitcoin nos EUA pode impactar o
+     mercado cripto brasileiro e o que esperar nos próximos meses."
+  RUINS: "Leia nossa notícia sobre Bitcoin. Clique aqui para saber mais."
+     (genérico, CTA explícito) / "Bitcoin Bitcoin criptomoeda crypto blockchain"
+     (keyword stuffing)
+</saida_json>"""
+
+    # Corpo do prompt do artigo. Copiado da f-string de _generate_content e
+    # convertido em template com campos nomeados, para servir à chamada única.
+    # A seção <output> antiga NÃO vem: ela pedia "APENAS o artigo em Markdown",
+    # o que contradiz o contrato JSON acima.
+    _ARTICLE_PROMPT_TEMPLATE = """<dados_da_fonte>
+Título Original: {title}
+Conteúdo da Fonte: {description}
+Categoria: {category}
+</dados_da_fonte>
+
+<regra_fonte>
+⚠️ REGRA CRÍTICA DE ATRIBUIÇÃO:
+
+1. NÃO mencione nomes de VEÍCULOS jornalísticos concorrentes (CoinDesk, CoinTelegraph, Bitcoin Magazine, CryptoSlate, Decrypt, The Block, BeInCrypto, NewsBTC).
+
+2. TAMBÉM NÃO use frases vagas como substituto — elas são fingerprint de IA que o Google penaliza:
+   ❌ PROIBIDO: "segundo informações divulgadas", "conforme reportado", "de acordo com dados do mercado", "fontes do setor indicam".
+
+3. CAMINHO CORRETO: atribua à FONTE PRIMÁRIA — quem produziu/emitiu a informação:
+   ✅ Empresa/projeto: "Segundo o relatório da [nome da empresa]..."
+   ✅ Regulador: "De acordo com comunicado da SEC/CVM/SFC..."
+   ✅ Executivo: "[Nome], CEO da [empresa], afirmou que..."
+   ✅ Documento técnico: "O whitepaper detalha que..."
+   ✅ Provedor de dados (não é veículo): "Dados da Glassnode/CoinGecko/Chainalysis/Dune mostram..."
+
+4. Se a fonte primária não estiver clara na notícia original, REFORMULE o fato em voz direta sem atribuir — não use atribuição vaga.
+</regra_fonte>
+
+<configuracao_editorial>
+Tom recomendado: {tom}
+Foco da cobertura: {foco}
+Palavra-chave principal: {keyword}
+</configuracao_editorial>
+
+<tarefa>
+Transforme os dados acima em um artigo jornalístico completo para o portal VerticeCripto, seguindo a estrutura abaixo.
+</tarefa>
+
+<estrutura_do_artigo>
+O artigo deve ter ESTRUTURA HIERÁRQUICA com múltiplos subtítulos H2 — cada um cobrindo uma seção distinta, NÃO parafraseando o título principal. Estrutura obrigatória:
+
+## [Manchete Interna H2 — ângulo principal da matéria]
+Subtítulo informativo, sem clickbait, que abra um ângulo específico (não repetir o título).
+
+**Lead jornalístico (1-2 parágrafos, ~120 palavras):**
+Responda Quem? O quê? Quando? Onde? Por quê? em 4-6 frases.
+Use pirâmide invertida — o essencial vem primeiro.
+O leitor deve entender a notícia completa apenas lendo este trecho.
+
+## [H2 — Contexto e detalhes]
+**3-4 parágrafos (~280-350 palavras)** desenvolvendo a notícia com dados PRESENTES NA FONTE.
+
+Se a fonte mencionar termos técnicos, explique-os naturalmente (sem parecer didático):
+- ETF: Fundo negociado em bolsa que replica o desempenho de um ativo
+- Halving: Evento programado que reduz pela metade a recompensa de mineração
+- DeFi: Ecossistema de finanças descentralizadas sem intermediários tradicionais
+- Layer 2: Soluções de segunda camada para escalabilidade de blockchains
+- Staking: Processo de bloquear criptomoedas para validar transações e receber recompensas
+
+Adicione contexto histórico ou de mercado quando RELEVANTE e VERIFICÁVEL na fonte.
+
+⚠️ Use APENAS dados que estão explicitamente na fonte. NÃO invente números, datas, percentuais.
+
+## [H2 — Impacto no Brasil] (OBRIGATÓRIO)
+**2-3 parágrafos (~220-280 palavras)** com ângulo brasileiro específico. Esta seção é o diferencial editorial — sem ela, o artigo é apenas tradução de conteúdo gringo (Google penaliza).
+
+Aborde pelo menos UM destes ângulos (o que fizer mais sentido pra notícia):
+- Regulação: como CVM, BCB, Lei 14.478/2022 (marco cripto BR), Receita Federal afetam ou são afetados.
+- Mercado local: impacto em exchanges nacionais (Mercado Bitcoin, Foxbit, NovaDAX, BitPreço), liquidez em real, paridade BTC/BRL.
+- Investidor BR: impacto fiscal (IN 1.888 da Receita), tributação de ganho de capital cripto, declaração de IR.
+- Comparação: como o fato se compara a iniciativas/regulação brasileiras similares.
+
+Se nenhum ângulo BR for aplicável, mencione brevemente por que e como o leitor brasileiro pode acompanhar o desenrolar.
+
+## [H2 — Próximos passos / O que observar]
+**1-2 parágrafos (~120-160 palavras)** de fechamento analítico (NÃO conclusivo robótico).
+
+Indique o que observar a seguir: próximas datas, votações, releases, eventos. Conecte ao contexto maior do mercado cripto.
+
+⚠️ REGRAS CRÍTICAS:
+- NÃO faça recomendações de investimento.
+- NÃO preveja preços/movimentos como certezas.
+- NÃO use frases robóticas de fechamento ("em conclusão", "por fim", "em suma").
+- ✅ Limite-se a analisar possíveis desdobramentos de forma neutra.
+</estrutura_do_artigo>
+
+<requisitos_tecnicos>
+⚠️ REQUISITOS OBRIGATÓRIOS - ARTIGO SERÁ REJEITADO SE NÃO CUMPRIR:
+
+1. CONTAGEM DE PALAVRAS:
+   - MÍNIMO ABSOLUTO: 700 palavras (artigos com menos serão REJEITADOS)
+   - IDEAL: 900-1200 palavras
+   - MÁXIMO: 1500 palavras
+   → Profundidade real, não enchimento. Cada parágrafo deve agregar informação ou contexto novo.
+
+2. PALAVRAS-CHAVE OBRIGATÓRIAS:
+   O artigo DEVE conter pelo menos UMA destas palavras (validação automática):
+   - "Bitcoin", "BTC", "Ethereum", "ETH", "crypto", "criptomoeda"
+   - "blockchain", "DeFi", "NFT", "token", "moeda digital"
+   → Use "{keyword}" 3-5 vezes (densidade natural) E variações como "criptomoeda" ou "cripto".
+
+3. FORMATAÇÃO:
+   - Idioma: Português brasileiro fluente
+   - Quebras de linha duplas (\\n\\n) entre TODOS os parágrafos
+   - 4 seções H2 distintas (manchete, contexto, impacto Brasil, próximos passos)
+   - Parágrafos com 3-5 frases cada (evite blocos extremos: nem 1 frase, nem 10)
+
+4. ESTRUTURA H2:
+   - O artigo DEVE começar com ## (heading H2)
+   - DEVE conter PELO MENOS 3 H2s distintos (não parafrasear o título principal)
+   - Cada H2 abre uma seção temática diferente
+</requisitos_tecnicos>
+
+<validacao_obrigatoria>
+⚠️ CHECKLIST CRÍTICO - Verifique TODOS os itens antes de finalizar:
+
+☐ CONTAGEM: O artigo tem entre 700 e 1500 palavras?
+   → Se estiver curto, EXPANDA com contexto verificável, não com enchimento.
+   → Se passou de 1500, CORTE redundâncias.
+
+☐ KEYWORDS: O texto contém "criptomoeda", "cripto", "Bitcoin", "blockchain" ou similar?
+   → Inclua 3-5 termos cripto naturalmente — não force keyword stuffing.
+
+☐ DADOS: Todos os números, preços, datas e porcentagens vieram da fonte original?
+   → Se NÃO estão na fonte, NÃO invente. Use termos qualitativos ("registrou alta", "apresentou queda").
+
+☐ NFA: Existe alguma frase que soa como conselho de investimento?
+   → Se SIM, reformule para tom neutro e informativo.
+
+☐ FLUÊNCIA: O texto flui sem frases-tique de IA?
+   → PROIBIDAS: "vale ressaltar", "em conclusão", "é importante mencionar", "segundo informações divulgadas", "conforme reportado", "fontes do setor indicam", "este movimento reflete".
+
+☐ ESTRUTURA: O artigo tem 4 seções H2 distintas, cada uma com 1-3 parágrafos?
+   → 4 H2s: Manchete principal, Contexto/Detalhes, Impacto no Brasil, Próximos passos.
+   → H2s NÃO podem parafrasear o título principal — cada um cobre seção diferente.
+
+☐ SEÇÃO BRASIL: O artigo tem uma seção específica com ângulo brasileiro (regulação CVM/BCB, exchanges nacionais, tributação)?
+   → Esta seção é OBRIGATÓRIA. Sem ela = artigo rejeitado.
+
+☐ ATRIBUIÇÃO: Dados específicos estão atribuídos à FONTE PRIMÁRIA (não a veículos nem a frases vagas)?
+   → ✅ "Segundo relatório da [empresa]...", "De acordo com comunicado da SEC...", "Dados da Glassnode..."
+   → ❌ "Segundo informações divulgadas...", "Conforme reportado...", "Fontes do setor..."
+</validacao_obrigatoria>"""
+
     # System Prompt v3.0 - Estruturado com tags XML para melhor parsing
     SYSTEM_PROMPT = """<persona>
 Você é o Editor-Chefe do portal VerticeCripto, um veículo jornalístico especializado em criptoeconomia para o público brasileiro. Sua formação combina jornalismo financeiro (Bloomberg), tecnologia acessível (The Verge) e expertise no mercado cripto.
@@ -574,6 +766,113 @@ Nenhum texto adicional, prefixo ou metadado.
 
         return content
     
+    def _build_article_prompt(
+        self,
+        title: str,
+        description: str,
+        source: str,
+        category: str,
+        keyword: str,
+        correction_hint: Optional[str] = None,
+    ) -> str:
+        """
+        Monta o user prompt da chamada única.
+
+        Reaproveita as seções que já existiam no prompt de conteúdo
+        (<dados_da_fonte> até <validacao_obrigatoria>), acrescenta o contrato
+        de saída no lugar do <output> antigo — que pedia "APENAS o artigo em
+        Markdown", incompatível com JSON — e anexa o bloco de correção em retry.
+        """
+        cat_config = self._get_category_config(category)
+        base = self._ARTICLE_PROMPT_TEMPLATE.format(
+            title=title,
+            description=description,
+            category=category,
+            tom=cat_config["tom"],
+            foco=cat_config["foco"],
+            keyword=keyword,
+        )
+        prompt = base + self.JSON_CONTRACT_BLOCK.format(keyword=keyword)
+
+        if correction_hint:
+            prompt += (
+                "\n\n<correcao_obrigatoria>\n"
+                "A geração anterior foi REPROVADA na validação editorial com estes problemas:\n"
+                f"{correction_hint}\n\n"
+                "Corrija TODOS esses problemas na nova geração. Se o problema foi "
+                "word count abaixo do mínimo, EXPANDA as seções com mais contexto "
+                "VERIFICÁVEL (regulação BR, dados on-chain, comparação histórica) — "
+                "nunca com enchimento ou frases robóticas.\n"
+                "</correcao_obrigatoria>"
+            )
+        return prompt
+
+    async def _generate_article_json(
+        self,
+        title: str,
+        description: str,
+        source: str,
+        category: str = "default",
+        correction_hint: Optional[str] = None,
+    ) -> Optional[Dict]:
+        """
+        Gera o artigo completo — conteúdo, título, excerpt e meta — numa
+        chamada só.
+
+        Antes eram três chamadas sequenciais, e uma falha na segunda descartava
+        o artigo junto com a chamada de conteúdo já paga. Aqui é transação
+        única: ou vem tudo, ou não vem nada.
+
+        O contrato JSON vive no PROMPT, não no mecanismo de saída estruturada
+        de cada provedor: Gemini e OpenAI têm mecanismos diferentes, e apostar
+        neles exigiria duas implementações de contrato. Cada provedor recebe
+        apenas sua dica nativa de "responda JSON" como reforço barato.
+        """
+        cat_config = self._get_category_config(category)
+        keyword = cat_config["keywords"][0] if cat_config["keywords"] else "criptomoeda"
+
+        user_prompt = self._build_article_prompt(
+            title, description, source, category, keyword, correction_hint
+        )
+        full_prompt = f"{self.SYSTEM_PROMPT}\n\n{user_prompt}"
+
+        # Gemini primário
+        if self.use_gemini and self.gemini_client:
+            try:
+                logger.info(f"[Gemini] Gerando artigo (chamada única) com {self.GEMINI_MODEL}...")
+                response = await self.gemini_client.aio.models.generate_content(
+                    model=self.GEMINI_MODEL,
+                    contents=full_prompt,
+                    config=genai.types.GenerateContentConfig(
+                        temperature=0.4,
+                        response_mime_type="application/json",
+                    ),
+                )
+                artigo = self._parse_article_json(getattr(response, "text", None))
+                if artigo:
+                    return artigo
+                logger.warning("[Gemini] JSON inaproveitável. Tentando OpenAI...")
+            except Exception as e:
+                logger.warning(f"[Gemini] Falha: {e}. Tentando OpenAI...")
+
+        # Fallback OpenAI, mesmo contrato
+        try:
+            logger.info(f"[OpenAI] Gerando artigo (chamada única) com {self.OPENAI_MODEL}...")
+            response = await self.openai_client.chat.completions.create(
+                model=self.OPENAI_MODEL,
+                messages=[
+                    {"role": "system", "content": self.SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.4,
+                max_tokens=4000,
+                response_format={"type": "json_object"},
+            )
+            return self._parse_article_json(response.choices[0].message.content)
+        except Exception as e:
+            logger.error(f"[OpenAI] Falha na geração: {e}")
+            return None
+
     def _parse_article_json(self, text: Optional[str]) -> Optional[Dict]:
         """
         Parseia o JSON do artigo devolvido pelo LLM.
