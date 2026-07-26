@@ -123,7 +123,12 @@ objeto. Quando ausente, a chave não aparece, para não poluir a linha comum.
 
 ### Falha do próprio sink
 
-Um sink que levanta exceção faz o loguru imprimir um aviso e descartar a linha.
+Quando um sink levanta exceção, o loguru captura, escreve um bloco
+`--- Logging error in Loguru Handler ---` em stderr contendo o record, e segue.
+Medido: o conteúdo da mensagem não some, mas a **linha estruturada** sim — o que
+chega ao agregador é um bloco multi-linha não parseável, exatamente o problema
+que este trabalho existe para eliminar.
+
 Como este sink é a única saída estruturada de produção, ele não pode perder log:
 `json.dumps` roda com `default=str`, e o corpo inteiro fica dentro de
 `try`/`except`. Se ainda assim falhar, o `except` emite uma linha JSON mínima
