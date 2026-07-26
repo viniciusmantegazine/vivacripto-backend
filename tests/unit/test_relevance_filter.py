@@ -185,3 +185,34 @@ def test_nao_descarta_noticia_do_tema(filtro, titulo, resumo):
 def test_noticia_sem_campo_nenhum_passa(filtro):
     """Dict vazio nao pode virar descarte silencioso."""
     assert filtro.rejection_reason({}) is None
+
+
+# --- falha abre ----------------------------------------------------------
+
+def test_erro_interno_deixa_passar(filtro):
+    """
+    Assimetria: descartar noticia real e o erro caro, porque o leitor nunca a
+    ve e ninguem percebe. Artigo fora de tema e visivel e removivel.
+    """
+    class ExplodeAoBuscar:
+        def search(self, _texto):
+            raise RuntimeError("regex engine morreu")
+
+    filtro._off_beat = ExplodeAoBuscar()
+
+    assert filtro.rejection_reason({"title": "Nvidia lanca GPU nova", "description": ""}) is None
+
+
+def test_vocabulario_invalido_desativa_o_filtro(monkeypatch):
+    """
+    Padrao quebrado nao pode derrubar a construcao do NewsAggregator, que
+    levaria o pipeline inteiro junto.
+    """
+    monkeypatch.setattr(
+        RelevanceFilter, "OFF_BEAT_PATTERNS", (r"[nao-fecha",), raising=True
+    )
+
+    filtro_quebrado = RelevanceFilter()
+
+    assert filtro_quebrado._off_beat is None
+    assert filtro_quebrado.rejection_reason({"title": "Nvidia lanca GPU nova"}) is None
