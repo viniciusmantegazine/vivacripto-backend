@@ -92,4 +92,4 @@ async def test_cada_descarte_e_logado(aggregator):
         logger.remove(sink_id)
 
     texto = "".join(linhas)
-    assert "Nvidia" in texto
+    assert "casou 'AI labs'" in texto

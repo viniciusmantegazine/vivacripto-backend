@@ -12,7 +12,7 @@ Odos Protocol, HTX e Bitchat, porque vocabulário exaustivo de cripto não exist
 de forma estável — nasce nome novo toda semana.
 """
 import re
-from typing import Dict, Optional, Pattern, Sequence
+from typing import Dict, Optional, Sequence
 
 from loguru import logger
 
@@ -33,15 +33,24 @@ class RelevanceFilter:
         r"\bdeepseek\b", r"\bqwen\b", r"\bllama\b", r"\bchatgpt\b", r"\bgpt-?\d",
         r"\bclaude\b", r"\bglm\b", r"\bthinking machines\b",
         r"\bblack forest labs\b", r"\bmidjourney\b", r"\bopenrouter\b",
-        # Hardware e infraestrutura
-        r"\bnvidia\b", r"\bgpus?\b", r"\bdata ?centers?\b",
+        # NAO acrescentar substantivo geral de tecnologia aqui. Esta lista ja
+        # teve `nvidia`, `gpus?`, `data ?centers?`, `benchmarks?`,
+        # `quantum comput`, `robots?` e `self-driving`. Ablacao leave-one-out
+        # contra o feed vivo: os sete custavam ZERO descartes, juntos ou
+        # separados, e derrubavam noticia legitima de cripto —
+        # "Riot Platforms converts Texas data center to high-performance
+        # compute" (minerador de bitcoin), "Fed holds benchmark rate steady",
+        # "A16z leads round in decentralized GPU marketplace". O pivo de
+        # minerador para data center de IA e pauta central de cripto e nao
+        # carrega termo nenhum do veto.
+        #
+        # O criterio desta lista e: NOME PROPRIO de laboratorio/modelo de IA,
+        # ou jargao especifico de IA. Nunca substantivo que cripto tambem usa.
         # Jargão de IA
         r"\bai (model|lab|labs|startup|safety|agent|agents|kill switch)\b",
         r"\bllms?\b", r"\blarge language model", r"\bchatbot",
         r"\b(image|video|frontier|open-weight) models?\b",
-        r"\bopen-?source ai\b", r"\bbenchmarks?\b",
-        # Outras editorias
-        r"\brobots?\b", r"\bself-driving\b", r"\bquantum comput",
+        r"\bopen-?source ai\b",
     )
 
     # Veto. Precisa ser ESPECÍFICA: moeda nomeada, ticker, exchange nomeada,
@@ -86,7 +95,7 @@ class RelevanceFilter:
         )
 
     @staticmethod
-    def _compile(patterns: Sequence[str], nome: str) -> Optional[Pattern[str]]:
+    def _compile(patterns: Sequence[str], nome: str) -> Optional["re.Pattern[str]"]:
         """
         Compila o vocabulário. Padrão inválido desativa o filtro em vez de
         derrubar a construção do NewsAggregator — e com ele o pipeline inteiro.

@@ -60,7 +60,7 @@ FORA_DE_TEMA = [
         "Twenty-five companies signed a letter defending open-weight models days "
         "after a Chinese AI helped Hugging Face survive a hack triggered by "
         "OpenAI's own systems.",
-        "Nvidia",
+        "Open-Source AI",
     ),
     # Este passou porque a OFF_BEAT nao tinha nome proprio de laboratorio:
     # "Chinese AI" e "Chinese model GLM 5.2" nao casavam com padrao nenhum.
@@ -113,7 +113,9 @@ def test_nenhuma_virgula_esquecida_no_vocabulario(vocabulario):
     nenhum outro teste percebe.
     """
     for padrao in vocabulario:
-        assert "\\b\\b" not in padrao, f"virgula esquecida perto de: {padrao}"
+        assert padrao.startswith(r"\b"), f"padrao nao comeca com \\b: {padrao}"
+        miolo = padrao[2:-2] if padrao.endswith(r"\b") else padrao[2:]
+        assert r"\b" not in miolo, f"virgula esquecida perto de: {padrao}"
 
 
 # Itens reais que DEVEM passar. Metade fala de IA, mas o sujeito e cripto.
@@ -167,6 +169,16 @@ DENTRO_DO_TEMA = [
         "entities “providing crypto-assets services or payment services“ in "
         "defiance of the EU’s measures against Russia.",
     ),
+    # Estas seis NAO vem do feed: sao reconstrucoes das classes de historia que
+    # o vocabulario comia antes da ablacao (minerador virando data center de
+    # IA, macro do Fed, DePIN de GPU). Ficam como regressao — se alguem
+    # reintroduzir substantivo geral de tecnologia na OFF_BEAT, caem de novo.
+    ("Riot Platforms converts Texas data center to high-performance compute", ""),
+    ("Hut 8 announces 300MW data center expansion in Alberta", ""),
+    ("TeraWulf secures $3B financing for AI data centers", ""),
+    ("Fed holds benchmark rate steady as risk assets rally", ""),
+    ("A16z leads round in decentralized GPU marketplace", ""),
+    ("Nvidia earnings beat sends risk assets higher", ""),
 ]
 
 

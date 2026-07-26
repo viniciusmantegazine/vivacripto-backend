@@ -141,7 +141,7 @@ class NewsAggregator:
                 continue
             logger.warning(
                 f"Fora de tema (casou '{termo}', sem sinal de cripto): "
-                f"[{news.get('source', '')}] {news.get('title', '')[:80]}"
+                f"[{str(news.get('source') or '')}] {str(news.get('title') or '')[:80]}"
             )
 
         descartadas = len(news_list) - len(mantidas)
