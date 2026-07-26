@@ -512,3 +512,41 @@ pytest -v --tb=short
 9. **Sempre teste com `DEBUG=false` antes de deploy**: Validações de segurança só rodam em produção.
 
 10. **Os comentários no código estão em português**: Toda a lógica de negócio está bem documentada nos próprios arquivos.
+
+---
+
+## Decisão pendente: o que `UPDATE_EXISTING` deveria fazer
+
+Quando o `DuplicateDetector` decide `UPDATE_EXISTING`, o caminho vivo
+(`ArticlePublisher.update_article`) **sobrescreve** o corpo do post com o
+artigo novo. Não mescla, não guarda histórico.
+
+O código continha uma implementação alternativa, mais rica, em
+`DuplicateDetector.process_assignment` — método sem nenhum consumidor, removido
+em 2026-07-26. O que ela fazia, registrado aqui porque a decisão de qual
+comportamento é o certo continua aberta:
+
+1. **Anexava com marcador de fonte** em vez de sobrescrever:
+   `conteudo += f"\n\n[Atualização - {fonte}]\n{novo_conteudo}"`
+2. **Guardava histórico** em `historico_atualizacoes`: timestamp, tipo da
+   atualização, conteúdo adicionado, fonte e resumo da mudança. O campo NÃO
+   existe no modelo do banco — `deduplication/repository.py` tem o comentário
+   "Será implementado quando o campo for adicionado ao modelo".
+3. **Tinha guarda de idempotência**: só anexava se o conteúdo novo já não
+   estivesse presente.
+
+**Nenhuma das duas abordagens é claramente melhor:**
+
+| | Sobrescrever (vivo) | Anexar (intenção original) |
+|---|---|---|
+| Resultado | um artigo coerente | dois artigos de 700-1500 palavras concatenados |
+| Perda | o texto original é destruído | nada se perde |
+| Problema | perde a cobertura anterior | redundante, e estoura o limite de 1500 palavras do validador — que não é reexecutado em update |
+
+Uma terceira via seria regerar um artigo mesclado, ao custo de mais uma chamada
+de LLM.
+
+**Ao decidir, considere junto:** o threshold do detector está em 0.80 e não
+dispara (ver a seção sobre isso), então hoje o caminho de update quase nunca
+roda. Corrigir o threshold aumenta a frequência disso e torna a escolha mais
+urgente.
