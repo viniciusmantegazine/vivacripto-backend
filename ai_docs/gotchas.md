@@ -569,7 +569,29 @@ casou `Nvidia` e `Open-Source AI` na OFF_BEAT, e mesmo assim passou — uma
 palavra que qualquer setor usa anulou dois sinais corretos. Também proibidos:
 `protocol`, `exchange`, `treasury`, `node`, `bridge`, `ledger`, `circle`, `ada`.
 
-**2. Não use `\bai\b` solto na lista de outra editoria.**
+**2. Não ponha substantivo geral de tecnologia na `OFF_BEAT_PATTERNS`.**
+
+Esta é a mesma classe de erro da regra 1, na lista onde o custo é **descartar**
+em vez de deixar passar — ou seja, a direção cara. A lista já teve `nvidia`,
+`gpus?`, `data ?centers?`, `benchmarks?`, `quantum comput`, `robots?` e
+`self-driving`. Ablação leave-one-out contra o feed vivo: os sete custavam
+**zero** descartes, juntos ou separados, e derrubavam notícia legítima:
+
+    data center  ->  Riot Platforms converts Texas data center to high-performance compute
+    data center  ->  Hut 8 announces 300MW data center expansion in Alberta
+    benchmark    ->  Fed holds benchmark rate steady as risk assets rally
+    GPU          ->  A16z leads round in decentralized GPU marketplace
+
+Riot e Hut 8 são mineradores de bitcoin. O pivô de minerador para data center
+de IA é pauta central de negócio cripto, e esses títulos não carregam nenhum
+termo do veto — então o veto não salva. O item equivalente do Galaxy sobrevivia
+só porque `galaxy` por acaso estava na lista de cripto: frágil por acidente, não
+por desenho.
+
+**O critério da `OFF_BEAT_PATTERNS` é: nome próprio de laboratório ou modelo de
+IA, ou jargão específico de IA. Nunca substantivo que cripto também usa.**
+
+**3. Não use `\bai\b` solto na lista de outra editoria.**
 
 Matéria de cripto cita IA o tempo todo ("Is the AI-to-crypto rotation
 underway?", "Franklin Templeton Says Agentic AI Is Crypto's Killer Use Case").
