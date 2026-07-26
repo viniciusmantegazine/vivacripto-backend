@@ -114,3 +114,74 @@ def test_nenhuma_virgula_esquecida_no_vocabulario(vocabulario):
     """
     for padrao in vocabulario:
         assert "\\b\\b" not in padrao, f"virgula esquecida perto de: {padrao}"
+
+
+# Itens reais que DEVEM passar. Metade fala de IA, mas o sujeito e cripto.
+# A decisao editorial e: criterio e o sujeito da noticia.
+DENTRO_DO_TEMA = [
+    # Worldcoin/World Network: projeto de cripto do Sam Altman
+    (
+        "Sam Altman-backed World Network secures $52.5 million in fresh funding "
+        "to fight online AI deepfakes",
+        "",
+    ),
+    # Casa 'AI agents' na OFF_BEAT — passa pelo veto ('Pantera', 'token sale')
+    (
+        "World Foundation Raises $52.5M to Scale Sam Altman’s ‘Proof of Human’ ID",
+        "Pantera Capital led the one-year locked token sale, joined by Bain "
+        "Capital Crypto, as World scales its ID network for AI agents.",
+    ),
+    (
+        "Bitcoin OG selling eases as dormant BTC movement hits 4-year low: Galaxy",
+        "Dormant BTC activity fell to its lowest level since Q3 2022, suggesting "
+        "long-term holders have slowed distribution after heavy profit-taking.",
+    ),
+    (
+        "Bitcoin treasury companies sell up, repay debt, pivot to AI as share "
+        "prices collapse",
+        "",
+    ),
+    (
+        "Crypto Biz: Is the AI-to-crypto rotation underway?",
+        "Bitcoin ETF inflows, cooling AI momentum and potential regulatory "
+        "progress under the CLARITY Act are fueling speculation that capital is "
+        "rotating back into crypto.",
+    ),
+    (
+        "Franklin Templeton Says Agentic AI Is Crypto's 'Killer Use Case'",
+        "The asset manager argues that AI software capable of paying for things "
+        "autonomously will need blockchain rails to work—and that most investors "
+        "aren't positioned for it.",
+    ),
+    # Os tres abaixo sao itens que a allowlist original PERDEU. Ficam como
+    # regressao: se alguem trocar o denylist por allowlist, eles caem de novo.
+    ("Shiba Inu surges 36% as South Korean traders fuel mystery rally", ""),
+    (
+        "Odos Protocol to shut down, gives users until July 30 to withdraw assets",
+        "Odos Protocol will shut down on July 30, giving users one week to "
+        "withdraw assets. The team did not provide a reason for the decision.",
+    ),
+    (
+        "EU authorities include HTX exchange in Russian sanctions",
+        "The exchange, already sanctioned by the UK, is now on a list of 18 "
+        "entities “providing crypto-assets services or payment services“ in "
+        "defiance of the EU’s measures against Russia.",
+    ),
+]
+
+
+@pytest.mark.parametrize("titulo,resumo", DENTRO_DO_TEMA)
+def test_nao_descarta_noticia_do_tema(filtro, titulo, resumo):
+    """
+    Trava a decisao editorial: empresa de cripto tratando de IA e pauta.
+    Falha aqui significa que o vocabulario ficou estrito demais e esta
+    comendo noticia legitima.
+    """
+    termo = filtro.rejection_reason({"title": titulo, "description": resumo})
+
+    assert termo is None, f"nao deveria descartar (casou {termo!r}): {titulo}"
+
+
+def test_noticia_sem_campo_nenhum_passa(filtro):
+    """Dict vazio nao pode virar descarte silencioso."""
+    assert filtro.rejection_reason({}) is None
