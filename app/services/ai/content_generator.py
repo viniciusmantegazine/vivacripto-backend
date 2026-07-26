@@ -155,6 +155,19 @@ meta_description — alvo 140 a 160 caracteres (limite absoluto: 120 a 180).
      (keyword stuffing)
 </saida_json>"""
 
+    # Seção de dados de mercado. Condicional: só entra quando o pipeline
+    # conseguiu coletar. O "apenas se pertinente" evita que o modelo enfie
+    # preço numa notícia de regulação só porque o número está ali.
+    MARKET_DATA_BLOCK = """
+<dados_de_mercado>
+Dados VERIFICADOS de mercado, coletados em tempo real. São fonte válida para
+citar números — use-os apenas se forem pertinentes ao fato noticiado, e deixe
+claro que se referem ao momento da publicação.
+
+{market_data}
+</dados_de_mercado>
+"""
+
     # Corpo do prompt do artigo. Copiado da f-string de _generate_content e
     # convertido em template com campos nomeados, para servir à chamada única.
     # A seção <output> antiga NÃO vem: ela pedia "APENAS o artigo em Markdown",
@@ -353,9 +366,10 @@ NUNCA:
 🚫 PROIBIÇÕES ABSOLUTAS - VIOLAÇÃO RESULTA EM REJEIÇÃO:
 
 1. **DADOS INVENTADOS:**
-   - NUNCA invente preços, porcentagens, datas, valores ou estatísticas que NÃO estejam EXPLICITAMENTE na fonte fornecida.
-   - Se a fonte disser "Bitcoin subiu", NÃO escreva "Bitcoin subiu 5,3%" ou "atingiu US$ 70.000".
-   - Quando não houver dados específicos, use termos como "registrou alta", "apresentou valorização", "sofreu queda".
+   - NUNCA invente preços, porcentagens, datas, valores ou estatísticas que NÃO estejam EXPLICITAMENTE na fonte fornecida OU na seção <dados_de_mercado>.
+   - A seção <dados_de_mercado>, quando presente, contém dados VERIFICADOS de mercado em tempo real. Pode e DEVE citá-los quando forem pertinentes ao fato noticiado, sempre deixando claro que são dados de mercado do momento.
+   - Se a fonte disser "Bitcoin subiu" e não houver <dados_de_mercado>, NÃO escreva "Bitcoin subiu 5,3%" ou "atingiu US$ 70.000".
+   - Sem dados específicos, use termos como "registrou alta", "apresentou valorização", "sofreu queda".
 
 2. **CONSELHO FINANCEIRO (NFA - Not Financial Advice):**
    NUNCA use linguagem que possa ser interpretada como recomendação de investimento:
@@ -478,7 +492,12 @@ NUNCA:
             logger.info(f"Gerando artigo para: {title[:50]}... (categoria: {category})")
 
             dados = await self._generate_article_json(
-                title, description, source, category, correction_hint
+                title,
+                description,
+                source,
+                category,
+                correction_hint,
+                market_data=source_news.get("market_data"),
             )
             if not dados:
                 logger.warning("Falha ao gerar artigo (JSON inaproveitável)")
@@ -533,6 +552,7 @@ NUNCA:
         category: str,
         keyword: str,
         correction_hint: Optional[str] = None,
+        market_data: Optional[str] = None,
     ) -> str:
         """
         Monta o user prompt da chamada única.
@@ -541,6 +561,9 @@ NUNCA:
         (<dados_da_fonte> até <validacao_obrigatoria>), acrescenta o contrato
         de saída no lugar do <output> antigo — que pedia "APENAS o artigo em
         Markdown", incompatível com JSON — e anexa o bloco de correção em retry.
+
+        `market_data` entra logo após <dados_da_fonte>: é material de fonte, e
+        fica antes das instruções de tarefa.
         """
         cat_config = self._get_category_config(category)
         base = self._ARTICLE_PROMPT_TEMPLATE.format(
@@ -551,6 +574,15 @@ NUNCA:
             foco=cat_config["foco"],
             keyword=keyword,
         )
+
+        if market_data:
+            marcador = "</dados_da_fonte>"
+            base = base.replace(
+                marcador,
+                marcador + "\n" + self.MARKET_DATA_BLOCK.format(market_data=market_data),
+                1,
+            )
+
         prompt = base + self.JSON_CONTRACT_BLOCK.format(keyword=keyword)
 
         if correction_hint:
@@ -573,6 +605,7 @@ NUNCA:
         source: str,
         category: str = "default",
         correction_hint: Optional[str] = None,
+        market_data: Optional[str] = None,
     ) -> Optional[Dict]:
         """
         Gera o artigo completo — conteúdo, título, excerpt e meta — numa
@@ -591,7 +624,7 @@ NUNCA:
         keyword = cat_config["keywords"][0] if cat_config["keywords"] else "criptomoeda"
 
         user_prompt = self._build_article_prompt(
-            title, description, source, category, keyword, correction_hint
+            title, description, source, category, keyword, correction_hint, market_data
         )
         full_prompt = f"{self.SYSTEM_PROMPT}\n\n{user_prompt}"
 

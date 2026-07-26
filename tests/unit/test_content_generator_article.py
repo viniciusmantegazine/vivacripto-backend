@@ -37,10 +37,18 @@ def _news(**extra):
 def _gen_com_json(monkeypatch, payload, capturado=None):
     gen = ContentGenerator()
 
-    async def fake(title, description, source, category="default", correction_hint=None):
+    async def fake(
+        title,
+        description,
+        source,
+        category="default",
+        correction_hint=None,
+        market_data=None,
+    ):
         if capturado is not None:
             capturado["description"] = description
             capturado["correction_hint"] = correction_hint
+            capturado["market_data"] = market_data
         return payload
 
     monkeypatch.setattr(gen, "_generate_article_json", fake)
@@ -139,3 +147,28 @@ async def test_correction_hint_e_repassado(monkeypatch):
     await gen.generate_article(_news(), correction_hint="word count baixo")
 
     assert capturado["correction_hint"] == "word count baixo"
+
+
+@pytest.mark.asyncio
+async def test_market_data_de_source_news_e_repassado(monkeypatch):
+    """
+    O pipeline injeta em source_news["market_data"] (mesmo padrão do
+    full_text); generate_article precisa repassar ao gerador.
+    """
+    capturado = {}
+    gen = _gen_com_json(monkeypatch, _json_do_llm(), capturado)
+
+    await gen.generate_article(_news(market_data="PREÇOS: BTC US$ 64.640"))
+
+    assert capturado["market_data"] == "PREÇOS: BTC US$ 64.640"
+
+
+@pytest.mark.asyncio
+async def test_sem_market_data_repassa_none(monkeypatch):
+    """Ausência do dado não pode virar string vazia nem quebrar a chamada."""
+    capturado = {}
+    gen = _gen_com_json(monkeypatch, _json_do_llm(), capturado)
+
+    await gen.generate_article(_news())
+
+    assert capturado["market_data"] is None
