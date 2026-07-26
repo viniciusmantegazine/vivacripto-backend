@@ -129,18 +129,24 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 
 ---
 
-### 6. Testes — UUID PostgreSQL vs SQLite
+### 6. Testes — UUID PostgreSQL vs SQLite ✅ RESOLVIDO (2026-07-26)
 
-**Sintoma**: Qualquer teste que use a fixture `db_session` quebra com:
+**Sintoma (histórico)**: Qualquer teste que usasse a fixture `db_session` quebrava com:
 ```
 sqlalchemy.exc.CompileError: Compiler can't render element of type UUID
 ```
 
-**Causa**: `app/db/models.py` importa `UUID` de `sqlalchemy.dialects.postgresql` (tipo Postgres-only). Os testes rodam SQLite in-memory que não compila esse tipo.
+**Causa**: `app/db/models.py` importava `UUID`/`JSONB` de `sqlalchemy.dialects.postgresql` (tipos Postgres-only). Os testes rodam SQLite in-memory, que não compila esses tipos. 47 testes morriam antes de executar uma linha.
 
-**Solução atual**: Testes do endpoint de airdrop **mockam `AsyncSession`** em vez de usar `db_session` real. Veja `tests/integration/test_api_airdrops_*.py` que usam `MagicMock()` no `dependency_overrides[get_db]`.
+**Solução aplicada**: `app/db/types.py` define os TypeDecorators portáteis:
+- `GUID` — `UUID` nativo no Postgres, `CHAR(36)` no resto. Sempre devolve `uuid.UUID`, aceita `uuid.UUID` ou `str` na entrada.
+- `PortableJSONB` — `JSONB` no Postgres, `JSON` no resto.
 
-**Solução definitiva (não aplicada ainda)**: Trocar `from sqlalchemy.dialects.postgresql import UUID` por um `TypeDecorator` que use `CHAR(36)` em SQLite e `UUID` em Postgres. ~49 testes existentes destravariam.
+`models.py` usa esses tipos. **As migrations Alembic seguem declarando `postgresql.UUID`/`JSONB` direto** — rodam só contra Postgres, não precisam (nem devem) ser portáteis.
+
+**Ao escrever testes novos**: `db_session` funciona normalmente, use-a. O padrão de mockar `AsyncSession` (ainda presente em `tests/integration/test_api_airdrops_*.py` e em vários testes deste repo) continua válido para testes de unidade que não querem tocar banco, mas não é mais uma obrigação imposta por este gotcha.
+
+**Lição**: enquanto os 47 testes ficaram cegos, dois bugs se esconderam atrás deles — `httpx 0.28` quebrando a fixture `api_client` (removeu `AsyncClient(app=...)`, exige `ASGITransport`) e 9 chamadas `PostCreate` sem o campo obrigatório `excerpt`. Teste que não roda não é rede de segurança; é passivo.
 
 ---
 
