@@ -4,7 +4,7 @@ Orquestra todo o fluxo de automação de notícias.
 Utiliza serviços especializados para cada etapa do processo.
 """
 import traceback
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict
 from uuid import uuid4
 
@@ -28,6 +28,7 @@ from app.services.deduplication import (
     NewsAssignment,
     PostRepositoryImpl,
 )
+from app.services.sources.article_extractor import ArticleExtractor
 from app.services.sources.news_aggregator import NewsAggregator
 from app.services.ai.category_classifier import CategoryClassifier
 
@@ -63,6 +64,7 @@ class NewsPipeline:
         )
         self.publisher = ArticlePublisher(self.image_generator)
         self.category_classifier = CategoryClassifier()
+        self.article_extractor = ArticleExtractor()
     
     async def run(self, db: AsyncSession) -> Dict:
         """
@@ -147,9 +149,28 @@ class NewsPipeline:
                 metrics.record_error(f"Collection failed: {e}")
                 raise
 
+            # Pré-filtro: descarta notícias cuja URL já virou post nos
+            # últimos 7 dias. A coleta olha 24h para trás e o cron roda
+            # várias vezes ao dia — sem isso, a mesma notícia era regerada
+            # (4 chamadas de LLM) em cada run só para o dedup descartá-la.
+            if news_items:
+                urls = [n["url"] for n in news_items if n.get("url")]
+                # naive p/ TIMESTAMP WITHOUT TIME ZONE (ver ai_docs/gotchas.md)
+                since = datetime.utcnow() - timedelta(days=7)
+                seen_urls = await crud_post.get_existing_source_urls(db, urls, since)
+                if seen_urls:
+                    news_items = [
+                        n for n in news_items if n.get("url") not in seen_urls
+                    ]
+                    report["skipped_already_processed"] = len(seen_urls)
+                    logger.info(
+                        f"Pré-filtro de URL: {len(seen_urls)} notícia(s) já "
+                        f"processada(s) removidas da fila"
+                    )
+
             if not news_items:
                 report["status"] = "completed"
-                report["message"] = "Nenhuma notícia nova encontrada"
+                report["message"] = "Nenhuma notícia nova para processar"
                 logger.info(report["message"])
                 metrics.finalize()
                 metrics.log_summary()
@@ -167,20 +188,46 @@ class NewsPipeline:
             )
 
             remaining_slots = await self._get_remaining_daily_slots(db)
-            posts_to_process = min(self.POSTS_PER_EXECUTION, remaining_slots, len(news_items))
-            logger.info(f"Processando até {posts_to_process} notícia(s) (slots disponíveis: {remaining_slots})")
+            target = min(self.POSTS_PER_EXECUTION, remaining_slots)
+            # Falhas e duplicatas não consomem a meta: tentamos as próximas
+            # da fila (ordenada por relevância) até atingir o alvo, com teto
+            # de tentativas para limitar custo de LLM em runs problemáticos.
+            max_attempts = min(len(news_items), target * 3)
+            logger.info(
+                f"Meta: {target} post(s) | fila: {len(news_items)} | "
+                f"teto de tentativas: {max_attempts}"
+            )
 
             processed_count = 0
+            attempts = 0
 
-            for i, source_news in enumerate(news_items[:posts_to_process], 1):
+            for source_news in news_items:
+                if processed_count >= target or attempts >= max_attempts:
+                    break
+                attempts += 1
                 try:
-                    logger.info(f"\n--- Notícia {i}/{posts_to_process} ---")
+                    logger.info(
+                        f"\n--- Tentativa {attempts}/{max_attempts} "
+                        f"(meta {processed_count}/{target}) ---"
+                    )
                     logger.info(f"Título: {source_news.get('title', '')[:80]}...")
+
+                    # Texto completo da matéria original: o resumo de RSS tem
+                    # 1-2 frases — insuficiente para 700+ palavras sem
+                    # alucinação. Falha => segue só com o resumo.
+                    full_text = await self.article_extractor.extract(
+                        source_news.get("url", "")
+                    )
+                    if full_text:
+                        source_news["full_text"] = full_text
+                        logger.info(f"Texto completo extraído ({len(full_text)} chars)")
 
                     # Pré-classificar categoria para ajuste de tom na geração
                     title = source_news.get('title', '')
                     description = source_news.get('description', '')
-                    category = self.category_classifier.classify(title, description, "")
+                    category = self.category_classifier.classify(
+                        title, description, source_news.get("full_text", "")
+                    )
                     logger.info(f"Categoria detectada: {category}")
 
                     # Gerar artigo com categoria para ajuste de tom (com métricas)
@@ -228,7 +275,7 @@ class NewsPipeline:
                         titulo=article["title"],
                         resumo=article.get("excerpt", ""),
                         conteudo=article["content_markdown"],
-                        fonte=source_news.get("source_name", ""),
+                        fonte=source_news.get("source", ""),
                         timestamp=datetime.now(timezone.utc).isoformat()
                     )
 
