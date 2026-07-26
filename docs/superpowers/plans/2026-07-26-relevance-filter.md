@@ -57,10 +57,12 @@ Criar `tests/unit/test_relevance_filter.py`:
 """
 Testes do RelevanceFilter.
 
-A fixture usa titulo e resumo REAIS, capturados dos feeds em 2026-07-26.
-Texto sintetico nao serve aqui: o filtro decide por vocabulario, e foi
-exatamente o resumo (nao o titulo) que causou as duas falhas da primeira
-versao do vocabulario.
+A fixture usa titulo e resumo REAIS, capturados dos feeds em 2026-07-26. O
+resumo importa principalmente na direcao negativa: e ele que o veto de cripto
+le, e uma implementacao que ignorasse `description` por completo passaria
+despercebida nos testes de descarte (os 7 itens descartam pelo titulo
+sozinho) se nao fosse por `test_le_o_resumo_e_nao_so_o_titulo`, que existe
+so para fechar esse buraco.
 """
 import pytest
 
@@ -80,27 +82,32 @@ FORA_DE_TEMA = [
         "After two years of silence from Thinking Machines Lab, Murati's debut "
         "model is out and on OpenRouter. The MCP score is genuinely impressive. "
         "The price-to-performance math is more complicated.",
+        "AI Model",
     ),
     (
         "What Is an AI Kill Switch and Why Do US Lawmakers Want One?",
         "The AI Kill Switch Act would let Homeland Security order frontier AI "
         "throttled or shut down, with fines up to $20 million a day for defying it.",
+        "AI Kill Switch",
     ),
     (
         "Claude Opus 5 Outscores Fable 5 on Most Benchmarks—At Half the Price",
         "Anthropic's new everyday model undercuts its own frontier product on "
         "cost and beats it almost everywhere that counts.",
+        "Claude",
     ),
     (
         "Black Forest Labs Unveils FLUX 3 AI: Ditches Stills for Video—And Robot Hands",
         "FLUX 3 is the German AI lab’s first video model, and the same system is "
         "already teaching robots to work an Audi assembly line.",
+        "Black Forest Labs",
     ),
     (
         "Alibaba's New Qwen Image 3 AI Wants to Be Useful, Not Just Pretty",
         "Qwen Image 3.0 generates dense newspapers and infographic grids in one "
         "shot and renders text down to 10 pixels. The catch: no benchmarks, no "
         "open weights.",
+        "Qwen",
     ),
     # Este passou na primeira versao do vocabulario porque 'hack', no RESUMO,
     # estava no veto de cripto e anulou 'Nvidia' + 'Open-Source AI'.
@@ -109,6 +116,7 @@ FORA_DE_TEMA = [
         "Twenty-five companies signed a letter defending open-weight models days "
         "after a Chinese AI helped Hugging Face survive a hack triggered by "
         "OpenAI's own systems.",
+        "Nvidia",
     ),
     # Este passou porque a OFF_BEAT nao tinha nome proprio de laboratorio:
     # "Chinese AI" e "Chinese model GLM 5.2" nao casavam com padrao nenhum.
@@ -117,26 +125,51 @@ FORA_DE_TEMA = [
         "When American commercial AI refused to help investigate the breach, "
         "Hugging Face ran Chinese model GLM 5.2 locally. Its CEO now says "
         "there's an important lesson in this.",
+        "Hugging Face",
     ),
 ]
 
 
-@pytest.mark.parametrize("titulo,resumo", FORA_DE_TEMA)
-def test_descarta_noticia_de_outra_editoria(filtro, titulo, resumo):
-    termo = filtro.check({"title": titulo, "description": resumo})
+@pytest.mark.parametrize("titulo,resumo,esperado", FORA_DE_TEMA)
+def test_descarta_noticia_de_outra_editoria(filtro, titulo, resumo, esperado):
+    termo = filtro.rejection_reason({"title": titulo, "description": resumo})
 
     assert termo is not None, f"deveria descartar: {titulo}"
 
 
-@pytest.mark.parametrize("titulo,resumo", FORA_DE_TEMA)
-def test_termo_devolvido_aparece_no_texto(filtro, titulo, resumo):
+@pytest.mark.parametrize("titulo,resumo,esperado", FORA_DE_TEMA)
+def test_devolve_o_termo_que_causou_o_descarte(filtro, titulo, resumo, esperado):
     """
-    O valor devolvido vai para o log de descarte. Se nao for um trecho real do
-    texto, a linha de log nao explica nada e a calibracao fica cega.
+    Igualdade e nao 'e substring': o valor devolvido vai para o log de
+    descarte, e documentar QUAL sinal disparou em cada item pega o
+    descarte-pelo-motivo-errado, que a versao com substring nao ve.
     """
-    termo = filtro.check({"title": titulo, "description": resumo})
+    assert filtro.rejection_reason({"title": titulo, "description": resumo}) == esperado
 
-    assert termo.lower() in f"{titulo} {resumo}".lower()
+
+def test_le_o_resumo_e_nao_so_o_titulo(filtro):
+    """
+    Sem isto, uma implementacao que ignorasse `description` por completo
+    passaria em todos os outros testes: os 7 fixtures descartam pelo
+    titulo sozinho.
+    """
+    _, resumo, _ = FORA_DE_TEMA[0]
+
+    assert filtro.rejection_reason({"title": "", "description": resumo}) is not None
+
+
+@pytest.mark.parametrize(
+    "vocabulario",
+    [RelevanceFilter.OFF_BEAT_PATTERNS, RelevanceFilter.CRYPTO_SIGNAL_PATTERNS],
+)
+def test_nenhuma_virgula_esquecida_no_vocabulario(vocabulario):
+    """
+    Virgula esquecida faz o Python concatenar duas entradas vizinhas em
+    algo como r"\\bnvidia\\b\\bgpus?\\b" — casa com nada, compila sem erro e
+    nenhum outro teste percebe.
+    """
+    for padrao in vocabulario:
+        assert "\\b\\b" not in padrao, f"virgula esquecida perto de: {padrao}"
 ```
 
 - [ ] **Step 2: Rodar e verificar que falha**
@@ -163,7 +196,7 @@ Odos Protocol, HTX e Bitchat, porque vocabulário exaustivo de cripto não exist
 de forma estável — nasce nome novo toda semana.
 """
 import re
-from typing import Dict, Optional
+from typing import Dict, Optional, Pattern, Sequence
 
 from loguru import logger
 
@@ -237,21 +270,21 @@ class RelevanceFilter:
         )
 
     @staticmethod
-    def _compile(patterns, nome: str):
+    def _compile(patterns: Sequence[str], nome: str) -> Optional[Pattern[str]]:
         """
         Compila o vocabulário. Padrão inválido desativa o filtro em vez de
         derrubar a construção do NewsAggregator — e com ele o pipeline inteiro.
         """
         try:
             return re.compile("|".join(patterns), re.IGNORECASE)
-        except re.error as e:
+        except Exception as e:
             logger.error(
                 f"Vocabulário {nome} inválido ({e}); "
                 f"filtro de relevância DESATIVADO, tudo passa"
             )
             return None
 
-    def check(self, news: Dict) -> Optional[str]:
+    def rejection_reason(self, news: Dict) -> Optional[str]:
         """
         Devolve o termo de outra editoria que motivou o descarte, ou None se a
         notícia for relevante.
@@ -259,6 +292,10 @@ class RelevanceFilter:
         Uma primitiva só, devolvendo decisão e motivo juntos: o chamador testa
         `is None` e usa o valor na linha de log. Evita ter is_relevant() e
         reason() que podem divergir.
+
+        O chamador DEVE testar `is None`, nunca truthiness: um vocabulário
+        vazio compila para um casamento de largura zero, e o método pode
+        legitimamente devolver `''`.
         """
         try:
             if self._off_beat is None or self._crypto is None:
@@ -266,12 +303,12 @@ class RelevanceFilter:
 
             texto = f"{news.get('title', '')} {news.get('description', '')}"
 
-            fora = self._off_beat.search(texto)
-            if not fora:
+            off_beat_match = self._off_beat.search(texto)
+            if not off_beat_match:
                 return None
             if self._crypto.search(texto):
                 return None
-            return fora.group(0)
+            return off_beat_match.group(0)
 
         except Exception as e:
             # Falha ABRE. Mesma assimetria do threshold de deduplicação:
@@ -284,7 +321,7 @@ class RelevanceFilter:
 - [ ] **Step 4: Rodar e verificar que passa**
 
 Run: `python3 -m pytest tests/unit/test_relevance_filter.py -q`
-Expected: PASS, 14 passed (7 itens × 2 testes)
+Expected: PASS, 17 passed (7 itens × 2 testes + guard de resumo + 2 canários)
 
 - [ ] **Step 5: Commit**
 
@@ -370,20 +407,20 @@ def test_nao_descarta_noticia_do_tema(filtro, titulo, resumo):
     Falha aqui significa que o vocabulario ficou estrito demais e esta
     comendo noticia legitima.
     """
-    termo = filtro.check({"title": titulo, "description": resumo})
+    termo = filtro.rejection_reason({"title": titulo, "description": resumo})
 
     assert termo is None, f"nao deveria descartar (casou {termo!r}): {titulo}"
 
 
 def test_noticia_sem_campo_nenhum_passa(filtro):
     """Dict vazio nao pode virar descarte silencioso."""
-    assert filtro.check({}) is None
+    assert filtro.rejection_reason({}) is None
 ```
 
 - [ ] **Step 2: Rodar**
 
 Run: `python3 -m pytest tests/unit/test_relevance_filter.py -q`
-Expected: PASS, 24 passed.
+Expected: PASS, 27 passed (17 da Task 1 + 10 desta).
 
 Se algum item de `DENTRO_DO_TEMA` falhar, **não relaxe o teste**. O vocabulário
 é que está errado: tire o padrão responsável da `OFF_BEAT_PATTERNS`, ou
@@ -422,7 +459,7 @@ def test_erro_interno_deixa_passar(filtro):
 
     filtro._off_beat = ExplodeAoBuscar()
 
-    assert filtro.check({"title": "Nvidia lanca GPU nova", "description": ""}) is None
+    assert filtro.rejection_reason({"title": "Nvidia lanca GPU nova", "description": ""}) is None
 
 
 def test_vocabulario_invalido_desativa_o_filtro(monkeypatch):
@@ -437,13 +474,13 @@ def test_vocabulario_invalido_desativa_o_filtro(monkeypatch):
     filtro_quebrado = RelevanceFilter()
 
     assert filtro_quebrado._off_beat is None
-    assert filtro_quebrado.check({"title": "Nvidia lanca GPU nova"}) is None
+    assert filtro_quebrado.rejection_reason({"title": "Nvidia lanca GPU nova"}) is None
 ```
 
 - [ ] **Step 2: Rodar**
 
 Run: `python3 -m pytest tests/unit/test_relevance_filter.py -q`
-Expected: PASS, 26 passed.
+Expected: PASS, 29 passed (27 + 2 desta).
 
 - [ ] **Step 3: Commit**
 
@@ -625,7 +662,7 @@ Em `app/services/sources/news_aggregator.py`, acrescentar este método logo apó
         """
         mantidas = []
         for news in news_list:
-            termo = self.relevance_filter.check(news)
+            termo = self.relevance_filter.rejection_reason(news)
             if termo is None:
                 mantidas.append(news)
                 continue
@@ -651,8 +688,8 @@ Expected: PASS, 3 passed.
 - [ ] **Step 7: Rodar a suíte inteira**
 
 Run: `python3 -m pytest tests/ -q`
-Expected: PASS. O baseline antes desta task é 444 passed; agora devem ser 473
-(444 + 26 da Task 1-3 + 3 desta). Se algum teste **pré-existente** quebrar, é
+Expected: PASS. O baseline antes desta task é 444 passed; agora devem ser 476
+(444 + 29 das Tasks 1-3 + 3 desta). Se algum teste **pré-existente** quebrar, é
 sinal de que o filtro está comendo notícia usada como fixture em outro teste —
 investigue, não relaxe.
 
@@ -686,7 +723,7 @@ from app.services.sources.relevance_filter import RelevanceFilter
 async def main():
     itens = await RSSCollector().collect_all(hours_back=72)
     filtro = RelevanceFilter()
-    descartes = [(n, filtro.check(n)) for n in itens]
+    descartes = [(n, filtro.rejection_reason(n)) for n in itens]
     fora = [(n, t) for n, t in descartes if t is not None]
     print(f"fila: {len(itens)} | descartados: {len(fora)} ({100*len(fora)/max(len(itens),1):.1f}%)\n")
     print("=== CONFERIR NA MAO, UM POR UM ===")
@@ -697,6 +734,13 @@ async def main():
 asyncio.run(main())
 PY
 ```
+
+> **Resultado da calibração executada em 2026-07-26 (feed vivo, janela de 72h):**
+> 4 descartes em 87 itens (4,6%) — `AI Model`, `AI Kill Switch`, `Claude`,
+> `Nvidia`, todos do Decrypt e todos IA pura. Zero notícia legítima descartada,
+> nenhum ajuste de vocabulário necessário. Medição anterior sobre 110 itens
+> (janela maior) deu 7 descartes (6,4%), também limpos. Tempo do filtro: 1,64 ms
+> para 87 itens.
 
 - [ ] **Step 2: Conferir cada descarte na mão**
 
@@ -809,7 +853,7 @@ Após a Task 6, usar **superpowers:finishing-a-development-branch** na branch
 
 ## O que este plano deliberadamente NÃO faz
 
-- **Classificador LLM de relevância.** `RelevanceFilter.check` é a costura onde
+- **Classificador LLM de relevância.** `RelevanceFilter.rejection_reason` é a costura onde
   ele entraria. A decisão depende de medir em produção se o denylist basta.
 - **Fontes primárias (SEC, EDGAR, Ethereum Foundation).** Derrubado pela medição
   registrada na spec. EDGAR continua sendo o candidato real se o tema voltar.
