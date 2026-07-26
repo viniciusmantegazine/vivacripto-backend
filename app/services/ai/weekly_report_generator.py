@@ -50,9 +50,13 @@ class WeeklyReportGenerator:
     CLAUDE_MODEL = "claude-opus-5"
     CLAUDE_FALLBACK_MODEL = "claude-sonnet-5"
 
-    # Configurações de geração
-    MAX_TOKENS = 8192  # Relatórios longos precisam de mais tokens
-    TEMPERATURE = 0.7  # Um pouco mais criativo para análises
+    # Configurações de geração.
+    # 16000 e não 8192: nos modelos atuais o thinking vem ligado por padrão e
+    # divide este teto com o texto da resposta. Um relatório de 3000 palavras
+    # em português já consome ~4500 tokens sozinho.
+    # NÃO reintroduzir `temperature`/`top_p`/`top_k`: foram removidos da API
+    # nos modelos atuais e causam HTTP 400. O tom vive no system prompt.
+    MAX_TOKENS = 16000
 
     def __init__(self):
         """Inicializa o gerador de relatórios semanais"""
@@ -163,6 +167,35 @@ class WeeklyReportGenerator:
             logger.error(f"Erro ao gerar relatório semanal: {e}")
             return None
 
+    async def _call_claude(self, model: str, user_prompt: str) -> Optional[str]:
+        """
+        Faz UMA chamada ao Claude e devolve o texto do relatório.
+
+        Existe para desduplicar: o primário e o fallback tinham blocos de
+        chamada idênticos, então cada correção precisava ser aplicada duas
+        vezes — foi assim que os defeitos de parâmetro e de leitura da
+        resposta sobreviveram.
+
+        Usa streaming porque relatório longo + thinking é o caso clássico de
+        requisição não-streaming estourar timeout de HTTP. `get_final_message`
+        devolve a resposta completa, então quem chama não lida com eventos.
+
+        Devolve None quando não há texto utilizável (sem levantar exceção).
+        """
+        async with self.claude_client.messages.stream(
+            model=model,
+            max_tokens=self.MAX_TOKENS,
+            system=WEEKLY_REPORT_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_prompt}],
+        ) as stream:
+            message = await stream.get_final_message()
+
+        text = self._extract_text(message)
+        if not text:
+            logger.error(f"[Claude] {model} não retornou bloco de texto")
+            return None
+        return text
+
     def _extract_text(self, message) -> Optional[str]:
         """
         Extrai o texto da resposta do Claude.
@@ -210,50 +243,28 @@ REGRAS DE FORMATAÇÃO OBRIGATÓRIAS:
 
 Gere o relatório completo agora:"""
 
-        content = None
-
-        # Tentar Claude Opus primeiro
+        # Primário; em falha ou resposta sem texto, tenta o fallback.
         try:
             logger.info(f"[Claude] Gerando relatório com {self.CLAUDE_MODEL}...")
-
-            response = await self.claude_client.messages.create(
-                model=self.CLAUDE_MODEL,
-                max_tokens=self.MAX_TOKENS,
-                temperature=self.TEMPERATURE,
-                system=WEEKLY_REPORT_SYSTEM_PROMPT,
-                messages=[
-                    {"role": "user", "content": user_prompt}
-                ]
-            )
-
-            content = response.content[0].text.strip()
-            logger.info(f"[Claude] Relatório gerado com sucesso ({len(content)} chars)")
-
+            content = await self._call_claude(self.CLAUDE_MODEL, user_prompt)
+            if content:
+                logger.info(f"[Claude] Relatório gerado com sucesso ({len(content)} chars)")
+                return content
+            logger.warning("[Claude] Primário não produziu texto. Tentando fallback...")
         except Exception as e:
-            logger.warning(f"[Claude Opus] Falha: {e}. Tentando fallback...")
+            logger.warning(f"[Claude] Falha no primário: {e}. Tentando fallback...")
 
-            # Tentar fallback com Sonnet
-            try:
-                logger.info(f"[Claude] Tentando fallback com {self.CLAUDE_FALLBACK_MODEL}...")
-
-                response = await self.claude_client.messages.create(
-                    model=self.CLAUDE_FALLBACK_MODEL,
-                    max_tokens=self.MAX_TOKENS,
-                    temperature=self.TEMPERATURE,
-                    system=WEEKLY_REPORT_SYSTEM_PROMPT,
-                    messages=[
-                        {"role": "user", "content": user_prompt}
-                    ]
-                )
-
-                content = response.content[0].text.strip()
+        try:
+            logger.info(f"[Claude] Tentando fallback com {self.CLAUDE_FALLBACK_MODEL}...")
+            content = await self._call_claude(self.CLAUDE_FALLBACK_MODEL, user_prompt)
+            if content:
                 logger.info(f"[Claude Fallback] Relatório gerado com sucesso ({len(content)} chars)")
-
-            except Exception as e2:
-                logger.error(f"[Claude] Falha total na geração: {e2}")
-                return None
-
-        return content
+                return content
+            logger.error("[Claude] Fallback também não produziu texto")
+            return None
+        except Exception as e2:
+            logger.error(f"[Claude] Falha total na geração: {e2}")
+            return None
 
     async def _generate_title(self, content: str) -> str:
         """Retorna o título do relatório semanal com número da semana atual"""

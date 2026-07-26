@@ -76,3 +76,116 @@ def test_extract_text_sem_bloco_de_texto_retorna_none():
 
     assert gen._extract_text(_Mensagem([_Bloco("thinking", thinking="x")])) is None
     assert gen._extract_text(_Mensagem([])) is None
+
+
+class _StreamFalso:
+    """
+    Context manager async que imita `client.messages.stream(...)`.
+
+    Atenção: `stream()` NÃO é corrotina — devolve o context manager na hora.
+    Por isso o mock que o retorna é MagicMock, não AsyncMock.
+    """
+
+    def __init__(self, mensagem):
+        self._mensagem = mensagem
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return False
+
+    async def get_final_message(self):
+        return self._mensagem
+
+
+def _gerador_com_cliente(mensagens):
+    """
+    WeeklyReportGenerator com cliente Claude falso.
+
+    `mensagens` é a lista de respostas a devolver, uma por chamada (permite
+    testar o fallback). Um item que seja Exception é levantado.
+    """
+    gen = WeeklyReportGenerator()
+
+    chamadas = []
+
+    def stream(**kwargs):
+        chamadas.append(kwargs)
+        proxima = mensagens[len(chamadas) - 1]
+        if isinstance(proxima, Exception):
+            raise proxima
+        return _StreamFalso(proxima)
+
+    cliente = MagicMock()
+    cliente.messages = MagicMock()
+    cliente.messages.stream = MagicMock(side_effect=stream)
+
+    gen.claude_client = cliente
+    gen.claude_available = True
+    return gen, chamadas
+
+
+def _texto(conteudo="## Relatório\n\nCorpo do relatório."):
+    return _Mensagem([_Bloco("text", text=conteudo)])
+
+
+@pytest.fixture
+def sem_rede(monkeypatch):
+    """Neutraliza a coleta de dados de mercado (_generate_content faz rede)."""
+    monkeypatch.setattr(
+        "app.services.ai.market_data_collector.market_data_collector.collect_all",
+        AsyncMock(return_value="dados de mercado de teste"),
+    )
+
+
+@pytest.mark.asyncio
+async def test_nao_envia_parametros_removidos_pela_api(sem_rede):
+    """
+    Regressão crítica: `temperature` (e top_p/top_k) foram REMOVIDOS nos
+    modelos atuais — enviá-los é HTTP 400.
+    """
+    gen, chamadas = _gerador_com_cliente([_texto()])
+
+    await gen._generate_content()
+
+    assert chamadas, "nenhuma chamada ao Claude foi feita"
+    for kwargs in chamadas:
+        assert "temperature" not in kwargs
+        assert "top_p" not in kwargs
+        assert "top_k" not in kwargs
+
+
+@pytest.mark.asyncio
+async def test_usa_streaming_e_teto_de_tokens_ampliado(sem_rede):
+    """Streaming evita timeout; 16000 dá folga para thinking + texto longo."""
+    gen, chamadas = _gerador_com_cliente([_texto()])
+
+    await gen._generate_content()
+
+    assert chamadas[0]["max_tokens"] == 16000
+    assert chamadas[0]["model"] == WeeklyReportGenerator.CLAUDE_MODEL
+    # É messages.stream que precisa ter sido chamado, não messages.create.
+    # (MagicMock cria atributos sob demanda, então `messages.create` existiria
+    # mesmo sem ser configurado — a asserção abaixo é o que prova o caminho.)
+    gen.claude_client.messages.stream.assert_called()
+
+
+def test_temperature_removida_das_constantes():
+    """A constante TEMPERATURE não deve sobreviver ao refactor."""
+    assert not hasattr(WeeklyReportGenerator, "TEMPERATURE")
+
+
+@pytest.mark.asyncio
+async def test_fallback_dispara_quando_primario_levanta(sem_rede):
+    """Erro de rede/rate limit no primário deve cair no modelo de fallback."""
+    gen, chamadas = _gerador_com_cliente([
+        RuntimeError("500 overloaded"),
+        _texto("## Relatório do fallback\n\nCorpo."),
+    ])
+
+    resultado = await gen._generate_content()
+
+    assert resultado.startswith("## Relatório do fallback")
+    assert chamadas[0]["model"] == WeeklyReportGenerator.CLAUDE_MODEL
+    assert chamadas[1]["model"] == WeeklyReportGenerator.CLAUDE_FALLBACK_MODEL
