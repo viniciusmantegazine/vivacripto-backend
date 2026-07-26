@@ -29,9 +29,20 @@ class NewsAggregator:
     # positivo. 0.42 casaria 11, mas com só 0.017 de margem numa amostra só.
     #
     # A escolha é conservadora de propósito, por assimetria de custo: falso
-    # positivo DESCARTA uma notícia distinta e o leitor nunca a vê; falso
-    # negativo é absorvido pelo DuplicateDetector (threshold 0.80) na hora de
-    # publicar, custando apenas o boost de source_count.
+    # positivo DESCARTA uma notícia distinta e o leitor nunca a vê.
+    #
+    # ATENÇÃO — correção de uma afirmação anterior: este comentário dizia que
+    # falso negativo era "absorvido pelo DuplicateDetector (threshold 0.80) na
+    # hora de publicar". Isso é FALSO. Medido: duplicatas reais pontuam
+    # 0.53-0.62 no engine TF-IDF que o detector usa (settings
+    # DEDUPLICATION_ENGINE = "tfidf"), então o threshold de 0.80 nunca dispara
+    # e aquela camada não pega nada hoje. Falso negativo aqui resulta em
+    # conteúdo duplicado PUBLICADO, não em perda apenas do boost de
+    # source_count.
+    #
+    # Enquanto o threshold do DuplicateDetector não for corrigido, os dois
+    # tipos de erro custam. Ao revisitar este valor, verifique primeiro se
+    # aquela camada voltou a funcionar.
     SOURCE_DEDUP_THRESHOLD = 0.45
 
     def __init__(self):
