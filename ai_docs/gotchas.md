@@ -550,3 +550,66 @@ de LLM.
 dispara (ver a seção sobre isso), então hoje o caminho de update quase nunca
 roda. Corrigir o threshold aumenta a frequência disso e torna a escolha mais
 urgente.
+
+## Filtro de relevância: duas armadilhas de vocabulário
+
+`app/services/sources/relevance_filter.py` descarta notícia quando há sinal de
+outra editoria (`OFF_BEAT_PATTERNS`) e **não** há sinal de cripto
+(`CRYPTO_SIGNAL_PATTERNS`). Duas regras não são óbvias e custaram uma rodada de
+medição cada.
+
+**1. Nunca ponha palavra genérica de negócios no veto.**
+
+A primeira versão tinha `hack` na `CRYPTO_SIGNAL_PATTERNS`. Resultado:
+
+    título: Nvidia, Meta, and Microsoft Tell Washington: Don't Kill Open-Source AI
+    resumo: ...days after a Chinese AI helped Hugging Face survive a hack...
+
+casou `Nvidia` e `Open-Source AI` na OFF_BEAT, e mesmo assim passou — uma
+palavra que qualquer setor usa anulou dois sinais corretos. Também proibidos:
+`protocol`, `exchange`, `treasury`, `node`, `bridge`, `ledger`, `circle`, `ada`.
+
+**2. Não use `\bai\b` solto na lista de outra editoria.**
+
+Matéria de cripto cita IA o tempo todo ("Is the AI-to-crypto rotation
+underway?", "Franklin Templeton Says Agentic AI Is Crypto's Killer Use Case").
+Um padrão largo aí faz todo o resultado depender do veto. A forma correta de
+cobrir contexto de IA é **nome próprio** de laboratório ou modelo — foi o que
+resolveu "Chinese AI ... Chinese model GLM 5.2", que não casava com jargão
+nenhum.
+
+Medido: dos 9 itens de fronteira, **8 passam porque a `OFF_BEAT` nem dispara**;
+só um depende do veto. O veto é rede de segurança estreita, não o mecanismo
+principal — alargar a `OFF_BEAT` confiando no veto para compensar inverte isso
+e é o caminho mais provável para o filtro começar a comer notícia legítima.
+
+**Fronteira editorial:** o critério é o **sujeito** da notícia. Empresa de
+cripto tratando de IA é pauta (Galaxy construindo data center, tesouraria em
+bitcoin pivotando para IA, Worldcoin). Os testes em
+`tests/unit/test_relevance_filter.py::test_nao_descarta_noticia_do_tema` travam
+essa decisão. Se eles reclamarem depois de um ajuste de vocabulário, o
+vocabulário é que está errado.
+
+**Falha abre, em dois níveis.** Exceção dentro de `rejection_reason` deixa a
+notícia passar; vocabulário que não compila desativa o filtro inteiro em vez de
+derrubar a construção do `NewsAggregator` — que levaria o pipeline junto. O
+guard captura `Exception`, e não só `re.error`, porque um item não-string na
+tupla faz `"|".join()` levantar `TypeError`, que é o erro de digitação mais
+provável.
+
+**`rejection_reason` devolve `Optional[str]`, e `None` significa MANTER.**
+Teste sempre com `is None`, nunca por veracidade: vocabulário vazio compila
+para uma regex de largura zero e o método pode devolver `''`.
+
+**Ao mexer no vocabulário:** rode o filtro contra o feed vivo e confira cada
+descarte na mão. Lista de palavras não se escreve por suposição.
+
+    python3 -c "
+    import asyncio, sys; sys.path.insert(0,'.')
+    from app.services.sources.news_aggregator import NewsAggregator
+    agg = NewsAggregator()
+    itens = asyncio.run(agg.rss_collector.collect_all(hours_back=72))
+    agg._filter_off_topic(itens)"
+
+A taxa esperada fica entre 3% e 10% (medido: 4 de 87 e 7 de 110). Acima de 15%
+quase certamente indica padrão largo demais na `OFF_BEAT_PATTERNS`.
