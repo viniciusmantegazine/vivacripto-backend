@@ -166,3 +166,61 @@ def test_registro_nao_serializavel_ainda_produz_linha():
 
     assert payload["message"] == "falha ao serializar registro de log"
     assert "RuntimeError" in payload["sink_error"]
+
+
+# --- fiacao em setup_logging ---------------------------------------------
+
+def test_producao_usa_o_sink_json(monkeypatch):
+    """
+    Sem isto, a funcao existiria sem ninguem chama-la e o bug continuaria vivo
+    em producao.
+    """
+    import app.core.logging as modulo
+
+    monkeypatch.setattr(modulo.settings, "DEBUG", False)
+    adicionados = []
+    monkeypatch.setattr(
+        modulo.logger, "add", lambda alvo, **kw: adicionados.append((alvo, kw))
+    )
+    monkeypatch.setattr(modulo.logger, "remove", lambda *a, **k: None)
+
+    modulo.setup_logging()
+
+    alvos = [alvo for alvo, _ in adicionados]
+    assert modulo._json_sink in alvos, "o ramo de producao nao usa o sink JSON"
+
+
+def test_producao_mantem_o_context_filter(monkeypatch):
+    """
+    E o context_filter que popula request_id e correlation_id no record. Sem
+    ele os dois campos sumiriam do contrato com o agregador.
+    """
+    import app.core.logging as modulo
+
+    monkeypatch.setattr(modulo.settings, "DEBUG", False)
+    adicionados = []
+    monkeypatch.setattr(
+        modulo.logger, "add", lambda alvo, **kw: adicionados.append((alvo, kw))
+    )
+    monkeypatch.setattr(modulo.logger, "remove", lambda *a, **k: None)
+
+    modulo.setup_logging()
+
+    kwargs = next(kw for alvo, kw in adicionados if alvo is modulo._json_sink)
+    assert kwargs.get("filter") is modulo.context_filter
+
+
+def test_desenvolvimento_nao_usa_o_sink_json(monkeypatch):
+    """O ramo de DEBUG e formato colorido para humano, nao JSON."""
+    import app.core.logging as modulo
+
+    monkeypatch.setattr(modulo.settings, "DEBUG", True)
+    adicionados = []
+    monkeypatch.setattr(
+        modulo.logger, "add", lambda alvo, **kw: adicionados.append((alvo, kw))
+    )
+    monkeypatch.setattr(modulo.logger, "remove", lambda *a, **k: None)
+
+    modulo.setup_logging()
+
+    assert modulo._json_sink not in [alvo for alvo, _ in adicionados]

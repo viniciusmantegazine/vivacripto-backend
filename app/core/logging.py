@@ -143,23 +143,16 @@ def setup_logging():
             colorize=True,
         )
     else:
-        # Production: JSON format for log aggregation
-        log_format = (
-            '{{"timestamp":"{time:YYYY-MM-DDTHH:mm:ss.SSSZ}",'
-            '"level":"{level}",'
-            '"request_id":"{extra[request_id]}",'
-            '"correlation_id":"{extra[correlation_id]}",'
-            '"logger":"{name}",'
-            '"function":"{function}",'
-            '"line":{line},'
-            '"message":"{message}"}}'
-        )
+        # Produção: uma linha de JSON por registro, para o agregador.
+        #
+        # O sink monta um dict e passa por json.dumps em vez de interpolar numa
+        # format-string. A versão anterior colocava {message} cru dentro de
+        # aspas, então título de notícia com aspas retas quebrava a linha.
+        # Ver _json_sink e ai_docs/gotchas.md.
         logger.add(
-            sys.stderr,
-            format=log_format,
+            _json_sink,
             level="INFO",
             filter=context_filter,
-            serialize=False,
         )
 
     # Add file handler for errors
