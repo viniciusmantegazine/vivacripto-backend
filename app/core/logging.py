@@ -2,7 +2,9 @@
 Structured Logging Configuration
 Configura loguru com contexto estruturado para melhor observabilidade.
 """
+import json
 import sys
+import traceback as traceback_mod
 from contextvars import ContextVar
 from functools import wraps
 from typing import Any, Callable, Dict, Optional
@@ -42,9 +44,72 @@ def clear_request_context():
 
 def context_filter(record: Dict[str, Any]) -> bool:
     """Add context variables to log records."""
-    record["extra"]["request_id"] = get_request_id() or "-"
-    record["extra"]["correlation_id"] = get_correlation_id() or "-"
+    record["extra"].setdefault("request_id", get_request_id() or "-")
+    record["extra"].setdefault("correlation_id", get_correlation_id() or "-")
     return True
+
+
+def _json_sink(message) -> None:
+    """
+    Escreve o record como UMA linha de JSON válido em stderr.
+
+    Substitui a format-string que montava o JSON por interpolação. Aquela
+    versão colocava `{message}` cru dentro de aspas, então qualquer mensagem
+    com `"`, `\\` ou quebra de linha produzia linha que o agregador não
+    parseava — e título de notícia vai para o log. `logger.exception` era pior:
+    emitia o traceback em linhas soltas FORA do objeto JSON.
+
+    Os nomes de campo são o contrato com o agregador e não podem mudar.
+    Cuidado com dois detalhes:
+
+    - `timestamp` usa `isoformat(timespec="milliseconds")` porque ele reproduz
+      byte a byte o formato antigo `{time:YYYY-MM-DDTHH:mm:ss.SSSZ}`, que emite
+      o offset COM dois-pontos (-03:00). `strftime("%z")` daria -0300.
+    - `line` é número, não string. O formato antigo emitia `"line":{line}`.
+    """
+    record = message.record
+    try:
+        payload = {
+            "timestamp": record["time"].isoformat(timespec="milliseconds"),
+            "level": record["level"].name,
+            "request_id": record["extra"].get("request_id", "-"),
+            "correlation_id": record["extra"].get("correlation_id", "-"),
+            "logger": record["name"],
+            "function": record["function"],
+            "line": record["line"],
+            "message": record["message"],
+        }
+
+        exception = record["exception"]
+        if exception is not None:
+            payload["exception"] = "".join(
+                traceback_mod.format_exception(
+                    exception.type, exception.value, exception.traceback
+                )
+            ).rstrip()
+
+        linha = json.dumps(payload, ensure_ascii=False, default=str)
+
+    except Exception as e:
+        # Deixar a exceção escapar faz o loguru escrever um bloco
+        # `--- Logging error in Loguru Handler ---` multi-linha em stderr, que é
+        # justamente a saída não parseável que este sink existe para eliminar.
+        # Perder a estrutura de uma linha é aceitável; perder a linha não é.
+        linha = json.dumps(
+            {
+                "timestamp": "-",
+                "level": "ERROR",
+                "request_id": "-",
+                "correlation_id": "-",
+                "logger": "app.core.logging",
+                "function": "_json_sink",
+                "line": 0,
+                "message": "falha ao serializar registro de log",
+                "sink_error": repr(e),
+            }
+        )
+
+    sys.stderr.write(linha + "\n")
 
 
 def setup_logging():
