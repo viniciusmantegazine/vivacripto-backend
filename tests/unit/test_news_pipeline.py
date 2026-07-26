@@ -79,6 +79,19 @@ def mock_article_publisher():
         yield publisher
 
 
+@pytest.fixture(autouse=True)
+def mock_market_data():
+    """
+    Neutraliza a coleta de dados de mercado.
+
+    `autouse` de propósito: todo teste que roda o pipeline passa pelo fetch, e
+    nenhum deles deve tocar a CoinGecko.
+    """
+    with patch("app.services.automation.news_pipeline.market_data_collector") as mdc:
+        mdc.collect_snapshot = AsyncMock(return_value=None)
+        yield mdc
+
+
 @pytest.fixture
 def mock_crud_post():
     """Mock crud_post."""

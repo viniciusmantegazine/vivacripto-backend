@@ -28,6 +28,7 @@ from app.services.deduplication import (
     NewsAssignment,
     PostRepositoryImpl,
 )
+from app.services.ai.market_data_collector import market_data_collector
 from app.services.sources.article_extractor import ArticleExtractor
 from app.services.sources.news_aggregator import NewsAggregator
 from app.services.ai.category_classifier import CategoryClassifier
@@ -199,6 +200,22 @@ class NewsPipeline:
                 f"teto de tentativas: {max_attempts}"
             )
 
+            # Dados de mercado: UMA coleta por run, reaproveitada por todas as
+            # tentativas. Preço não muda em segundos e o run tenta até 3
+            # notícias — buscar por artigo triplicaria 1,1s de rede pelo mesmo
+            # número. Usa collect_snapshot e não collect_all: o contexto macro
+            # do collect_all custa ~5,9s e é material de análise semanal.
+            # Falha aqui não bloqueia: dado de mercado enriquece o artigo.
+            market_data = None
+            try:
+                market_data = await market_data_collector.collect_snapshot()
+                if market_data:
+                    logger.info(f"Dados de mercado coletados ({len(market_data)} chars)")
+                else:
+                    logger.warning("Dados de mercado indisponíveis — seguindo sem eles")
+            except Exception as e:
+                logger.warning(f"Falha ao coletar dados de mercado: {e} (seguindo sem eles)")
+
             processed_count = 0
             attempts = 0
 
@@ -222,6 +239,9 @@ class NewsPipeline:
                     if full_text:
                         source_news["full_text"] = full_text
                         logger.info(f"Texto completo extraído ({len(full_text)} chars)")
+
+                    if market_data:
+                        source_news["market_data"] = market_data
 
                     # Pré-classificar categoria para ajuste de tom na geração
                     title = source_news.get('title', '')

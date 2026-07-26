@@ -1,8 +1,11 @@
 """
-Testes do NewsPipeline: pré-filtro de URL, loop até a meta, fix do campo
-fonte e integração do ArticleExtractor.
+Testes da injeção de dados de mercado pelo pipeline.
 
-Usa mocks em vez de db_session (gotcha UUID/SQLite — ai_docs/gotchas.md §6).
+O fetch é UMA vez por run, não por artigo: preço não muda em segundos e o run
+tenta até 3 notícias. Buscar por artigo triplicaria 1,1s de rede sem ganho.
+
+Falha do collector não pode impedir publicação — dado de mercado enriquece o
+artigo, não é requisito dele.
 """
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -10,6 +13,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.services.deduplication import ActionType
+
+SNAPSHOT = "=== DADOS DE MERCADO ===\n\nPREÇOS: BTC US$ 64,640.00"
 
 
 def _news(source, title, url):
@@ -30,9 +35,9 @@ ARTICLE = {
     "title": "Bitcoin atinge US$ 100 mil pela primeira vez na história",
     "slug": "bitcoin-atinge-100-mil",
     "content_markdown": "## Bitcoin\n\n" + "palavra de conteúdo " * 120,
-    "excerpt": "Bitcoin atinge marco histórico em meio a forte demanda.",
+    "excerpt": "Bitcoin atinge marco histórico em meio a forte demanda institucional hoje.",
     "meta_title": "Bitcoin US$100k",
-    "meta_description": "Bitcoin ultrapassa US$100 mil pela primeira vez.",
+    "meta_description": "Bitcoin ultrapassa US$100 mil pela primeira vez na história do mercado.",
     "source_url": "https://coindesk.com/a",
     "source_name": "CoinDesk",
     "category": "bitcoin",
@@ -41,10 +46,10 @@ ARTICLE = {
 
 @pytest.fixture
 def m():
-    """Patcha todas as dependências do pipeline e expõe os mocks."""
+    """Patcha as dependências do pipeline e expõe os mocks."""
     with patch("app.services.automation.news_pipeline.NewsAggregator") as agg_cls, \
          patch("app.services.automation.news_pipeline.ContentGenerator") as gen_cls, \
-         patch("app.services.automation.news_pipeline.ImageGenerator") as img_cls, \
+         patch("app.services.automation.news_pipeline.ImageGenerator"), \
          patch("app.services.automation.news_pipeline.QualityValidator") as val_cls, \
          patch("app.services.automation.news_pipeline.ArticlePublisher") as pub_cls, \
          patch("app.services.automation.news_pipeline.CategoryClassifier") as cat_cls, \
@@ -64,8 +69,6 @@ def m():
         mocks.generator = MagicMock()
         mocks.generator.generate_article = AsyncMock(return_value=dict(ARTICLE))
         gen_cls.return_value = mocks.generator
-
-        img_cls.return_value = MagicMock()
 
         mocks.validator = MagicMock()
         mocks.validator.validate_article = MagicMock(return_value=(True, []))
@@ -90,10 +93,8 @@ def m():
         mocks.detector.check_duplicate = AsyncMock(return_value=check)
         det_cls.return_value = mocks.detector
 
-        # Sem isso o pipeline bateria na CoinGecko de verdade: teste unitário
-        # não pode depender de rede externa.
         mocks.market = mdc
-        mdc.collect_snapshot = AsyncMock(return_value=None)
+        mdc.collect_snapshot = AsyncMock(return_value=SNAPSHOT)
 
         mocks.crud = crud
         crud.get_recent_posts = AsyncMock(return_value=[])
@@ -109,80 +110,70 @@ def m():
 
 
 @pytest.mark.asyncio
-async def test_prefiltro_pula_urls_ja_processadas(m):
+async def test_busca_o_snapshot_uma_vez_por_run(m):
+    """
+    Três notícias na fila, uma única coleta. Buscar por artigo triplicaria
+    1,1s de rede para obter o mesmo preço.
+    """
     from app.services.automation.news_pipeline import NewsPipeline
 
     m.aggregator.collect_news.return_value = [
         _news("CoinDesk", "Noticia A", "https://a.com/1"),
         _news("Decrypt", "Noticia B", "https://b.com/2"),
+        _news("CryptoSlate", "Noticia C", "https://c.com/3"),
     ]
-    m.crud.get_existing_source_urls.return_value = {"https://a.com/1"}
+    m.generator.generate_article.side_effect = [None, None, dict(ARTICLE)]
 
-    report = await NewsPipeline().run(MagicMock())
+    await NewsPipeline().run(MagicMock())
 
-    assert report["skipped_already_processed"] == 1
-    # A primeira notícia tentada deve ser a B (a A foi filtrada)
-    called_news = m.generator.generate_article.await_args_list[0][0][0]
-    assert called_news["url"] == "https://b.com/2"
+    assert m.market.collect_snapshot.await_count == 1
 
 
 @pytest.mark.asyncio
-async def test_todas_filtradas_encerra_sem_gerar(m):
+async def test_injeta_o_snapshot_em_source_news(m):
+    """O gerador recebe o dado pelo mesmo caminho do full_text."""
     from app.services.automation.news_pipeline import NewsPipeline
 
     m.aggregator.collect_news.return_value = [
         _news("CoinDesk", "Noticia A", "https://a.com/1"),
     ]
-    m.crud.get_existing_source_urls.return_value = {"https://a.com/1"}
 
-    report = await NewsPipeline().run(MagicMock())
+    await NewsPipeline().run(MagicMock())
 
-    assert report["status"] == "completed"
-    m.generator.generate_article.assert_not_awaited()
+    recebido = m.generator.generate_article.await_args_list[0][0][0]
+    assert recebido["market_data"] == SNAPSHOT
 
 
 @pytest.mark.asyncio
-async def test_falha_de_geracao_nao_consome_meta(m):
-    """Se a notícia 1 falha, a notícia 2 deve ser tentada no mesmo run."""
+async def test_snapshot_none_nao_impede_publicacao(m):
+    """CoinGecko fora do ar não pode parar o pipeline."""
     from app.services.automation.news_pipeline import NewsPipeline
 
     m.aggregator.collect_news.return_value = [
         _news("CoinDesk", "Noticia A", "https://a.com/1"),
-        _news("Decrypt", "Noticia B", "https://b.com/2"),
     ]
-    m.generator.generate_article.side_effect = [None, dict(ARTICLE)]
+    m.market.collect_snapshot.return_value = None
 
     report = await NewsPipeline().run(MagicMock())
 
-    assert report["failed"] == 1
     assert report["published"] == 1
+    recebido = m.generator.generate_article.await_args_list[0][0][0]
+    assert recebido.get("market_data") is None
 
 
 @pytest.mark.asyncio
-async def test_fonte_vem_da_chave_source(m):
-    """Regressão: fonte lia 'source_name' (inexistente) e chegava vazia."""
+async def test_excecao_no_collector_nao_impede_publicacao(m):
+    """
+    Timeout ou erro de rede no collector é capturado. Dado de mercado
+    enriquece o artigo; não é requisito dele.
+    """
     from app.services.automation.news_pipeline import NewsPipeline
 
     m.aggregator.collect_news.return_value = [
         _news("CoinDesk", "Noticia A", "https://a.com/1"),
     ]
+    m.market.collect_snapshot.side_effect = RuntimeError("timeout na CoinGecko")
 
-    await NewsPipeline().run(MagicMock())
+    report = await NewsPipeline().run(MagicMock())
 
-    assignment = m.detector.check_duplicate.await_args[0][0]
-    assert assignment.fonte == "CoinDesk"
-
-
-@pytest.mark.asyncio
-async def test_texto_completo_vai_para_o_gerador(m):
-    from app.services.automation.news_pipeline import NewsPipeline
-
-    m.aggregator.collect_news.return_value = [
-        _news("CoinDesk", "Noticia A", "https://a.com/1"),
-    ]
-    m.extractor.extract.return_value = "texto completo da matéria original " * 20
-
-    await NewsPipeline().run(MagicMock())
-
-    called_news = m.generator.generate_article.await_args_list[0][0][0]
-    assert called_news["full_text"].startswith("texto completo")
+    assert report["published"] == 1
