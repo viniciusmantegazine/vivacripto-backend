@@ -56,6 +56,7 @@ class TestCRUDPost:
             slug="published-post",
             content_markdown="Content",
             content_html="<p>Content</p>",
+            excerpt="Excerpt for Published Post",
             status="published",
             category_id=category.id,
         )
@@ -75,6 +76,7 @@ class TestCRUDPost:
             slug="no-auto-commit",
             content_markdown="Content",
             content_html="<p>Content</p>",
+            excerpt="Excerpt for No Auto Commit Post",
             status="draft",
             category_id=category.id,
         )
@@ -138,6 +140,7 @@ class TestCRUDPost:
             slug="draft-post",
             content_markdown="Content",
             content_html="<p>Content</p>",
+            excerpt="Excerpt for Draft Post",
             status="draft",
             category_id=category.id,
         )
@@ -189,6 +192,7 @@ class TestCRUDPost:
                 slug=f"post-{i}",
                 content_markdown=f"Content {i}",
                 content_html=f"<p>Content {i}</p>",
+                excerpt=f"Excerpt for Post {i}",
                 status="published",
                 category_id=category.id,
             )
@@ -211,6 +215,7 @@ class TestCRUDPost:
             slug="published",
             content_markdown="Content",
             content_html="<p>Content</p>",
+            excerpt="Excerpt for Published",
             status="published",
             category_id=category.id,
         )
@@ -222,6 +227,7 @@ class TestCRUDPost:
             slug="draft",
             content_markdown="Content",
             content_html="<p>Content</p>",
+            excerpt="Excerpt for Draft",
             status="draft",
             category_id=category.id,
         )
@@ -244,6 +250,7 @@ class TestCRUDPost:
             slug="recent-post",
             content_markdown="Content",
             content_html="<p>Content</p>",
+            excerpt="Excerpt for Recent Post",
             status="published",
             category_id=category.id,
         )
@@ -264,6 +271,7 @@ class TestCRUDPost:
             slug="bitcoin-price-analysis",
             content_markdown="Analysis of Bitcoin market trends",
             content_html="<p>Analysis of Bitcoin market trends</p>",
+            excerpt="Excerpt for Bitcoin Price Analysis",
             status="published",
             category_id=category.id,
         )
@@ -286,6 +294,7 @@ class TestCRUDPost:
             slug="test-search",
             content_markdown="Content",
             content_html="<p>Content</p>",
+            excerpt="Excerpt for Test Post",
             status="published",
             category_id=category.id,
         )

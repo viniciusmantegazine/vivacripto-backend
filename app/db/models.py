@@ -5,7 +5,7 @@ import uuid
 from math import ceil
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Table, CheckConstraint
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from app.db.types import GUID, PortableJSONB
 from sqlalchemy.orm import relationship, backref
 from app.db.base_class import Base
 
@@ -19,8 +19,8 @@ def utc_now() -> datetime:
 post_tags = Table(
     'post_tags',
     Base.metadata,
-    Column('post_id', UUID(as_uuid=True), ForeignKey('posts.id', ondelete='CASCADE'), primary_key=True),
-    Column('tag_id', UUID(as_uuid=True), ForeignKey('tags.id', ondelete='CASCADE'), primary_key=True),
+    Column('post_id', GUID(), ForeignKey('posts.id', ondelete='CASCADE'), primary_key=True),
+    Column('tag_id', GUID(), ForeignKey('tags.id', ondelete='CASCADE'), primary_key=True),
 )
 
 
@@ -28,7 +28,7 @@ class Author(Base):
     """Author model"""
     __tablename__ = 'authors'
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False)
     bio = Column(Text)
     avatar_url = Column(Text)
@@ -43,7 +43,7 @@ class Category(Base):
     """Category model"""
     __tablename__ = 'categories'
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     name = Column(String(100), nullable=False, unique=True)
     slug = Column(String(100), nullable=False, unique=True)
     created_at = Column(DateTime, default=utc_now, nullable=False)
@@ -56,7 +56,7 @@ class Tag(Base):
     """Tag model"""
     __tablename__ = 'tags'
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     name = Column(String(100), nullable=False, unique=True)
     slug = Column(String(100), nullable=False, unique=True)
     created_at = Column(DateTime, default=utc_now, nullable=False)
@@ -69,7 +69,7 @@ class Post(Base):
     """Post model"""
     __tablename__ = 'posts'
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     title = Column(String(255), nullable=False)
     slug = Column(String(255), nullable=False, unique=True)
     content_markdown = Column(Text, nullable=False)
@@ -85,8 +85,8 @@ class Post(Base):
     published_at = Column(DateTime)
     
     # Foreign Keys
-    author_id = Column(UUID(as_uuid=True), ForeignKey('authors.id', ondelete='SET NULL'))
-    category_id = Column(UUID(as_uuid=True), ForeignKey('categories.id', ondelete='SET NULL'))
+    author_id = Column(GUID(), ForeignKey('authors.id', ondelete='SET NULL'))
+    category_id = Column(GUID(), ForeignKey('categories.id', ondelete='SET NULL'))
     
     # SEO fields
     meta_title = Column(String(70))
@@ -102,7 +102,7 @@ class Post(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
     
     # Deduplication tracking
-    deduplication_history = Column(JSONB, nullable=True, server_default='[]')
+    deduplication_history = Column(PortableJSONB, nullable=True, server_default='[]')
     
     # Relationships
     author = relationship("Author", back_populates="posts")
@@ -131,7 +131,7 @@ class NewsletterSubscriber(Base):
     """Newsletter subscriber model"""
     __tablename__ = 'newsletter_subscribers'
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     email = Column(String(255), nullable=False, unique=True)
     is_active = Column(Boolean, nullable=False, default=True)
     subscribed_at = Column(DateTime, default=utc_now, nullable=False)
@@ -142,11 +142,11 @@ class AutomationLog(Base):
     """Automation log model"""
     __tablename__ = 'automation_logs'
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    run_id = Column(UUID(as_uuid=True), nullable=False)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    run_id = Column(GUID(), nullable=False)
     level = Column(String(20), nullable=False)
     message = Column(Text, nullable=False)
-    log_metadata = Column(JSONB)
+    log_metadata = Column(PortableJSONB)
     created_at = Column(DateTime, default=utc_now, nullable=False)
 
 
@@ -154,8 +154,8 @@ class SocialPost(Base):
     """Social media post tracking model"""
     __tablename__ = 'social_posts'
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    post_id = Column(UUID(as_uuid=True), ForeignKey('posts.id', ondelete='CASCADE'), nullable=False)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    post_id = Column(GUID(), ForeignKey('posts.id', ondelete='CASCADE'), nullable=False)
     platform = Column(String(50), nullable=False)  # "twitter", "instagram"
     platform_post_id = Column(String(255), nullable=True)  # ID do post na plataforma
     platform_url = Column(Text, nullable=True)  # URL do post na plataforma

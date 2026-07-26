@@ -36,7 +36,7 @@ from uuid import uuid4
 
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
@@ -273,7 +273,11 @@ async def api_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, No
 
     app.dependency_overrides[get_db] = override_get_db
 
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    # httpx >= 0.28 removeu o atalho `AsyncClient(app=...)`; o app ASGI agora
+    # precisa vir embrulhado num ASGITransport explícito.
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         yield client
 
     app.dependency_overrides.clear()
@@ -294,6 +298,8 @@ def create_test_post_data(
         "slug": title.lower().replace(" ", "-"),
         "content_markdown": f"# {title}\n\nTest content for {title}.",
         "content_html": f"<h1>{title}</h1><p>Test content for {title}.</p>",
+        # excerpt é obrigatório em PostBase (Field(...)) — sem ele, PostCreate
+        # falha na validação e o Post viola o NOT NULL da coluna.
         "excerpt": f"Excerpt for {title}",
         "status": "draft",
         "category_id": category_id,
