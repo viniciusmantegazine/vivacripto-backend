@@ -89,6 +89,11 @@ class PostUpdate(BaseModel):
     category_id: Optional[UUID] = None
     meta_title: Optional[str] = Field(None, max_length=70)
     meta_description: Optional[str] = Field(None, max_length=160)
+    # A URL da fonte precisa poder ser atualizada: quando o dedup decide
+    # UPDATE_EXISTING, é a URL da SEGUNDA fonte que passa a valer. Sem gravá-la,
+    # o pré-filtro anti-reprocessamento (que busca por Post.source_url) nunca a
+    # vê e deixa a mesma notícia ser regerada em todo run seguinte.
+    source_url: Optional[str] = None
 
 
 class PostRead(PostBase):

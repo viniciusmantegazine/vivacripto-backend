@@ -100,10 +100,32 @@ class ArticlePublisher:
             # Converter markdown para HTML
             content_html = self._convert_markdown_to_html(article["content_markdown"])
 
+            # Todos os campos DERIVADOS do conteúdo acompanham o conteúdo.
+            # Antes só o corpo era gravado, e o post ficava com título, excerpt
+            # e meta antigos junto de texto novo — o conteúdo é escrito para o
+            # título novo, então manter o antigo produz post incoerente.
+            #
+            # O slug NÃO entra: é a URL pública, e trocá-la quebraria links e
+            # histórico de SEO. Título mudar sem o slug mudar é o correto.
+            meta_title = article.get("meta_title") or article.get("title") or ""
+            meta_description = article.get("meta_description") or ""
+            if len(meta_title) > 70:
+                meta_title = meta_title[:67] + "..."
+            if len(meta_description) > 160:
+                meta_description = meta_description[:157] + "..."
+
             # Atualizar post (usar datetime naive para compatibilidade com DB)
             post_update = PostUpdate(
+                title=article.get("title"),
                 content_markdown=article["content_markdown"],
                 content_html=content_html,
+                excerpt=article.get("excerpt"),
+                meta_title=meta_title or None,
+                meta_description=meta_description or None,
+                # A URL da segunda fonte precisa ser gravada: o pré-filtro
+                # anti-reprocessamento busca por Post.source_url, e sem isso a
+                # mesma notícia era regerada em todo run seguinte.
+                source_url=article.get("source_url"),
                 updated_at=datetime.utcnow(),
             )
 
