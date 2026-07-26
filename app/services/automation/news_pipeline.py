@@ -152,7 +152,8 @@ class NewsPipeline:
             # Pré-filtro: descarta notícias cuja URL já virou post nos
             # últimos 7 dias. A coleta olha 24h para trás e o cron roda
             # várias vezes ao dia — sem isso, a mesma notícia era regerada
-            # (4 chamadas de LLM) em cada run só para o dedup descartá-la.
+            # (1 chamada de LLM por artigo) em cada run só para o dedup
+            # descartá-la.
             if news_items:
                 urls = [n["url"] for n in news_items if n.get("url")]
                 # naive p/ TIMESTAMP WITHOUT TIME ZONE (ver ai_docs/gotchas.md)
