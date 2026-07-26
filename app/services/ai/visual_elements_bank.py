@@ -216,7 +216,10 @@ class EditorialVisualElementsBank:
             "with broken lock security breach indication",
             "surrounded by shattered digital barrier",
             "with visible crack in protective wall",
-            "under attack with warning indicators",
+            # NÃO usar "under attack": é vocabulário que APIs de imagem
+            # recusam/flagram, e esta opção vazava a palavra para o prompt
+            # em ~27% das gerações de notícia de segurança.
+            "under security incident with warning indicators",
         ],
 
         # Ações de análise

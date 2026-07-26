@@ -128,9 +128,28 @@ class TestArticlePublisher:
         result = await publisher._generate_image(sample_article)
 
         assert result == expected_url
+        # _generate_image propaga category_slug como category_name (contexto
+        # visual da categoria). Sem categoria, vai None.
         mock_image_gen.generate_and_upload_image.assert_called_once_with(
             sample_article["title"],
             sample_article["content_markdown"],
+            category_name=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_generate_image_propaga_categoria(self, sample_article: dict):
+        """A categoria dá contexto visual ao gerador — não pode ser perdida."""
+        mock_image_gen = MagicMock()
+        mock_image_gen.generate_and_upload_image = AsyncMock(return_value="https://x/y.jpg")
+
+        publisher = ArticlePublisher(image_generator=mock_image_gen)
+
+        await publisher._generate_image(sample_article, category_slug="bitcoin")
+
+        mock_image_gen.generate_and_upload_image.assert_called_once_with(
+            sample_article["title"],
+            sample_article["content_markdown"],
+            category_name="bitcoin",
         )
 
     @pytest.mark.asyncio

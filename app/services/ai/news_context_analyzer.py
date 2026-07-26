@@ -151,10 +151,20 @@ class NewsContextAnalyzer:
         'explorada': 'vulnerability exposure',
         'invadido': 'compromised',
         'invadida': 'compromised',
+        # Equivalentes em INGLÊS dos termos acima. O mapa cobria só o
+        # português, mas o banco de elementos visuais e os prompts são em
+        # inglês — sem estes, "attack"/"stolen" chegavam à API de imagem.
+        'attack': 'security incident',
+        'attacked': 'compromised',
+        'hacked': 'security breach',
         # Roubo e fraude
         'roubo': 'unauthorized transfer',
         'roubado': 'unauthorized transfer',
         'roubada': 'unauthorized transfer',
+        'stolen': 'unauthorized transfer',
+        'steal': 'unauthorized transfer',
+        'stealing': 'unauthorized transfer',
+        'theft': 'unauthorized transfer',
         'fraude': 'irregularity',
         'golpe': 'scheme',
         'scam': 'fraudulent scheme',

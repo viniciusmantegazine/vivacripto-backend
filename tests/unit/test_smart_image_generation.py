@@ -11,6 +11,8 @@ NOVO v3.1: Testes de correspondência título-imagem
 - Títulos específicos ("Bitcoin", "Ethereum") → apenas essa cripto
 """
 
+import re
+
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -345,19 +347,42 @@ class TestEditorialVisualElementsBank:
         assert "sec" in subject.lower() or "regulatory" in subject.lower()
 
     def test_get_background_for_positive_sentiment(self, bank):
-        """Deve retornar background apropriado para sentimento positivo"""
+        """
+        TODA opção de background positivo deve ler como clara/limpa.
+
+        Verifica a lista inteira, não uma amostra: get_background usa
+        random.choice, então testar o retorno de uma chamada só falhava
+        ~25% das vezes (a opção "bright professional backdrop with
+        optimistic tones" não casava com white/green/light).
+        """
         background = bank.get_background(NewsSentiment.POSITIVE)
         assert isinstance(background, str)
-        # Deve ser limpo/claro
-        assert "white" in background.lower() or "green" in background.lower() or "light" in background.lower()
+
+        vocabulario_claro = (
+            "white", "green", "light", "bright", "clean", "natural",
+            "gold", "optimistic",
+        )
+        for opcao in bank.BACKGROUNDS[NewsSentiment.POSITIVE]:
+            assert any(t in opcao.lower() for t in vocabulario_claro), (
+                f"background positivo sem vocabulário claro: {opcao}"
+            )
 
     def test_get_background_for_negative_sentiment(self, bank):
-        """Deve retornar background apropriado para sentimento negativo"""
+        """
+        TODA opção de background negativo deve ler como séria/escura.
+        Verifica a lista inteira (get_background sorteia) — hoje passa por
+        sorte, mas uma opção nova fora do contrato quebraria só às vezes.
+        """
         background = bank.get_background(NewsSentiment.NEGATIVE)
         assert isinstance(background, str)
-        # v3.1: Deve ser mais sério (navy, dark, serious, etc)
-        bg_lower = background.lower()
-        assert "dark" in bg_lower or "navy" in bg_lower or "serious" in bg_lower or "charcoal" in bg_lower
+
+        vocabulario_serio = (
+            "dark", "navy", "serious", "charcoal", "deep", "somber", "muted",
+        )
+        for opcao in bank.BACKGROUNDS[NewsSentiment.NEGATIVE]:
+            assert any(t in opcao.lower() for t in vocabulario_serio), (
+                f"background negativo sem vocabulário sério: {opcao}"
+            )
 
     def test_get_color_palette_for_bitcoin(self, bank):
         """Deve retornar paleta de cores específica do Bitcoin"""
@@ -391,10 +416,25 @@ class TestEditorialVisualElementsBank:
         assert overlay is None
 
     def test_get_lighting_for_positive_sentiment(self, bank):
-        """Deve retornar iluminação apropriada para sentimento positivo"""
+        """
+        TODA opção de iluminação positiva deve ler como clara/acolhedora.
+
+        Verifica a lista inteira: get_lighting sorteia, e 2 das 4 opções
+        ("clean high-key lighting with soft shadows" e "uplifting studio
+        lighting with highlight accents") não casavam com
+        bright/warm/optimistic — o teste falhava 50% das vezes.
+        """
         lighting = bank.get_lighting(NewsSentiment.POSITIVE)
         assert isinstance(lighting, str)
-        assert "bright" in lighting.lower() or "warm" in lighting.lower() or "optimistic" in lighting.lower()
+
+        vocabulario_positivo = (
+            "bright", "warm", "optimistic", "natural", "golden", "clean",
+            "high-key", "uplifting",
+        )
+        for opcao in bank.LIGHTING_STYLES[NewsSentiment.POSITIVE]:
+            assert any(t in opcao.lower() for t in vocabulario_positivo), (
+                f"iluminação positiva sem vocabulário adequado: {opcao}"
+            )
 
     def test_get_text_area(self, bank):
         """Deve retornar especificação de área para texto"""
@@ -527,7 +567,12 @@ class TestSmartPromptGenerator:
         assert 'news_type' in result['metadata']
         assert 'action' in result['metadata']
         assert 'prompt_version' in result['metadata']
-        assert result['metadata']['prompt_version'] == 'v3.1-contextual-storytelling-title-matching'
+        # Contrato é o FORMATO da versão, não o valor: fixar a string literal
+        # fazia este teste quebrar em todo bump de versão do gerador (quebrou
+        # no v3.1 -> v3.2) sem que nada estivesse errado no produto.
+        assert re.match(
+            r'^v\d+\.\d+-[\w-]+$', result['metadata']['prompt_version']
+        ), f"prompt_version fora do formato: {result['metadata']['prompt_version']}"
 
     def test_fallback_prompt_generation(self, generator):
         """Deve gerar prompt fallback em caso de categoria"""
