@@ -163,6 +163,20 @@ class WeeklyReportGenerator:
             logger.error(f"Erro ao gerar relatório semanal: {e}")
             return None
 
+    def _extract_text(self, message) -> Optional[str]:
+        """
+        Extrai o texto da resposta do Claude.
+
+        NÃO usar `message.content[0].text`: nos modelos atuais o thinking vem
+        ligado por padrão e seus blocos vêm ANTES do texto, então o primeiro
+        bloco não tem `.text` e o acesso direto estoura AttributeError.
+        Varremos os blocos e pegamos o primeiro de tipo "text".
+        """
+        for block in message.content:
+            if getattr(block, "type", None) == "text":
+                return block.text.strip()
+        return None
+
     async def _generate_content(self) -> Optional[str]:
         """Gera o conteúdo principal do relatório usando Claude Opus"""
 

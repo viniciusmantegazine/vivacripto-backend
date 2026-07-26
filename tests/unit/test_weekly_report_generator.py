@@ -29,3 +29,50 @@ def test_nao_usa_ids_depreciados():
     depreciados = {"claude-opus-4-20250514", "claude-sonnet-4-20250514"}
     assert WeeklyReportGenerator.CLAUDE_MODEL not in depreciados
     assert WeeklyReportGenerator.CLAUDE_FALLBACK_MODEL not in depreciados
+
+
+class _Bloco:
+    """Bloco de conteúdo estilo SDK Anthropic."""
+
+    def __init__(self, tipo: str, **campos):
+        self.type = tipo
+        for nome, valor in campos.items():
+            setattr(self, nome, valor)
+
+
+class _Mensagem:
+    """Resposta estilo SDK Anthropic."""
+
+    def __init__(self, content, stop_reason="end_turn"):
+        self.content = content
+        self.stop_reason = stop_reason
+
+
+def test_extract_text_ignora_bloco_de_thinking():
+    """
+    Regressão: com thinking ligado (padrão atual), content[0] é um bloco de
+    thinking sem `.text` — o antigo content[0].text estourava AttributeError.
+    """
+    gen = WeeklyReportGenerator()
+    mensagem = _Mensagem([
+        _Bloco("thinking", thinking="raciocinio interno do modelo"),
+        _Bloco("text", text="## Relatório\n\nConteúdo real."),
+    ])
+
+    assert gen._extract_text(mensagem) == "## Relatório\n\nConteúdo real."
+
+
+def test_extract_text_com_texto_no_primeiro_bloco():
+    """Sem thinking, o texto é o primeiro bloco — deve funcionar igual."""
+    gen = WeeklyReportGenerator()
+    mensagem = _Mensagem([_Bloco("text", text="  conteúdo  ")])
+
+    assert gen._extract_text(mensagem) == "conteúdo"
+
+
+def test_extract_text_sem_bloco_de_texto_retorna_none():
+    """Resposta só com thinking (ou vazia) não é conteúdo — devolve None."""
+    gen = WeeklyReportGenerator()
+
+    assert gen._extract_text(_Mensagem([_Bloco("thinking", thinking="x")])) is None
+    assert gen._extract_text(_Mensagem([])) is None
