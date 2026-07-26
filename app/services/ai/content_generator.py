@@ -3,9 +3,11 @@ AI Content Generator Service v4.0
 Gera conteúdo de notícias usando Google Gemini (primário) com OpenAI como fallback,
 estrutura otimizada, guardrails de segurança e prevenção de alucinações
 """
+import json
 import re
 from typing import Dict, Optional
 
+import json_repair
 from loguru import logger
 from openai import AsyncOpenAI
 from slugify import slugify
@@ -92,6 +94,18 @@ class ContentGenerator:
     # "The Block informou que...", porque LLM capitaliza nome próprio.
     # Custo aceito: menção ao veículo escrita toda em minúscula escapa.
     CASE_SENSITIVE_SITE_NAMES = frozenset({"The Block"})
+
+    # Campos que o LLM precisa entregar para o artigo existir. excerpt e
+    # meta_description ficam de fora de propósito: são recuperáveis, e
+    # descartar um artigo de 2500 tokens por causa deles repetiria o defeito
+    # que esta consolidação corrige.
+    REQUIRED_ARTICLE_FIELDS = ("content_markdown", "title")
+
+    # Faixa de excerpt que o QualityValidator aceita. Duplicada aqui de
+    # propósito: precisamos decidir o fallback antes da validação, não depois
+    # de o artigo ser reprovado.
+    MIN_EXCERPT_LENGTH = 80
+    MAX_EXCERPT_LENGTH = 200
 
     # System Prompt v3.0 - Estruturado com tags XML para melhor parsing
     SYSTEM_PROMPT = """<persona>
@@ -560,6 +574,53 @@ Nenhum texto adicional, prefixo ou metadado.
 
         return content
     
+    def _parse_article_json(self, text: Optional[str]) -> Optional[Dict]:
+        """
+        Parseia o JSON do artigo devolvido pelo LLM.
+
+        Duas defesas, nesta ordem:
+        1. Remoção de cercas ```json — modelos embrulham mesmo quando o prompt
+           pede JSON puro.
+        2. json_repair quando json.loads falha. O caso comum é aspas ou
+           newlines não escapadas dentro do content_markdown longo; o repair
+           conserta sem desfigurar conteúdo válido.
+
+        Devolve None quando não há JSON aproveitável ou quando falta campo
+        obrigatório (REQUIRED_ARTICLE_FIELDS).
+        """
+        if not text:
+            return None
+
+        limpo = text.strip()
+        if limpo.startswith("```"):
+            partes = limpo.split("```")
+            limpo = partes[1] if len(partes) > 1 else limpo
+            if limpo.startswith("json"):
+                limpo = limpo[4:]
+            limpo = limpo.strip()
+
+        dados = None
+        try:
+            dados = json.loads(limpo)
+        except (json.JSONDecodeError, ValueError):
+            try:
+                dados = json_repair.loads(limpo)
+            except Exception as e:
+                logger.error(f"[JSON] Parse falhou mesmo com json_repair: {e}")
+                return None
+
+        if not isinstance(dados, dict):
+            logger.error(f"[JSON] Esperado objeto, recebido {type(dados).__name__}")
+            return None
+
+        for campo in self.REQUIRED_ARTICLE_FIELDS:
+            valor = dados.get(campo)
+            if not isinstance(valor, str) or not valor.strip():
+                logger.error(f"[JSON] Campo obrigatório ausente ou vazio: {campo}")
+                return None
+
+        return dados
+
     def _sanitize_content(self, content: str) -> str:
         """
         Sanitiza o conteúdo gerado pela IA (v3.0)
