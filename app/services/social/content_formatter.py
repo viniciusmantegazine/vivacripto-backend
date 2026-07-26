@@ -113,9 +113,12 @@ class SocialContentFormatter:
         hashtags = self._get_hashtags(category_slug, limit=3)
         hashtags_text = " ".join(f"#{tag}" for tag in hashtags)
 
-        # Calculate available space for title
-        # URL (23) + space (1) + hashtags + space (1)
-        reserved_space = self.TWITTER_URL_LENGTH + 2 + len(hashtags_text)
+        # Espaço reservado para o que não é título.
+        # O texto final é "{titulo}\n\n{hashtags}\n\n{url}": são DOIS
+        # separadores de 2 chars cada, ou seja 4 — não 2. Contar 2 fazia o
+        # tweet chegar a 282 quando o título não tinha espaço perto do corte,
+        # porque nesse caso o recuo do truncamento não absorve a diferença.
+        reserved_space = self.TWITTER_URL_LENGTH + 4 + len(hashtags_text)
         max_title_length = self.TWITTER_MAX_LENGTH - reserved_space
 
         # Apply sentence case (pt-BR) and truncate if needed
