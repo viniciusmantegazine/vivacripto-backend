@@ -53,3 +53,24 @@ async def test_descarta_entrada_sem_data(monkeypatch):
     titles = [i["title"] for i in items]
     assert "Noticia recente" in titles
     assert "Noticia sem data" not in titles
+
+
+@pytest.mark.asyncio
+async def test_collected_at_utc_aware(monkeypatch):
+    """collected_at deve ser UTC-aware (era datetime.now() local/naive)."""
+    collector = RSSCollector()
+
+    recent_struct = (datetime.now(timezone.utc) - timedelta(hours=1)).timetuple()
+    feed = _feed([_entry("Noticia recente", published_struct=recent_struct)])
+
+    async def fake_fetch(url):
+        return feed
+
+    monkeypatch.setattr(collector, "_fetch_feed", fake_fetch)
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    items = await collector._collect_from_feed(
+        {"name": "Test", "url": "x", "language": "en"}, cutoff
+    )
+
+    assert items[0]["collected_at"].tzinfo is not None

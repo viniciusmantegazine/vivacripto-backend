@@ -35,12 +35,22 @@ class RSSCollector:
             "language": "en"
         },
         {
-            "name": "The Block",
-            "url": "https://www.theblock.co/rss.xml",
+            "name": "Bitcoin Magazine",
+            "url": "https://bitcoinmagazine.com/feed",
             "language": "en"
         },
     ]
-    
+
+    # Alguns feeds (CoinDesk, Bitcoin Magazine) retornam 403 para User-Agents
+    # de bibliotecas HTTP. Usamos UA de browser real + Accept de RSS.
+    HEADERS = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+        ),
+        "Accept": "application/rss+xml, application/xml, text/xml, */*",
+    }
+
     def __init__(self):
         self.timeout = 10  # Reduzido para 10 segundos
     
@@ -116,7 +126,7 @@ class RSSCollector:
                         "url": entry.get("link", "").strip(),
                         "description": entry.get("summary", "").strip(),
                         "published_at": pub_date,
-                        "collected_at": datetime.now(),
+                        "collected_at": datetime.now(timezone.utc),
                     }
                     
                     # Validar dados mínimos
@@ -141,7 +151,8 @@ class RSSCollector:
                 async with httpx.AsyncClient(
                     timeout=self.timeout,
                     follow_redirects=True,
-                    limits=httpx.Limits(max_connections=5)
+                    limits=httpx.Limits(max_connections=5),
+                    headers=self.HEADERS,
                 ) as client:
                     logger.debug(f"Tentativa {attempt + 1}/{max_retries} para {url}")
                     response = await client.get(url)
@@ -163,7 +174,22 @@ class RSSCollector:
                 if attempt == max_retries - 1:
                     logger.error(f"Timeout definitivo em {url} após {max_retries} tentativas")
                     return None
-            
+
+            except httpx.HTTPStatusError as e:
+                status = e.response.status_code
+                if status >= 500 and attempt < max_retries - 1:
+                    logger.warning(
+                        f"HTTP {status} ao buscar {url} "
+                        f"(tentativa {attempt + 1}/{max_retries})"
+                    )
+                    continue
+                # 4xx não adianta repetir: feed removido ou bloqueio anti-bot.
+                logger.error(
+                    f"Feed {url} respondeu HTTP {status} — "
+                    f"verificar se o feed mudou de URL ou bloqueia bots"
+                )
+                return None
+
             except Exception as e:
                 logger.error(f"Erro inesperado ao buscar feed {url}: {type(e).__name__}: {e}")
                 return None
