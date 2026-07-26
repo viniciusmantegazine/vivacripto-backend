@@ -3,7 +3,7 @@ CRUD operations for Post model
 """
 import re
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Set
 from uuid import UUID
 
 from sqlalchemy import select, func, or_
@@ -60,6 +60,29 @@ async def get_recent_posts(db: AsyncSession, since: datetime) -> List[Post]:
         .order_by(Post.created_at.desc())
     )
     return list(result.scalars().all())
+
+
+async def get_existing_source_urls(
+    db: AsyncSession, urls: List[str], since: datetime
+) -> Set[str]:
+    """
+    Retorna o subconjunto de `urls` que já foi usado como fonte de algum
+    post criado desde `since`.
+
+    Usado pelo pipeline para pular notícias já processadas ANTES de gastar
+    chamadas de LLM (a coleta olha 24h para trás e o cron roda várias vezes
+    ao dia — sem esse filtro, a mesma notícia é regenerada em cada run).
+    """
+    if not urls:
+        return set()
+
+    result = await db.execute(
+        select(Post.source_url).where(
+            Post.source_url.in_(urls),
+            Post.created_at >= since,
+        )
+    )
+    return {row[0] for row in result.all()}
 
 
 async def get_post_by_id(db: AsyncSession, post_id: UUID) -> Optional[Post]:
@@ -250,7 +273,13 @@ class CRUDPost:
     
     async def get_recent_posts(self, db: AsyncSession, since: datetime) -> List[Post]:
         return await get_recent_posts(db, since)
-    
+
+    async def get_existing_source_urls(
+        self, db: AsyncSession, urls: List[str], since: datetime
+    ) -> Set[str]:
+        return await get_existing_source_urls(db, urls, since)
+
+
     async def get_post_by_id(self, db: AsyncSession, post_id: UUID) -> Optional[Post]:
         return await get_post_by_id(db, post_id)
     
