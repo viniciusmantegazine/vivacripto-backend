@@ -3,6 +3,7 @@ News Aggregator Service
 Agrega notícias de múltiplas fontes (RSS + APIs) com deduplicação inteligente
 """
 import asyncio
+from datetime import datetime, timezone
 from typing import List, Dict, Tuple
 from loguru import logger
 
@@ -87,14 +88,23 @@ class NewsAggregator:
     def _deduplicate_source_news(self, news_list: List[Dict]) -> List[Dict]:
         """
         Remove notícias duplicadas de diferentes fontes sobre o mesmo tema.
-        Mantém a notícia com descrição mais completa.
+
+        Mantém a notícia com descrição mais completa e CONTA quantas fontes
+        cobriram cada tema (source_count) — esse é o sinal de relevância
+        usado para ordenar o resultado: notícia coberta por mais fontes é
+        mais importante e vai para o topo da fila de processamento.
+        Empate é resolvido por recência (published_at).
 
         Args:
             news_list: Lista de notícias coletadas
 
         Returns:
-            Lista de notícias únicas
+            Lista de notícias únicas, ordenada por relevância
         """
+        for news in news_list:
+            news["source_count"] = 1
+            news["covered_by"] = [news.get("source", "")]
+
         if len(news_list) <= 1:
             return news_list
 
@@ -112,34 +122,33 @@ class NewsAggregator:
             is_duplicate = False
 
             # Comparar com notícias já marcadas como únicas
-            for news_j in unique_news:
+            for j, news_j in enumerate(unique_news):
                 text_j = self._get_comparison_text(news_j)
 
                 try:
-                    result = engine.calculate(text_i, text_j)
-                    similarity = result.score
-
-                    if similarity >= self.SOURCE_DEDUP_THRESHOLD:
-                        duplicates_found += 1
-                        logger.debug(
-                            f"Duplicata #{duplicates_found}: {similarity:.0%} - "
-                            f"[{news_i.get('source')}] vs [{news_j.get('source')}]"
-                        )
-
-                        # Manter a notícia com descrição mais completa
-                        desc_i = len(news_i.get('description', ''))
-                        desc_j = len(news_j.get('description', ''))
-
-                        if desc_i > desc_j:
-                            idx = unique_news.index(news_j)
-                            unique_news[idx] = news_i
-
-                        is_duplicate = True
-                        break
-
+                    similarity = engine.calculate(text_i, text_j).score
                 except Exception as e:
                     logger.warning(f"Erro ao calcular similaridade: {e}")
                     continue
+
+                if similarity >= self.SOURCE_DEDUP_THRESHOLD:
+                    duplicates_found += 1
+                    logger.debug(
+                        f"Duplicata #{duplicates_found}: {similarity:.0%} - "
+                        f"[{news_i.get('source')}] vs [{news_j.get('source')}]"
+                    )
+
+                    # Mantém a descrição mais completa, acumulando contagem
+                    # de fontes e lista de cobertura de ambas as versões.
+                    desc_i = len(news_i.get('description', ''))
+                    desc_j = len(news_j.get('description', ''))
+                    keeper = news_i if desc_i > desc_j else news_j
+                    keeper["source_count"] = news_j["source_count"] + 1
+                    keeper["covered_by"] = news_j["covered_by"] + [news_i.get("source", "")]
+                    unique_news[j] = keeper
+
+                    is_duplicate = True
+                    break
 
             if not is_duplicate:
                 unique_news.append(news_i)
@@ -148,7 +157,21 @@ class NewsAggregator:
             if (i + 1) % 10 == 0:
                 logger.debug(f"Deduplicação: {i + 1}/{len(news_list)} processadas")
 
+        # Ordena por relevância: mais fontes primeiro; empate -> mais recente.
+        # published_at das fontes RSS é sempre UTC-aware; fallback aware para
+        # itens sem data não quebrar a comparação.
+        fallback_date = datetime.min.replace(tzinfo=timezone.utc)
+        unique_news.sort(
+            key=lambda n: (n["source_count"], n.get("published_at") or fallback_date),
+            reverse=True,
+        )
+
         logger.info(f"Deduplicação concluída: {duplicates_found} duplicatas encontradas")
+        if unique_news:
+            top = unique_news[0]
+            logger.info(
+                f"Top da fila: [{top['source_count']} fonte(s)] {top.get('title', '')[:60]}"
+            )
         return unique_news
 
     def _get_comparison_text(self, news: Dict) -> str:
