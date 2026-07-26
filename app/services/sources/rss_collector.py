@@ -5,9 +5,27 @@ Coleta notícias de feeds RSS de fontes confiáveis
 import feedparser
 import httpx
 import asyncio
+import html as html_lib
+import re
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta, timezone
 from loguru import logger
+
+
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _strip_html(text) -> str:
+    """
+    Remove tags HTML e entidades de texto vindo de feeds RSS.
+    Vários feeds mandam `summary` com HTML embutido, que contaminaria o
+    prompt do LLM e a comparação de similaridade do dedup de fontes.
+    """
+    if not text:
+        return ""
+    text = _TAG_RE.sub(" ", text)
+    text = html_lib.unescape(text)
+    return re.sub(r"\s+", " ", text).strip()
 
 
 class RSSCollector:
@@ -122,9 +140,9 @@ class RSSCollector:
                     news_item = {
                         "source": feed_config["name"],
                         "source_language": feed_config["language"],
-                        "title": entry.get("title", "").strip(),
+                        "title": _strip_html(entry.get("title", "")),
                         "url": entry.get("link", "").strip(),
-                        "description": entry.get("summary", "").strip(),
+                        "description": _strip_html(entry.get("summary", "")),
                         "published_at": pub_date,
                         "collected_at": datetime.now(timezone.utc),
                     }
