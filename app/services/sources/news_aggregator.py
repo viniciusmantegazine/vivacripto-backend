@@ -9,6 +9,7 @@ from loguru import logger
 
 from .rss_collector import RSSCollector
 from .api_collector import APICollector
+from .relevance_filter import RelevanceFilter
 
 
 class NewsAggregator:
@@ -48,6 +49,7 @@ class NewsAggregator:
     def __init__(self):
         self.rss_collector = RSSCollector()
         self.api_collector = APICollector()
+        self.relevance_filter = RelevanceFilter()
         self._similarity_engine = None
 
     def _get_similarity_engine(self):
@@ -97,8 +99,16 @@ class NewsAggregator:
         except Exception as e:
             logger.error(f"Erro ao coletar de APIs: {type(e).__name__}: {e}")
 
+        # Filtro de relevância ANTES da deduplicação: o dedup é O(n²), e este é
+        # o funil único por onde passam RSS e API.
+        coletadas = len(all_news)
+        all_news = self._filter_off_topic(all_news)
+
         total_before = len(all_news)
-        logger.info(f"Coleta finalizada: {total_before} notícias no total")
+        logger.info(
+            f"Coleta finalizada: {coletadas} notícia(s) coletada(s), "
+            f"{total_before} no tema"
+        )
 
         # Deduplificar notícias de fontes diferentes sobre o mesmo tema.
         # O(n²) síncrono e CPU-bound (TF-IDF): roda fora do event loop.
@@ -111,6 +121,36 @@ class NewsAggregator:
         logger.info(f"Notícias únicas para processamento: {len(deduplicated_news)}")
 
         return deduplicated_news
+
+    def _filter_off_topic(self, news_list: List[Dict]) -> List[Dict]:
+        """
+        Remove notícias de outra editoria antes da deduplicação.
+
+        Loga CADA descarte em WARNING, com o termo que o causou. Não é excesso:
+        este projeto já calibrou dois thresholds fora da faixa onde o dado real
+        cai — SOURCE_DEDUP_THRESHOLD a 0,65 e DEDUPLICATION_THRESHOLD a 0,80 —
+        e nos dois casos o sintoma foi silêncio. Gate mal calibrado comendo
+        notícia legítima é o mesmo modo de falha, com consequência pior. A ~6%
+        de descarte são cerca de 7 linhas por run.
+        """
+        mantidas = []
+        for news in news_list:
+            termo = self.relevance_filter.rejection_reason(news)
+            if termo is None:
+                mantidas.append(news)
+                continue
+            logger.warning(
+                f"Fora de tema (casou '{termo}', sem sinal de cripto): "
+                f"[{news.get('source', '')}] {news.get('title', '')[:80]}"
+            )
+
+        descartadas = len(news_list) - len(mantidas)
+        if descartadas:
+            logger.warning(
+                f"Filtro de relevância: {descartadas}/{len(news_list)} "
+                f"notícia(s) descartada(s) por serem de outra editoria"
+            )
+        return mantidas
 
     def _deduplicate_source_news(self, news_list: List[Dict]) -> List[Dict]:
         """
