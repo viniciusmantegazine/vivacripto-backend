@@ -92,7 +92,11 @@ class Post(Base):
     meta_title = Column(String(70))
     meta_description = Column(String(160))
     canonical_url = Column(String(255))
-    
+
+    # URL da notícia original nas fontes (pré-filtro anti-reprocessamento
+    # do pipeline — ver crud_post.get_existing_source_urls)
+    source_url = Column(Text, nullable=True, index=True)
+
     # Timestamps
     created_at = Column(DateTime, default=utc_now, nullable=False)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)

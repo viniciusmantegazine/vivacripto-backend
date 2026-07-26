@@ -74,6 +74,8 @@ class PostCreate(PostBase):
     tag_ids: List[UUID] = Field(default_factory=list)
     status: PostStatus = "draft"
     published_at: Optional[datetime] = None
+    # URL da notícia original (não exposta em PostBase/PostRead de propósito)
+    source_url: Optional[str] = None
 
 
 class PostUpdate(BaseModel):

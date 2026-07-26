@@ -243,6 +243,7 @@ class ArticlePublisher:
             meta_title=meta_title or None,
             meta_description=meta_description or None,
             canonical_url=None,
+            source_url=article.get("source_url"),
             category_id=category_id,
         )
 
