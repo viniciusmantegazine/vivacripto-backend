@@ -204,6 +204,11 @@ class SmartPromptGenerator:
         "complete framing with nothing cropped, 16:9 aspect ratio"
     )
 
+    # Sentenças que NUNCA podem ser cortadas pelo cap de tamanho: carregam o
+    # formato (16:9) e as proteções de marca. Elas ficam no FIM do prompt, que
+    # era exatamente onde o corte agia — ver _validate_and_optimize_prompt.
+    MANDATORY_TAIL_PARTS = (QUALITY_SUFFIX, QUALITY_PROTECTION_SUFFIX)
+
     # NOVO v3.1: Instrução crítica para contextos genéricos
     # Adicionada ao final do prompt quando is_generic_context=True
     GENERIC_CONTEXT_INSTRUCTION = (
@@ -523,11 +528,51 @@ class SmartPromptGenerator:
 
         result = ', '.join(unique_sentences)
 
-        # Limitar tamanho (APIs podem ter limite de ~4000 chars, usamos 1500 para segurança)
+        # Limitar tamanho (Imagen aceita ~480 tokens; 1500 chars é a margem segura)
         MAX_PROMPT_LENGTH = 1500
+        if len(result) <= MAX_PROMPT_LENGTH:
+            return result
+
+        # ATENÇÃO: não voltar a cortar pelo fim (`result[:MAX].rsplit`).
+        # Os guardrails obrigatórios — 16:9, anti-watermark,
+        # anti-Getty/Shutterstock e anti-branding de veículos — ficam no FINAL
+        # do prompt, então o corte por tamanho os descartava em silêncio.
+        # Agora sacrificamos o miolo DESCRITIVO (cena, iluminação, paleta),
+        # de trás para frente, e a cauda obrigatória sempre sobrevive.
+        mandatory = {
+            s.strip().lower()
+            for part in self.MANDATORY_TAIL_PARTS
+            for s in part.split(', ')
+            if s.strip()
+        }
+
+        kept = list(unique_sentences)
+
+        def _joined() -> str:
+            return ', '.join(s for s in kept if s is not None)
+
+        for i in reversed(range(len(kept))):
+            if len(_joined()) <= MAX_PROMPT_LENGTH:
+                break
+            if kept[i] is not None and kept[i].strip().lower() not in mandatory:
+                kept[i] = None
+
+        result = _joined()
+        dropped = sum(1 for s in kept if s is None)
+        if dropped:
+            logger.debug(
+                f"[PromptGen] Prompt acima de {MAX_PROMPT_LENGTH} chars: "
+                f"{dropped} sentença(s) descritiva(s) removida(s), "
+                f"guardrails preservados"
+            )
+
         if len(result) > MAX_PROMPT_LENGTH:
-            # Cortar no último separador completo
-            result = result[:MAX_PROMPT_LENGTH].rsplit(', ', 1)[0]
+            # Só os guardrails já estouram o cap: preferimos manter as
+            # proteções e passar do limite a gerar imagem com marca d'água.
+            logger.warning(
+                f"[PromptGen] Guardrails obrigatórios somam {len(result)} chars "
+                f"(> {MAX_PROMPT_LENGTH}) — cap excedido de propósito"
+            )
 
         return result
 
