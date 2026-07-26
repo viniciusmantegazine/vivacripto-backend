@@ -189,3 +189,44 @@ async def test_fallback_dispara_quando_primario_levanta(sem_rede):
     assert resultado.startswith("## Relatório do fallback")
     assert chamadas[0]["model"] == WeeklyReportGenerator.CLAUDE_MODEL
     assert chamadas[1]["model"] == WeeklyReportGenerator.CLAUDE_FALLBACK_MODEL
+
+
+def _recusa():
+    """Recusa por classificador: HTTP 200, sem exceção, content vazio."""
+    return _Mensagem([], stop_reason="refusal")
+
+
+@pytest.mark.asyncio
+async def test_recusa_no_primario_cai_para_o_fallback(sem_rede):
+    """Classificadores diferem por modelo — vale tentar o fallback."""
+    gen, chamadas = _gerador_com_cliente([
+        _recusa(),
+        _texto("## Relatório do fallback\n\nCorpo."),
+    ])
+
+    resultado = await gen._generate_content()
+
+    assert resultado.startswith("## Relatório do fallback")
+    assert len(chamadas) == 2
+
+
+@pytest.mark.asyncio
+async def test_recusa_nos_dois_modelos_retorna_none(sem_rede):
+    """Recusa dupla não pode virar relatório vazio publicado como sucesso."""
+    gen, _ = _gerador_com_cliente([_recusa(), _recusa()])
+
+    assert await gen._generate_content() is None
+
+
+@pytest.mark.asyncio
+async def test_recusa_nao_e_confundida_com_texto_vazio(sem_rede):
+    """
+    Mesmo com bloco de texto presente, stop_reason=refusal invalida a
+    resposta — o conteúdo é parcial e não deve ser publicado.
+    """
+    gen, _ = _gerador_com_cliente([
+        _Mensagem([_Bloco("text", text="começo truncado")], stop_reason="refusal"),
+        _recusa(),
+    ])
+
+    assert await gen._generate_content() is None

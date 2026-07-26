@@ -190,6 +190,15 @@ class WeeklyReportGenerator:
         ) as stream:
             message = await stream.get_final_message()
 
+        # Recusa por classificador vem como HTTP 200, não como exceção: o
+        # try/except de quem chama não pega. Qualquer texto presente é
+        # parcial e não deve ser publicado.
+        if getattr(message, "stop_reason", None) == "refusal":
+            logger.error(
+                f"[Claude] {model} recusou a geração (classificador de segurança)"
+            )
+            return None
+
         text = self._extract_text(message)
         if not text:
             logger.error(f"[Claude] {model} não retornou bloco de texto")
