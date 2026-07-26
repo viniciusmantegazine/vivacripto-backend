@@ -155,15 +155,55 @@ class _Hostil:
         raise RuntimeError("nem str funciona")
 
 
+class _Nivel:
+    """Stub do objeto de nivel do loguru, que expõe `.name`."""
+
+    name = "INFO"
+
+
+class _MensagemFalsa:
+    """Stub do objeto Message do loguru: o sink só lê `.record`."""
+
+    def __init__(self, record):
+        self.record = record
+
+
+def _record_minimo(**sobrescreve) -> dict:
+    from datetime import datetime, timezone
+
+    record = {
+        "time": datetime.now(timezone.utc),
+        "level": _Nivel(),
+        "extra": {"request_id": "-", "correlation_id": "-"},
+        "name": "teste",
+        "function": "f",
+        "line": 1,
+        "message": "msg",
+        "exception": None,
+    }
+    record.update(sobrescreve)
+    return record
+
+
 def test_registro_nao_serializavel_ainda_produz_linha():
     """
     Sink que levanta faz o loguru escrever um bloco
     `--- Logging error in Loguru Handler ---` multi-linha em stderr — que e
     exatamente o tipo de saida nao parseavel que este trabalho elimina. Entao o
     sink degrada para uma linha minima em vez de deixar a excecao escapar.
-    """
-    payload = _payload(lambda: logger.bind(request_id=_Hostil()).info("msg"))
 
+    Chama `_json_sink` direto em vez de passar pelo logger: `context_filter`
+    sobrescreve `extra["request_id"]` antes do sink rodar, entao um
+    `logger.bind(request_id=...)` nunca chegaria ate aqui. Mudar o filtro para
+    tornar o teste alcancavel seria alterar producao por causa de teste.
+    """
+    record = _record_minimo(extra={"request_id": _Hostil(), "correlation_id": "-"})
+    buffer = io.StringIO()
+
+    with contextlib.redirect_stderr(buffer):
+        _json_sink(_MensagemFalsa(record))
+
+    payload = json.loads(buffer.getvalue())
     assert payload["message"] == "falha ao serializar registro de log"
     assert "RuntimeError" in payload["sink_error"]
 
@@ -224,3 +264,15 @@ def test_desenvolvimento_nao_usa_o_sink_json(monkeypatch):
     modulo.setup_logging()
 
     assert modulo._json_sink not in [alvo for alvo, _ in adicionados]
+
+
+def test_context_filter_tem_precedencia_sobre_bind():
+    """
+    `context_filter` sobrescreve `extra["request_id"]` de proposito: o
+    contextvar da requisicao e a fonte da verdade, e um `bind` de call site nao
+    deve mascara-la. Este teste existe porque a alternativa (setdefault) parece
+    inofensiva e muda a semantica.
+    """
+    payload = _payload(lambda: logger.bind(request_id="do-bind").info("x"))
+
+    assert payload["request_id"] == "-"

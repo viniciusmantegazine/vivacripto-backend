@@ -44,8 +44,8 @@ def clear_request_context():
 
 def context_filter(record: Dict[str, Any]) -> bool:
     """Add context variables to log records."""
-    record["extra"].setdefault("request_id", get_request_id() or "-")
-    record["extra"].setdefault("correlation_id", get_correlation_id() or "-")
+    record["extra"]["request_id"] = get_request_id() or "-"
+    record["extra"]["correlation_id"] = get_correlation_id() or "-"
     return True
 
 
