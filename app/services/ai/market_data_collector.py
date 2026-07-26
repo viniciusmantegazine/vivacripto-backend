@@ -24,10 +24,13 @@ class MarketDataCollector:
     COINGECKO_BASE = "https://api.coingecko.com/api/v3"
     FEAR_GREED_URL = "https://api.alternative.me/fng/"
 
-    async def collect_all(self) -> str:
+    async def _collect_sections(self, include_macro: bool) -> list:
         """
-        Coleta todos os dados de mercado e retorna como texto formatado.
-        Em caso de falha parcial, retorna o que conseguiu coletar.
+        Coleta as seções de dados disponíveis.
+
+        Falha parcial devolve o que deu — dado incompleto ainda é dado útil.
+        `include_macro` controla as 5 buscas web de contexto macro, que custam
+        ~5,9s dos ~7,0s totais e só interessam ao relatório semanal.
         """
         sections = []
 
@@ -44,9 +47,31 @@ class MarketDataCollector:
             if fng:
                 sections.append(fng)
 
-        macro = await self._search_macro_context()
-        if macro:
-            sections.append(macro)
+        if include_macro:
+            macro = await self._search_macro_context()
+            if macro:
+                sections.append(macro)
+
+        return sections
+
+    def _formatar(self, sections: list) -> str:
+        """
+        Cabeçalho com timestamp + seções. O timestamp diz ao modelo que o dado
+        é do momento, não histórico.
+        """
+        timestamp = datetime.utcnow().strftime("%d/%m/%Y %H:%M UTC")
+        header = f"=== DADOS DE MERCADO COLETADOS EM {timestamp} ==="
+        return header + "\n\n" + "\n\n".join(sections)
+
+    async def collect_all(self) -> str:
+        """
+        Dados de mercado COM contexto macro, para o relatório semanal.
+
+        Em falha total devolve uma NOTA em texto (não None): no relatório
+        semanal a ausência de dado merece nota ao leitor. Contrato preservado
+        do comportamento anterior.
+        """
+        sections = await self._collect_sections(include_macro=True)
 
         if not sections:
             return (
@@ -55,9 +80,21 @@ class MarketDataCollector:
                 "os dados podem estar defasados."
             )
 
-        timestamp = datetime.utcnow().strftime("%d/%m/%Y %H:%M UTC")
-        header = f"=== DADOS DE MERCADO COLETADOS EM {timestamp} ==="
-        return header + "\n\n" + "\n\n".join(sections)
+        return self._formatar(sections)
+
+    async def collect_snapshot(self) -> Optional[str]:
+        """
+        Dados de mercado SEM contexto macro, para o pipeline de notícias.
+
+        Devolve None em falha total — e não o texto de fallback do collect_all,
+        que instruiria o modelo a especular com conhecimento de treino. Aqui a
+        ausência de dado significa apenas que a seção não entra no prompt.
+        """
+        sections = await self._collect_sections(include_macro=False)
+        if not sections:
+            logger.warning("[MarketData] Nenhum dado coletado para o snapshot")
+            return None
+        return self._formatar(sections)
 
     async def _fetch_crypto_prices(self, client: httpx.AsyncClient) -> Optional[str]:
         """Busca preços de BTC, ETH e principais criptos via CoinGecko"""
