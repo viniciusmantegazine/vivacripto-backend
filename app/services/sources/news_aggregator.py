@@ -14,9 +14,25 @@ from .api_collector import APICollector
 class NewsAggregator:
     """Agregador de notícias de múltiplas fontes com deduplicação"""
 
-    # Threshold de similaridade para considerar notícias como duplicatas
-    # Mais baixo que o threshold de posts (0.80) para ser mais agressivo na filtragem
-    SOURCE_DEDUP_THRESHOLD = 0.65
+    # Threshold de similaridade para considerar notícias como duplicatas.
+    #
+    # NÃO subir para 0.65 (valor anterior): com ele o threshold nunca
+    # disparava. Medição sobre 3525 pares cross-fonte reais (96 notícias,
+    # janela de 72h) com o engine TF-IDF:
+    #
+    #   - maior similaridade entre par de MESMA notícia: 0.525
+    #   - primeiro falso positivo (notícias distintas):  0.403
+    #   - duplicatas verdadeiras descem até:             0.384
+    #
+    # As faixas se sobrepõem, então não existe corte limpo. 0.45 casa 8 pares
+    # verdadeiros com zero falsos e deixa 0.047 de folga até o primeiro falso
+    # positivo. 0.42 casaria 11, mas com só 0.017 de margem numa amostra só.
+    #
+    # A escolha é conservadora de propósito, por assimetria de custo: falso
+    # positivo DESCARTA uma notícia distinta e o leitor nunca a vê; falso
+    # negativo é absorvido pelo DuplicateDetector (threshold 0.80) na hora de
+    # publicar, custando apenas o boost de source_count.
+    SOURCE_DEDUP_THRESHOLD = 0.45
 
     def __init__(self):
         self.rss_collector = RSSCollector()
@@ -138,13 +154,23 @@ class NewsAggregator:
                         f"[{news_i.get('source')}] vs [{news_j.get('source')}]"
                     )
 
-                    # Mantém a descrição mais completa, acumulando contagem
-                    # de fontes e lista de cobertura de ambas as versões.
+                    # Mantém a descrição mais completa, acumulando a cobertura
+                    # de ambas as versões.
+                    #
+                    # source_count é derivado de covered_by DEDUPLICADO, não
+                    # incrementado: este loop não pula pares da mesma fonte,
+                    # então três artigos parecidos do mesmo veículo mergeavam
+                    # e produziam source_count=3 com covered_by repetido —
+                    # invertendo a premissa do ranking, porque veículo se
+                    # repetindo (digest, matérias relacionadas) passava à
+                    # frente de notícia realmente coberta por várias fontes.
                     desc_i = len(news_i.get('description', ''))
                     desc_j = len(news_j.get('description', ''))
                     keeper = news_i if desc_i > desc_j else news_j
-                    keeper["source_count"] = news_j["source_count"] + 1
-                    keeper["covered_by"] = news_j["covered_by"] + [news_i.get("source", "")]
+                    keeper["covered_by"] = sorted(
+                        set(news_j["covered_by"]) | {news_i.get("source", "")}
+                    )
+                    keeper["source_count"] = len(keeper["covered_by"])
                     unique_news[j] = keeper
 
                     is_duplicate = True
