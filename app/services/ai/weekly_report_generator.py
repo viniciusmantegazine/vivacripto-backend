@@ -43,9 +43,12 @@ class WeeklyReportGenerator:
     - Prompt: Fixo e extenso (vs. Dinâmico por notícia)
     """
 
-    # Modelos Claude
-    CLAUDE_MODEL = "claude-opus-4-20250514"
-    CLAUDE_FALLBACK_MODEL = "claude-sonnet-4-20250514"
+    # Modelos Claude. IDs sem sufixo de data — não acrescentar um.
+    # Os anteriores (claude-opus-4-20250514 / claude-sonnet-4-20250514) foram
+    # depreciados com retirada em 15/jun/2026; primário e fallback eram da
+    # mesma geração, então o fallback não salvava nada.
+    CLAUDE_MODEL = "claude-opus-5"
+    CLAUDE_FALLBACK_MODEL = "claude-sonnet-5"
 
     # Configurações de geração
     MAX_TOKENS = 8192  # Relatórios longos precisam de mais tokens
