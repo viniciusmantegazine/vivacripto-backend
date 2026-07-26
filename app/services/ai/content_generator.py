@@ -68,6 +68,31 @@ class ContentGenerator:
     GEMINI_MODEL = "gemini-2.5-flash"
     OPENAI_MODEL = "gpt-4o-mini"
 
+    # Veículos jornalísticos concorrentes que NUNCA devem aparecer no texto
+    # gerado. SEM variantes de caixa: o casamento é por regex com
+    # re.IGNORECASE. Reintroduzir "coindesk" ao lado de "CoinDesk" é o que
+    # causou a corrupção de texto corrigida aqui.
+    SOURCE_SITE_NAMES = (
+        "CoinDesk",
+        "CoinTelegraph",
+        "CryptoSlate",
+        "Bitcoin Magazine",
+        "Decrypt",
+        "The Block",
+        "CoinPaper",
+        "CoinRepo",
+        "BeInCrypto",
+        "NewsBTC",
+        "CryptoNews",
+    )
+
+    # Exceção: "the block" (artigo + substantivo) é vocabulário central de
+    # cripto — "the block height", "the block reward", "the block size".
+    # Casar este nome case-SENSITIVE preserva essas frases e ainda pega
+    # "The Block informou que...", porque LLM capitaliza nome próprio.
+    # Custo aceito: menção ao veículo escrita toda em minúscula escapa.
+    CASE_SENSITIVE_SITE_NAMES = frozenset({"The Block"})
+
     # System Prompt v3.0 - Estruturado com tags XML para melhor parsing
     SYSTEM_PROMPT = """<persona>
 Você é o Editor-Chefe do portal VerticeCripto, um veículo jornalístico especializado em criptoeconomia para o público brasileiro. Sua formação combina jornalismo financeiro (Bloomberg), tecnologia acessível (The Verge) e expertise no mercado cripto.
@@ -560,20 +585,7 @@ Nenhum texto adicional, prefixo ou metadado.
             "**Corpo:**", "**Artigo:**", "**Output:**",
         ]
 
-        # Nomes de sites/fontes de notícias que NUNCA devem aparecer no texto gerado
-        source_site_names = [
-            "CoinDesk", "Coindesk", "coindesk",
-            "CoinTelegraph", "Cointelegraph", "cointelegraph",
-            "CryptoSlate", "cryptoslate",
-            "Bitcoin Magazine", "bitcoin magazine",
-            "Decrypt", "decrypt",
-            "The Block", "the block",
-            "CoinPaper", "coinpaper",
-            "CoinRepo", "coinrepo",
-            "BeInCrypto", "beincrypto",
-            "NewsBTC", "newsbtc",
-            "CryptoNews", "cryptonews",
-        ]
+        # A lista de veículos agora é o atributo de classe SOURCE_SITE_NAMES.
 
         # Frases que indicam possível conselho financeiro (apenas warning)
         nfa_red_flags = [
@@ -644,27 +656,41 @@ Nenhum texto adicional, prefixo ou metadado.
         # ATENÇÃO: NÃO injetar frases-tique como "informações divulgadas"/"fontes do setor"
         # — esse é o fingerprint de IA que o Google penaliza. Se o LLM violou o prompt,
         # remover a frase introdutória inteira e logar ERROR para investigação.
-        for site_name in source_site_names:
-            if site_name in result:
-                logger.error(
-                    f"[Sanitização CRÍTICA] LLM violou regra e citou veículo '{site_name}'. "
-                    f"Removendo frase atributiva. Revisar prompt se reincidir."
-                )
-                # Remover frase introdutória completa: "Segundo o CoinDesk, ..."
-                result = re.sub(
-                    rf'(?i)\b(segundo|de acordo com|conforme|para|por)\s+(o|a|o portal|o site)?\s*{re.escape(site_name)}\b\s*[,.]?\s*',
-                    '',
-                    result
-                )
-                # Remover construções "o CoinDesk informou/reportou/publicou X" -> "X"
-                result = re.sub(
-                    rf'(?i)\b(o|a|o portal|o site)?\s*{re.escape(site_name)}\s+(informou|reportou|publicou|divulgou|noticiou|revelou)\s+que\s+',
-                    '',
-                    result
-                )
-                # Remoção final: deletar qualquer ocorrência restante do nome
-                if site_name in result:
-                    result = result.replace(site_name, "")
+        # Todo casamento usa \b...\b. Com substring, "decrypted" casava em
+        # "decrypt" e "the blockchain" em "the block" — corrompendo o texto
+        # ("the blockchain" virava "chain") e emitindo alerta CRÍTICO falso.
+        # NÃO usar (?i) embutido: ele ignora `flags` e quebraria a exceção
+        # case-sensitive de The Block.
+        for site_name in self.SOURCE_SITE_NAMES:
+            flags = (
+                0 if site_name in self.CASE_SENSITIVE_SITE_NAMES else re.IGNORECASE
+            )
+            padrao_nome = rf'\b{re.escape(site_name)}\b'
+
+            if not re.search(padrao_nome, result, flags):
+                continue
+
+            logger.error(
+                f"[Sanitização CRÍTICA] LLM violou regra e citou veículo '{site_name}'. "
+                f"Removendo frase atributiva. Revisar prompt se reincidir."
+            )
+            # Remover frase introdutória completa: "Segundo o CoinDesk, ..."
+            result = re.sub(
+                rf'\b(segundo|de acordo com|conforme|para|por)\s+(o|a|o portal|o site)?\s*{re.escape(site_name)}\b\s*[,.]?\s*',
+                '',
+                result,
+                flags=flags,
+            )
+            # Remover construções "o CoinDesk informou/reportou/publicou X" -> "X"
+            result = re.sub(
+                rf'\b(o|a|o portal|o site)?\s*{re.escape(site_name)}\s+(informou|reportou|publicou|divulgou|noticiou|revelou)\s+que\s+',
+                '',
+                result,
+                flags=flags,
+            )
+            # Remoção final: qualquer ocorrência restante do nome. Sem guarda
+            # de `if`: re.sub não faz nada quando não há casamento.
+            result = re.sub(padrao_nome, '', result, flags=flags)
 
         # Limpar artefatos de remoção (espaços duplos, vírgulas órfãs).
         # Restrito a [ \t] para NÃO colapsar \n\n — o validador exige quebras
