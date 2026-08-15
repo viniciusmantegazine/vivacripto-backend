@@ -50,30 +50,38 @@ curl -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5
 
 ---
 
-### 3. Threshold de Deduplicação - Falsos Positivos/Negativos
+### 3. Threshold de Deduplicação ✅ RECALIBRADO (2026-08-15)
 
-**Sintoma**: Notícias únicas são rejeitadas como duplicatas, ou duplicatas são publicadas.
+**Sintoma (histórico)**: Duplicatas eram publicadas no site — em agosto/2026
+dois pares chegaram ao ar (Tether/KPMG em 13-14/08 e Luke Dashjr duas vezes em
+11/08), ambos dentro da janela de 24h que o detector compara.
 
-**Causa**: Threshold de 0.80 pode ser muito alto ou baixo dependendo do conteúdo.
+**Causa**: O threshold de 0.80 foi calibrado para o engine de embeddings
+(sentence-transformers), que foi removido dos requirements. O engine de
+produção é o TF-IDF (`DEDUPLICATION_ENGINE = "tfidf"`, default), onde
+duplicata real pontua 0.72–0.73 — o 0.80 nunca disparava e a camada estava
+morta. A tabela antiga desta seção (produção = 0.80/embedding) descrevia uma
+configuração que não existia mais.
 
-**Solução**:
-| Ambiente | Threshold | Engine | Comportamento |
-|----------|-----------|--------|---------------|
-| Desenvolvimento | 0.40 | hybrid | Permissivo |
-| Staging | 0.60 | hybrid | Moderado |
-| **Produção** | **0.80** | **embedding** | Restritivo |
+**Solução aplicada**: `DEDUPLICATION_THRESHOLD = 0.55`, calibrado sobre
+artigos publicados reais comparados como o detector compara (título + resumo +
+conteúdo[:500]): duplicata verdadeira 0.72–0.73; mesma pauta com ângulo
+próprio 0.40; distintas ≤ 0.27. A fronteira editorial está travada em
+`tests/unit/test_duplicate_detector.py` com os textos reais dos pares.
 
-**Configuração**:
-```bash
-DEDUPLICATION_THRESHOLD=0.80
-DEDUPLICATION_ENGINE=embedding
-```
+**Ao recalibrar**: erre para cima. Falso positivo dispara `UPDATE_EXISTING`,
+que SOBRESCREVE o post existente — pior que publicar duplicata. E lembre que
+threshold e engine calibram JUNTOS: trocar o engine invalida o valor
+(o teste `_detector_de_producao` trava essa dependência).
+
+**Atenção deploy**: se a Railway definir `DEDUPLICATION_THRESHOLD` ou
+`DEDUPLICATION_ENGINE` como variável de ambiente, o env sobrepõe o default do
+código — confira que não há override com os valores antigos.
 
 **Diagnóstico**:
 ```python
 # No log, procure por:
-# "Similarity: 0.XX with post_id: ..."
-# Se muitos posts têm similaridade entre 0.75-0.85, ajuste o threshold
+# "Similaridade com '...': 0.XX"  (debug) e "Similaridade máxima: ..." (info)
 ```
 
 ---
@@ -546,10 +554,15 @@ comportamento é o certo continua aberta:
 Uma terceira via seria regerar um artigo mesclado, ao custo de mais uma chamada
 de LLM.
 
-**Ao decidir, considere junto:** o threshold do detector está em 0.80 e não
-dispara (ver a seção sobre isso), então hoje o caminho de update quase nunca
-roda. Corrigir o threshold aumenta a frequência disso e torna a escolha mais
-urgente.
+**Ao decidir, considere junto:** em 2026-08-15 o threshold do detector foi
+recalibrado de 0.80 (morto) para 0.55 (ver a seção sobre isso), então o
+caminho de update passou a rodar de verdade — para pares quase idênticos
+(≥0.55; duplicata real medida pontua 0.72+). O comportamento vivo de
+sobrescrever ficou: `update_article` hoje atualiza título, corpo, excerpt e
+meta juntos (coerente), preservando o slug. A escolha
+sobrescrever/anexar/mesclar segue aberta, mas o cenário que a torna aceitável
+— só disparar em releitura do mesmo fato — está travado por teste
+(`test_mesma_historia_com_angulo_proprio_vira_post_novo`).
 
 ## Filtro de relevância: duas armadilhas de vocabulário
 

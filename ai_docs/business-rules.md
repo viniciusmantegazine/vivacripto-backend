@@ -47,7 +47,7 @@ AIRDROP_DAILY_LIMIT = 5      # Apenas categoria 'airdrop'
 
 ### 2. Threshold de Deduplicação
 
-**Descrição**: Artigos com similaridade acima de 80% com posts existentes são considerados duplicatas.
+**Descrição**: Artigos com similaridade acima de 55% (engine TF-IDF) com posts publicados nas últimas 24 horas são considerados duplicatas.
 
 **Justificativa**:
 - Evitar conteúdo repetitivo
@@ -56,24 +56,30 @@ AIRDROP_DAILY_LIMIT = 5      # Apenas categoria 'airdrop'
 
 **Implementação**:
 - Arquivo: `app/services/deduplication/duplicate_detector.py`
-- Arquivo: `app/core/config.py` (linha 158)
+- Arquivo: `app/core/config.py` (constante `DEDUPLICATION_THRESHOLD`)
 
 **Configuração**:
 ```python
-DEDUPLICATION_THRESHOLD = 0.80  # 80%
-DEDUPLICATION_ENGINE = "embedding"
+DEDUPLICATION_THRESHOLD = 0.55  # calibrado para o engine tfidf (2026-08-15)
+DEDUPLICATION_ENGINE = "tfidf"
 ```
 
 **Validações**:
-- Compara título + excerpt + conteúdo
-- Usa embeddings semânticos (sentence-transformers)
-- Cache de embeddings em Redis para performance
+- Compara título + excerpt + primeiros 500 chars do conteúdo
+- Engine TF-IDF (implementação própria, sem dependência pesada)
 
 **Ações por Similaridade**:
 | Similaridade | Ação |
 |--------------|------|
-| < 80% | `CREATE_NEW` - Publica como novo |
-| ≥ 80% | `UPDATE_EXISTING` - Atualiza existente |
+| < 55% | `CREATE_NEW` - Publica como novo |
+| ≥ 55% | `UPDATE_EXISTING` - Sobrescreve o post existente (mesma URL) |
+
+**Calibração (2026-08-15, sobre artigos publicados reais)**: duplicata
+verdadeira pontua 0.72–0.73; mesma pauta com ângulo próprio, 0.40; notícias
+distintas, ≤ 0.27. O valor antigo de 0.80 foi calibrado para o engine de
+embeddings (removido dos requirements) e nunca disparava com TF-IDF — duas
+duplicatas chegaram a ser publicadas no site antes da correção. A fronteira
+está travada em `tests/unit/test_duplicate_detector.py`.
 
 ---
 
@@ -223,7 +229,7 @@ FORBIDDEN_PHRASES = [
           │                           │
           ▼                           ▼
     ┌───────────┐              ┌─────────────┐
-    │ < 80% sim │              │ ≥ 80% sim   │
+    │ < 55% sim │              │ ≥ 55% sim   │
     │CREATE_NEW │              │UPDATE_EXIST │
     └─────┬─────┘              └──────┬──────┘
           │                           │
@@ -341,7 +347,7 @@ def count_words(text: str) -> int:
 2. **Todo post deve ter slug único**
 3. **Limite diário não pode ser excedido para novos posts**
 4. **Tokens de autenticação devem ter mínimo 32 caracteres**
-5. **Posts duplicados (≥80% similaridade) não são criados como novos**
+5. **Posts duplicados (≥55% de similaridade TF-IDF) não são criados como novos**
 
 ### Relacionamentos
 

@@ -32,18 +32,16 @@ class NewsAggregator:
     # A escolha é conservadora de propósito, por assimetria de custo: falso
     # positivo DESCARTA uma notícia distinta e o leitor nunca a vê.
     #
-    # ATENÇÃO — correção de uma afirmação anterior: este comentário dizia que
-    # falso negativo era "absorvido pelo DuplicateDetector (threshold 0.80) na
-    # hora de publicar". Isso é FALSO. Medido: duplicatas reais pontuam
-    # 0.53-0.62 no engine TF-IDF que o detector usa (settings
-    # DEDUPLICATION_ENGINE = "tfidf"), então o threshold de 0.80 nunca dispara
-    # e aquela camada não pega nada hoje. Falso negativo aqui resulta em
-    # conteúdo duplicado PUBLICADO, não em perda apenas do boost de
-    # source_count.
-    #
-    # Enquanto o threshold do DuplicateDetector não for corrigido, os dois
-    # tipos de erro custam. Ao revisitar este valor, verifique primeiro se
-    # aquela camada voltou a funcionar.
+    # Histórico: este comentário já afirmou que falso negativo era "absorvido
+    # pelo DuplicateDetector na hora de publicar". Com o threshold antigo
+    # (0.80, calibrado para o engine de embeddings removido) isso era FALSO —
+    # a camada nunca disparava, e em 2026-08-15 duas duplicatas publicadas no
+    # site (pares Tether e Dashjr) confirmaram o custo. O threshold foi então
+    # recalibrado para 0.55 sobre artigos publicados reais (duplicata
+    # verdadeira 0.72-0.73, distintas <= 0.40 — ver app/core/config.py), e a
+    # camada voltou a funcionar: falso negativo aqui tende a virar
+    # UPDATE_EXISTING lá, não post duplicado. A rede de segurança existe, mas
+    # ela SOBRESCREVE o post alvo — continue preferindo acertar aqui.
     SOURCE_DEDUP_THRESHOLD = 0.45
 
     def __init__(self):

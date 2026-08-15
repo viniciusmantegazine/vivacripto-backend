@@ -203,7 +203,7 @@ class DuplicateDetector:
     def __init__(
         self,
         repository: PostRepository,
-        similarity_threshold: float = 0.80,
+        similarity_threshold: float = 0.55,
         engine_type: str = "hybrid"
     ):
         """
@@ -211,7 +211,10 @@ class DuplicateDetector:
 
         Args:
             repository: Repositório de posts
-            similarity_threshold: Threshold para considerar duplicata (padrão 80%)
+            similarity_threshold: Threshold para considerar duplicata. O
+                default acompanha settings.DEDUPLICATION_THRESHOLD, calibrado
+                para o engine tfidf (ver comentário em app/core/config.py) —
+                o pipeline passa o valor dos settings explicitamente.
             engine_type: Tipo de motor de similaridade
         """
         self.repository = repository

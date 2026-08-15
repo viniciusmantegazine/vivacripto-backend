@@ -258,44 +258,154 @@ async def test_erro_em_um_post_nao_impede_comparar_os_outros():
     assert resultado.post_existente_id == "post-bom"
 
 
-# --- o achado que motivou este arquivo -----------------------------------
+# --- o achado que motivou este arquivo (resolvido em 2026-08-15) ----------
+#
+# O teste-sentinela test_threshold_de_080_nao_dispara_em_duplicata_real vivia
+# aqui e falhava de propósito quando o threshold fosse corrigido. Foi. Os
+# testes abaixo o substituem, como o docstring dele instruía, usando a
+# validação com dado de produção que ele pedia: em 2026-08-15 o site publicou
+# duas duplicatas reais que o threshold de 0.80 deixou passar (pares Tether e
+# Dashjr abaixo, ambos dentro da mesma janela de 24h). Medido com o engine
+# TF-IDF sobre os artigos publicados (texto como o detector compara,
+# titulo + resumo + conteudo[:500]):
+#
+#   - duplicata real publicada:            0.7219 e 0.7279
+#   - mesma história, ângulos diferentes:  0.3967  (par Clarity Act)
+#   - notícias distintas:                  0.2346 a 0.2652
+#
+# A medição sintética anterior (pares imitados à mão) dava mesmo-evento em
+# 0.535-0.619; artigos gerados de verdade convergem mais em vocabulário e
+# pontuam mais alto. O threshold 0.55 cobre as duas medições com margem de
+# 0.15 sobre o pior não-duplicata real. Falso positivo aqui sobrescreve um
+# post publicado (ver test_update_sobrescreve_e_nao_mescla_conteudo), então
+# ao recalibrar, erre para cima.
 
-def test_threshold_de_080_nao_dispara_em_duplicata_real():
+# Fixtures reais: publicados em verticecripto.com.br, capturados em 2026-08-15.
+# titulo = og:title, resumo = meta description, conteudo = 500 chars do corpo.
+_TETHER_13_08 = dict(
+    titulo="Tether Conclui Auditoria Financeira com KPMG: Reforço de Confiança no Mercado Cripto",
+    resumo="Descubra os detalhes da auditoria da Tether pela KPMG e como a validação de suas reservas impacta a confiança nas stablecoins e o ecossistema cripto g...",
+    conteudo='Tether Anuncia Auditoria Financeira Histórica pela KPMG e Reforça Transparência A Tether, empresa por trás da maior stablecoin USDT , comunicou que a KPMG, uma das quatro maiores firmas de auditoria do mundo, emitiu uma opinião de auditoria sem ressalvas sobre as demonstrações financeiras de 2025 da Tether International. A companhia descreveu o processo como a "maior auditoria financeira inaugural da história", um marco significativo após anos de questionamentos sobre o lastro de seus ativos. Es',
+)
+_TETHER_14_08 = dict(
+    titulo="Auditoria KPMG da Tether Reforça Confiança no USDT e no Mercado Cripto",
+    resumo="A auditoria da KPMG na Tether reforça a confiança no USDT, impactando o mercado de criptomoedas. Entenda as implicações para o Brasil e o futuro das s...",
+    conteudo='Tether Conquista Auditoria Completa da KPMG, Reforçando Confiança no USDT A Tether, emissora da maior stablecoin do mercado, USDT , anunciou na quinta-feira que a renomada firma de auditoria Big Four, KPMG, emitiu uma opinião sem ressalvas sobre suas demonstrações financeiras de 2025. Este marco representa a "maior auditoria financeira inaugural da história", conforme a empresa, e aborda anos de questionamentos sobre a real sustentação de suas reservas. A KPMG examinou minuciosamente os ativos, ',
+)
+_DASHJR_MANHA = dict(
+    titulo="Bitcoin: Luke Dashjr Removido da Edição de Propostas de Melhoria (BIPs)",
+    resumo="A remoção de Luke Dashjr como editor de BIPs no Bitcoin levanta discussões sobre governança e o futuro das propostas de melhoria na rede. Entenda o im...",
+    conteudo="Governança do Bitcoin em Foco: Remoção de Editor de BIPs Gera Debate O desenvolvedor de Bitcoin, Luke Dashjr, foi removido de suas funções como editor de Bitcoin Improvement Proposals (BIPs), as propostas de melhoria para a rede. A decisão, que gerou controvérsia, ocorreu após desenvolvedores levantarem preocupações sobre a conduta de Dashjr em relação ao BIP 110. Este incidente sublinha a complexidade da governança descentralizada e a importância da imparcialidade no processo de evolução do pro",
+)
+_DASHJR_NOITE = dict(
+    titulo="Desenvolvedor Luke Dashjr Removido do Cargo de Editor de BIPs do Bitcoin",
+    resumo="A remoção de Luke Dashjr como editor de BIPs do Bitcoin levanta questões sobre governança e consenso na rede. Entenda o impacto da falha do BIP-110 e ...",
+    conteudo="O desenvolvedor de Bitcoin Luke Dashjr foi removido de sua posição como editor de Propostas de Melhoria do Bitcoin (BIPs), conforme votação de outros desenvolvedores e publicação no GitHub de BIPs no último domingo. A decisão ocorreu após a falha da proposta BIP-110, que visava reduzir o spam na rede, e acusações de que Dashjr teria exercido sua autoridade editorial de forma inconsistente, favorecendo a própria proposta. Este evento sublinha as complexidades da governança descentralizada e a imp",
+)
+_TESOURO_SANCOES = dict(
+    titulo="Regulação: Tesouro dos EUA Sanciona Exchanges Cripto por Lavagem para o Irã",
+    resumo="Entenda as sanções do Tesouro dos EUA contra exchanges cripto ligadas ao Irã, o impacto da regulação global e como isso se relaciona com o cenário bra...",
+    conteudo='Regulação Global: Tesouro dos EUA Sanciona Exchanges Cripto por Lavagem para o Irã O Tesouro dos Estados Unidos, por meio do Escritório de Controle de Ativos Estrangeiros (OFAC), impôs sanções a duas exchanges de criptomoedas, Shelbit Exchange e Aban Tether, no dia 7 de agosto. As plataformas são acusadas de movimentar milhões de dólares em ativos digitais para as Forças Armadas iranianas e outras entidades já sob sanção. Esta ação faz parte da campanha "Economic Fury", que visa desmantelar as r',
+)
+_CLARITY_ADIADA = dict(
+    titulo="Regulação Cripto nos EUA: Votação do Clarity Act Adiada para Setembro",
+    resumo="Entenda o contexto do Clarity Act nos EUA, as tensões políticas e como o atraso na regulação pode influenciar o mercado cripto global e as discussões ...",
+    conteudo="A votação do aguardado Clarity Act, legislação fundamental para a regulação de criptomoedas nos Estados Unidos, foi postergada para setembro. A decisão ocorre enquanto os legisladores entram em recesso, adiando o avanço de um projeto de lei que já havia sido aprovado pela Câmara dos Representantes. A medida reflete as contínuas tensões políticas em Washington, com acusações de que os democratas estariam atrasando o processo legislativo. O líder da maioria, John Thune, confirmou que a votação ser",
+)
+_CLARITY_TRAVA = dict(
+    titulo="Regulação Cripto nos EUA: Projeto de Lei Trava, Mas Agências Avançam",
+    resumo="Analise como o impasse regulatório nos EUA impacta o mercado cripto global e o que a continuidade das ações das agências significa para investidores b...",
+    conteudo="Impasse Legislativo nos EUA: Regulação Cripto Avança por Outras Vias O projeto de lei Digital Asset Market Clarity Act, que buscava estabelecer um arcabouço regulatório claro para criptoativos nos Estados Unidos, não obteve a votação necessária no Senado antes do recesso de verão. Este revés, embora significativo, não representa um fim para a esperança de políticas cripto no país, pois agências reguladoras já implementam diretrizes. A legislação visava definir a distinção entre valores mobiliári",
+)
+
+
+def _detector_de_producao(post_publicado: dict):
     """
-    O threshold DEFAULT de 0.80 está acima da faixa onde duplicata real cai,
-    então a camada não pega nada — foi o que invalidou a premissa usada para
-    escolher o SOURCE_DEDUP_THRESHOLD.
-
-    Medido com o engine TF-IDF (que é o configurado em
-    settings.DEDUPLICATION_ENGINE), comparando textos como o detector compara
-    (titulo + resumo + conteudo[:500]):
-
-      - mesmo evento, fontes diferentes: 0.535 a 0.619
-      - eventos distintos:               0.041 a 0.181
-
-    Existe uma lacuna larga e vazia entre 0.181 e 0.535: qualquer valor nela
-    separaria bem. 0.80 não está nela.
-
-    Este teste FALHA de propósito quando alguém corrigir o threshold para um
-    valor dentro da faixa útil — e é isso que se quer. Quando falhar, troque-o
-    por uma asserção de que o threshold está na lacuna.
-
-    Ressalva sobre a medição: os pares de "mesmo evento" foram construídos à
-    mão imitando o que o prompt produz, não são artigos gerados de verdade
-    (não havia credencial de LLM no ambiente). A conclusão "0.80 nunca
-    dispara" é robusta; o valor exato de substituição merece validação com
-    dado de produção — o detector já loga a similaridade máxima em nível info.
+    Detector como o news_pipeline constrói: threshold e engine dos settings,
+    engine TF-IDF REAL (não mock) — é a interação threshold × engine que estes
+    testes travam.
     """
-    assert DuplicateDetector.__init__.__defaults__[0] == 0.80, (
-        "o threshold default mudou — se foi corrigido para a faixa 0.20-0.53, "
-        "substitua este teste por uma asserção de que está na lacuna medida"
+    from app.core.config import settings
+    from app.services.deduplication.similarity_engine import TFIDFSimilarity
+
+    assert settings.DEDUPLICATION_ENGINE == "tfidf", (
+        "estes testes calibram o threshold para o engine tfidf; se o engine "
+        "de produção mudou, a calibração precisa ser refeita (ver comentário "
+        "acima das fixtures)"
     )
 
-    maior_duplicata_real_medida = 0.619
-    assert maior_duplicata_real_medida < 0.80, (
-        "com 0.80 a camada não dispara em duplicata real: falso negativo aqui "
-        "resulta em conteúdo duplicado PUBLICADO"
+    repo = MagicMock()
+    repo.get_posts_last_24h = AsyncMock(return_value=[
+        _post("post-publicado", **post_publicado)
+    ])
+    detector = DuplicateDetector(
+        repository=repo,
+        similarity_threshold=settings.DEDUPLICATION_THRESHOLD,
     )
+    detector.similarity_engine = TFIDFSimilarity()
+    return detector
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("publicado,novo", [
+    (_TETHER_13_08, _TETHER_14_08),
+    (_DASHJR_MANHA, _DASHJR_NOITE),
+])
+async def test_config_de_producao_pega_duplicata_real_publicada(publicado, novo):
+    """
+    Regressão dos dois pares de duplicata que o site publicou (Tether/KPMG em
+    13-14/08 e Luke Dashjr duas vezes em 11/08, ambos dentro da janela de
+    24h). Com threshold 0.80 os dois pontuavam ~0.72 e viravam CREATE_NEW.
+    """
+    detector = _detector_de_producao(publicado)
+
+    resultado = await detector.check_duplicate(_assignment(**novo))
+
+    assert resultado.acao == ActionType.UPDATE_EXISTING, (
+        f"duplicata real pontuou {resultado.similaridade_maxima:.4f}, abaixo "
+        f"do threshold {detector.similarity_threshold} — conteúdo duplicado "
+        f"seria PUBLICADO"
+    )
+    assert resultado.post_existente_id == "post-publicado"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("publicado,novo", [
+    (_TESOURO_SANCOES, _CLARITY_ADIADA),
+    (_TESOURO_SANCOES, _CLARITY_TRAVA),
+])
+async def test_config_de_producao_nao_marca_noticias_distintas(publicado, novo):
+    """
+    A fronteira do outro lado: notícias distintas da mesma editoria e da mesma
+    janela (pares reais, ~0.23-0.27) precisam de folga larga até o threshold,
+    porque falso positivo sobrescreve o post existente.
+    """
+    detector = _detector_de_producao(publicado)
+
+    resultado = await detector.check_duplicate(_assignment(**novo))
+
+    assert resultado.acao == ActionType.CREATE_NEW
+    assert resultado.similaridade_maxima < detector.similarity_threshold - 0.15, (
+        "par distinto chegou a menos de 0.15 do threshold — a margem contra "
+        "falso positivo (que sobrescreve post publicado) está fina demais"
+    )
+
+
+@pytest.mark.asyncio
+async def test_mesma_historia_com_angulo_proprio_vira_post_novo():
+    """
+    Decisão editorial deliberada: o par real do Clarity Act (mesma pauta, 6h
+    de diferença, ângulos diferentes — "votação adiada" vs "agências avançam")
+    pontua 0.3967 e fica ABAIXO do threshold. Cobertura em evolução gera post
+    novo; UPDATE_EXISTING é só para releitura do mesmo fato, porque sobrescreve
+    o post alvo. Se este teste falhar após recalibração, o threshold desceu
+    demais.
+    """
+    detector = _detector_de_producao(_CLARITY_ADIADA)
+
+    resultado = await detector.check_duplicate(_assignment(**_CLARITY_TRAVA))
+
+    assert resultado.acao == ActionType.CREATE_NEW
 
 
 @pytest.mark.asyncio
@@ -305,14 +415,13 @@ async def test_update_sobrescreve_e_nao_mescla_conteudo():
     na deduplicação de fontes.
 
     O detector devolve apenas o ID do post a atualizar; quem aplica é
-    ArticlePublisher.update_article, que SOBRESCREVE content_markdown e
-    content_html — sem mesclar, e sem tocar no título.
+    ArticlePublisher.update_article, que SOBRESCREVE o post inteiro (título,
+    corpo, excerpt e meta acompanham o conteúdo novo; só o slug é preservado)
+    — sem mesclar e sem guardar histórico.
 
-    Consequências de um falso positivo: o artigo publicado é destruído, a nova
-    história não ganha post próprio, e o post resultante fica com título antigo
-    e corpo novo. Por isso a correção do threshold deve errar para o lado
-    conservador, e por isso o desalinhamento título/corpo merece investigação
-    própria — ele acontece mesmo em duplicata verdadeira.
+    Consequências de um falso positivo: o artigo publicado é destruído e a
+    nova história não ganha post próprio. Por isso o threshold é calibrado
+    errando para o lado conservador (ver comentário acima das fixtures).
     """
     detector, _, _ = _detector(posts=[_post("post-existente")], score=0.95)
 

@@ -165,7 +165,18 @@ class Settings(BaseSettings):
     NEWS_MAX_WORD_COUNT: int = 1500
 
     # Deduplication
-    DEDUPLICATION_THRESHOLD: float = 0.80
+    # 0.55 calibrado para o engine tfidf em 2026-08-15, depois de duas
+    # duplicatas publicadas no site (pares Tether e Dashjr, ambos na janela de
+    # 24h do detector). Medido sobre artigos publicados reais, comparando como
+    # o detector compara (titulo + resumo + conteudo[:500]):
+    #   duplicata real 0.72-0.73 | mesma pauta com ângulo próprio 0.40 |
+    #   distintas <= 0.27.
+    # O 0.80 anterior foi calibrado para o engine de embeddings, removido dos
+    # requirements — com tfidf ele nunca disparava. Falso positivo aqui
+    # SOBRESCREVE o post existente (ArticlePublisher.update_article), então ao
+    # recalibrar erre para cima. Fronteira travada em
+    # tests/unit/test_duplicate_detector.py.
+    DEDUPLICATION_THRESHOLD: float = 0.55
     # Padrão tfidf (implementação própria, sem modelo pesado). O engine
     # "embedding" carrega ~500MB de sentence-transformers no processo web e
     # não está mais instalado — use apenas se reinstalar a dependência.
